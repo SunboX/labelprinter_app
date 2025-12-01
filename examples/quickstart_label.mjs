@@ -9,7 +9,6 @@ import {
     TextItem,
     BoxItem,
     WebUSBBackend,
-    WebSerialBackend,
     WebBluetoothBackend
 } from '../src/index.mjs'
 
@@ -17,9 +16,6 @@ async function connectBackend(mode = 'usb') {
     if (mode === 'usb') {
         // USB printer class; requires a user gesture in browsers.
         return WebUSBBackend.requestDevice({ filters: [{ classCode: 7 }] })
-    }
-    if (mode === 'serial') {
-        return WebSerialBackend.requestPort({ baudRate: 9600 })
     }
     if (mode === 'ble') {
         // Provide the BLE service/characteristic UUIDs for your device.
@@ -47,7 +43,7 @@ export async function printSample(mode = 'usb') {
     await printer.print(job)
 }
 
-// Attach to a user gesture (e.g., a button click) to satisfy WebUSB/WebSerial/WebBluetooth requirements.
+// Attach to a user gesture (e.g., a button click) to satisfy WebUSB/WebBluetooth requirements.
 if (typeof window !== 'undefined') {
     window.printSample = printSample
 }

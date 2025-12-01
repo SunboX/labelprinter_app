@@ -1,6 +1,6 @@
-### Labelprinterkit (JavaScript, WebUSB/WebSerial/WebBluetooth)
+### Labelprinterkit (JavaScript, WebUSB/WebBluetooth)
 
-Browser-ready label printing toolkit for Brother P-Touch devices. Everything is ESM (`.mjs`) and async/await friendly. Backends: WebUSB, WebSerial, and WebBluetooth (for BLE-capable models or adapters).
+Browser-ready label printing toolkit for Brother P-Touch devices. Everything is ESM (`.mjs`) and async/await friendly. Backends: WebUSB and WebBluetooth (for BLE-capable models or adapters).
 
 #### Quickstart
 
@@ -15,7 +15,6 @@ import {
     TextItem,
     BoxItem,
     WebUSBBackend,
-    WebSerialBackend,
     WebBluetoothBackend
 } from './src/index.mjs'
 
@@ -23,9 +22,6 @@ async function connectBackend(mode = 'usb') {
     if (mode === 'usb') {
         // USB printer class (07h). Must be triggered by a user gesture.
         return WebUSBBackend.requestDevice({ filters: [{ classCode: 7 }] })
-    }
-    if (mode === 'serial') {
-        return WebSerialBackend.requestPort({ baudRate: 9600 })
     }
     if (mode === 'ble') {
         // Provide the BLE service/characteristic UUIDs for your device.
@@ -40,7 +36,7 @@ async function connectBackend(mode = 'usb') {
 }
 
 async function printSample() {
-    const backend = await connectBackend('usb') // or "serial" or "ble"
+    const backend = await connectBackend('usb') // or "ble"
 
     const rowA = new BoxItem(45, [new TextItem(45, 'First line', '28px sans-serif')])
     const rowB = new BoxItem(25, [new TextItem(25, 'Second line', '22px sans-serif')])
@@ -66,7 +62,7 @@ PORT=3000 npm start
 # then open http://localhost:3000/examples/complex_label_with_frontend/
 ```
 
-The Express server (`examples/server.mjs`) serves the repo as static files; the editor is under `/examples/complex_label_with_frontend/`. Use a Chromium-based browser with WebUSB/WebSerial/WebBluetooth enabled. When using BLE, populate the UUID fields in the UI for your device. Printing still requires a user gesture (click) to grant device access. You can also set a custom media length (mm) in the UI; it converts to dots using the selected resolution’s Y DPI and enforces the protocol minimums.
+The Express server (`examples/server.mjs`) serves the repo as static files; the editor is under `/examples/complex_label_with_frontend/`. Use a Chromium-based browser with WebUSB/WebBluetooth enabled. When using BLE, populate the UUID fields in the UI for your device. Printing still requires a user gesture (click) to grant device access. You can also set a custom media length (mm) in the UI; it converts to dots using the selected resolution’s Y DPI and enforces the protocol minimums.
 
 #### API highlights
 
@@ -75,11 +71,10 @@ The Express server (`examples/server.mjs`) serves the repo as static files; the 
 -   Printers (from `src/printers.mjs`): Implements the Brother raster protocol with PackBits compression.
 -   Backends:
     -   `WebUSBBackend` for USB printer class devices.
-    -   `WebSerialBackend` for Web Serial–accessible adapters (e.g., Bluetooth SPP dongles exposing serial).
     -   `WebBluetoothBackend` for BLE devices when you supply the service/characteristic UUIDs and enable notifications.
 
 #### Notes
 
--   WebUSB/WebSerial/WebBluetooth all require a secure context (https or localhost) and a user gesture to request devices/ports.
+-   WebUSB/WebBluetooth require a secure context (https or localhost) and a user gesture to request devices/ports.
 -   Fonts come from whatever your page loads; adjust the CSS font stack you pass into `TextItem`.
 -   If you need to debug output, use `bitmapToImageData` from `src/page.mjs` to visualize the raster data in a canvas.

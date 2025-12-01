@@ -10,7 +10,6 @@ import {
     E550W,
     H500,
     WebUSBBackend,
-    WebSerialBackend,
     WebBluetoothBackend
 } from '../../src/index.mjs'
 
@@ -357,9 +356,6 @@ async function connectBackend() {
     const mode = state.backend
     if (mode === 'usb') {
         return WebUSBBackend.requestDevice({ filters: [{ classCode: 7 }] })
-    }
-    if (mode === 'serial') {
-        return WebSerialBackend.requestPort({ baudRate: 9600 })
     }
     if (mode === 'ble') {
         return WebBluetoothBackend.requestDevice({
