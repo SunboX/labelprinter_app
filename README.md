@@ -62,11 +62,11 @@ For a richer layout with a QR code, see `examples/complex_label_with_qrcode.mjs`
 
 ```bash
 npm install
-PORT=3001 npm start
-# then open http://localhost:3001/examples/
+PORT=3000 npm start
+# then open http://localhost:3000/examples/complex_label_with_frontend/
 ```
 
-The Express server (`examples/server.mjs`) serves the repo as static files; the editor is under `/examples/`. Use a Chromium-based browser with WebUSB/WebSerial/WebBluetooth enabled. When using BLE, populate the UUID fields in the UI for your device. Printing still requires a user gesture (click) to grant device access. You can also set a custom media length (mm) in the UI; it converts to dots using the selected resolution’s Y DPI and enforces the protocol minimums.
+The Express server (`examples/server.mjs`) serves the repo as static files; the editor is under `/examples/complex_label_with_frontend/`. Use a Chromium-based browser with WebUSB/WebSerial/WebBluetooth enabled. When using BLE, populate the UUID fields in the UI for your device. Printing still requires a user gesture (click) to grant device access. You can also set a custom media length (mm) in the UI; it converts to dots using the selected resolution’s Y DPI and enforces the protocol minimums.
 
 #### API highlights
 

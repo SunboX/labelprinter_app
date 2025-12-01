@@ -12,7 +12,7 @@ import {
     WebUSBBackend,
     WebSerialBackend,
     WebBluetoothBackend
-} from '../src/index.mjs'
+} from '../../src/index.mjs'
 
 const els = {
     items: document.querySelector('[data-items]'),
