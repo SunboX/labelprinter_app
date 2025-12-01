@@ -4,16 +4,16 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const app = express()
-const port = Number(process.env.PORT) || 3001
+const port = Number(process.env.PORT) || 3000
 
 app.use(express.static(join(__dirname, '..')))
 
 app.get('/', (_req, res) => {
-    res.redirect('/examples/')
+    res.redirect('/examples/complex_label_with_frontend/')
 })
 
 const server = app.listen(port, () => {
-    console.log(`Labelprinterkit demo running at http://localhost:${port}/examples/`)
+    console.log(`Labelprinterkit demo running at http://localhost:${port}/examples/complex_label_with_frontend/`)
 })
 
 server.on('error', (err) => {
