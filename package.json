@@ -1,0 +1,12 @@
+{
+  "name": "labelprinterkit-web",
+  "version": "1.0.0",
+  "description": "Browser-ready label printer toolkit demo (WebUSB/WebSerial/WebBluetooth) with editor UI",
+  "type": "module",
+  "scripts": {
+    "start": "node examples/server.mjs"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
