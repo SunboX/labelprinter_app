@@ -21,6 +21,7 @@ const els = {
     status: document.querySelector('[data-status]'),
     mode: document.querySelector('[data-mode]'),
     media: document.querySelector('[data-media]'),
+    orientation: document.querySelector('[data-orientation]'),
     resolution: document.querySelector('[data-resolution]'),
     mediaLength: document.querySelector('[data-media-length]'),
     printer: document.querySelector('[data-printer]'),
@@ -39,9 +40,10 @@ let idCounter = 1
 const nextId = () => `item-${idCounter++}`
 
 const defaultState = {
-    media: 'W24',
+    media: 'W9',
     mediaLengthMm: null,
     resolution: 'LOW',
+    orientation: 'horizontal',
     backend: 'usb',
     printer: 'P700',
     ble: {
@@ -50,12 +52,7 @@ const defaultState = {
         notifyCharacteristicUuid: '0000zzzz-0000-1000-8000-00805f9b34fb',
         namePrefix: 'PT-'
     },
-    items: [
-        { id: nextId(), type: 'text', text: 'Network Port', fontFamily: 'Inter', fontSize: 32, height: 46, xOffset: 4 },
-        { id: nextId(), type: 'text', text: 'Room: 1.23', fontFamily: 'Inter', fontSize: 22, height: 28, xOffset: 4 },
-        { id: nextId(), type: 'text', text: 'Jack: A12', fontFamily: 'monospace', fontSize: 22, height: 28, xOffset: 4 },
-        { id: nextId(), type: 'qr', data: 'https://example.com/device/port-24', size: 180, height: 190, xOffset: 4 }
-    ]
+    items: [{ id: nextId(), type: 'text', text: 'Network Port', fontFamily: 'Inter', fontSize: 32, height: 46, xOffset: 4, yOffset: 0 }]
 }
 
 let state = JSON.parse(JSON.stringify(defaultState))
@@ -87,6 +84,7 @@ function populateSelects() {
     if (state.mediaLengthMm) {
         els.mediaLength.value = state.mediaLengthMm
     }
+    els.orientation.value = state.orientation
 }
 
 function slider(label, value, min, max, step = 1, onInput) {
@@ -112,6 +110,7 @@ function slider(label, value, min, max, step = 1, onInput) {
 
 function renderItemsList() {
     els.items.innerHTML = ''
+    const sizeLabel = state.orientation === 'horizontal' ? 'Length' : 'Height'
     state.items.forEach((item, index) => {
         const card = document.createElement('div')
         card.className = 'item-card'
@@ -151,17 +150,25 @@ function renderItemsList() {
         const controls = document.createElement('div')
         controls.className = 'controls'
 
-        const heightCtrl = slider('Height', item.height, 20, 280, 1, (v) => {
-            item.height = v
-            renderPreview()
-        })
-        controls.appendChild(heightCtrl)
+        if (item.type !== 'text') {
+            const heightCtrl = slider(sizeLabel, item.height, 20, 280, 1, (v) => {
+                item.height = v
+                renderPreview()
+            })
+            controls.appendChild(heightCtrl)
+        }
 
         const offsetCtrl = slider('X offset', item.xOffset ?? 0, 0, 50, 1, (v) => {
             item.xOffset = v
             renderPreview()
         })
         controls.appendChild(offsetCtrl)
+
+        const yOffsetCtrl = slider('Y offset', item.yOffset ?? 0, -50, 50, 1, (v) => {
+            item.yOffset = v
+            renderPreview()
+        })
+        controls.appendChild(yOffsetCtrl)
 
         if (item.type === 'text') {
             const fontCtrl = document.createElement('div')
@@ -274,42 +281,146 @@ async function buildQrCanvas(data, size) {
     return canvas
 }
 
+function measureText(ctx, text, size, family) {
+    ctx.font = `${size}px ${family}`
+    const metrics = ctx.measureText(text || '')
+    const ascent = metrics.actualBoundingBoxAscent || size
+    const descent = metrics.actualBoundingBoxDescent || 0
+    const width = Math.ceil(metrics.width)
+    const height = Math.ceil(ascent + descent)
+    return { width, height, ascent, descent }
+}
+
+function resolveTextMetrics(text, family, requestedSize, maxHeight, ctx) {
+    const limit = Math.max(4, maxHeight)
+    let size = Math.min(Math.max(4, requestedSize), limit * 3) // allow overshoot; shrink only if needed
+    let { width, height } = measureText(ctx, text, size, family)
+    while (height > limit && size > 4) {
+        size -= 1
+        ;({ width, height } = measureText(ctx, text, size, family))
+    }
+    const { ascent, descent } = measureText(ctx, text, size, family)
+    return { size, width, height: Math.min(height, limit), ascent, descent }
+}
+
+function rotateForPrint(canvas) {
+    const rotated = document.createElement('canvas')
+    rotated.width = canvas.height
+    rotated.height = canvas.width
+    const ctx = rotated.getContext('2d')
+    // Rotate so the canvas height matches the print head width expected by Label/Job.
+    ctx.translate(rotated.width, 0)
+    ctx.rotate(Math.PI / 2)
+    ctx.drawImage(canvas, 0, 0)
+    return rotated
+}
+
 async function buildCanvasFromState() {
     const media = Media[state.media] || Media.W24
-    const width = media.printArea || 128
-    const totalHeight = state.items.reduce((sum, item) => sum + item.height, 0)
+    const printWidth = media.printArea || 128
+    const marginStart = media.lmargin || 0
+    const marginEnd = media.rmargin || 0
     const res = Resolution[state.resolution] || Resolution.LOW
-    const minHeight = res.minLength
-    const forcedHeightDots = state.mediaLengthMm
-        ? Math.max(minHeight, Math.round((state.mediaLengthMm / 25.4) * res.dots[1]))
-        : null
-    const height = forcedHeightDots ? Math.max(forcedHeightDots, totalHeight) : Math.max(totalHeight, minHeight)
-    const canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
-    const ctx = canvas.getContext('2d')
-    ctx.fillStyle = '#fff'
-    ctx.fillRect(0, 0, width, height)
-    ctx.fillStyle = '#000'
+    const dotScale = (res?.dots?.[1] || 180) / 96 // interpret font sizes as CSS px and scale to printer dots
+    const isHorizontal = state.orientation === 'horizontal'
+    const maxFontDots = Math.max(8, printWidth)
 
-    let y = 0
+    const measureCtx = document.createElement('canvas').getContext('2d')
+    const blocks = []
     for (const item of state.items) {
         if (item.type === 'text') {
-            ctx.font = `${item.fontSize}px ${item.fontFamily || 'sans-serif'}`
-            ctx.textBaseline = 'middle'
-            ctx.fillText(item.text || '', item.xOffset || 0, y + item.height / 2)
-        } else {
-            if (!item._qrCache || item._qrCacheKey !== `${item.data}-${item.size}`) {
-                item._qrCache = await buildQrCanvas(item.data, item.size)
-                item._qrCacheKey = `${item.data}-${item.size}`
-            }
-            const qrY = y + Math.max(0, (item.height - item.size) / 2)
-            ctx.drawImage(item._qrCache, item.xOffset || 0, qrY, item.size, item.size)
+            const family = item.fontFamily || 'sans-serif'
+            const requestedSizeDots = Math.round((item.fontSize || 16) * dotScale)
+            const { size: fontSizeDots, width: textWidth, height: textHeight, ascent, descent } = resolveTextMetrics(
+                item.text || '',
+                family,
+                requestedSizeDots,
+                maxFontDots,
+                measureCtx
+            )
+            const span = isHorizontal
+                ? Math.max(textWidth + (item.xOffset || 0) + 8, textHeight)
+                : Math.max(textHeight + Math.abs(item.yOffset || 0) * 2 + 4, textHeight)
+            blocks.push({ ref: item, span, fontSizeDots, textHeight, textWidth, family, ascent, descent })
+            continue
         }
-        y += item.height
+
+        if (!item._qrCache || item._qrCacheKey !== `${item.data}-${item.size}`) {
+            item._qrCache = await buildQrCanvas(item.data, item.size)
+            item._qrCacheKey = `${item.data}-${item.size}`
+        }
+        const span = Math.max(item.height, item.size)
+        blocks.push({ ref: item, span, qrSize: item.size })
     }
 
-    return { canvas, width, height }
+    const totalLength = blocks.reduce((sum, block) => sum + block.span, 0)
+    const minLength = res.minLength
+    const forcedLengthDots = state.mediaLengthMm
+        ? Math.max(minLength, Math.round((state.mediaLengthMm / 25.4) * res.dots[1]))
+        : null
+    const length = forcedLengthDots ? Math.max(forcedLengthDots, totalLength) : Math.max(totalLength, minLength)
+    const canvas = document.createElement('canvas')
+    canvas.width = isHorizontal ? length : printWidth
+    canvas.height = isHorizontal ? printWidth : length
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = '#000'
+
+    if (isHorizontal) {
+        let x = 0
+        for (const { ref: item, span, fontSizeDots, family, ascent, descent } of blocks) {
+            const yAdjust = item.yOffset || 0
+            if (item.type === 'text') {
+                const resolvedSize = fontSizeDots || Math.min(Math.max(8, Math.round((item.fontSize || 16) * dotScale)), maxFontDots)
+                ctx.font = `${resolvedSize}px ${family || item.fontFamily || 'sans-serif'}`
+                ctx.textBaseline = 'alphabetic'
+                const a = ascent || resolvedSize
+                const d = descent || 0
+                const blockH = a + d
+                const baselineY = (canvas.height - blockH) / 2 + a + yAdjust
+                ctx.fillText(item.text || '', (item.xOffset || 0) + x, baselineY)
+            } else {
+                const qrY = Math.max(0, (canvas.height - item.size) / 2 + yAdjust)
+                ctx.drawImage(item._qrCache, (item.xOffset || 0) + x, qrY, item.size, item.size)
+            }
+            x += span
+        }
+    } else {
+        let y = 0
+        for (const { ref: item, span, fontSizeDots, family, ascent, descent } of blocks) {
+            const yAdjust = item.yOffset || 0
+            if (item.type === 'text') {
+                const resolvedSize = fontSizeDots || Math.min(Math.max(8, Math.round((item.fontSize || 16) * dotScale)), maxFontDots)
+                ctx.font = `${resolvedSize}px ${family || item.fontFamily || 'sans-serif'}`
+                ctx.textBaseline = 'alphabetic'
+                const a = ascent || resolvedSize
+                const d = descent || 0
+                const blockH = a + d
+                const baselineY = y + (span - blockH) / 2 + a + yAdjust
+                ctx.fillText(item.text || '', item.xOffset || 0, baselineY)
+            } else {
+                const qrY = y + Math.max(0, (span - item.size) / 2 + yAdjust)
+                ctx.drawImage(item._qrCache, item.xOffset || 0, qrY, item.size, item.size)
+            }
+            y += span
+        }
+    }
+
+    // Preview shows only the printable area; margins are hinted in renderPreview.
+    const preview = canvas
+    const printCanvas = isHorizontal ? canvas : rotateForPrint(canvas)
+    return {
+        preview,
+        printCanvas,
+        width: preview.width,
+        height: preview.height,
+        res,
+        printWidth,
+        marginStart,
+        marginEnd,
+        isHorizontal
+    }
 }
 
 let previewBusy = false
@@ -322,13 +433,41 @@ async function renderPreview() {
     previewBusy = true
     previewQueued = false
     try {
-        const { canvas, width, height } = await buildCanvasFromState()
+        const { preview, width, height, res, printWidth, marginStart, marginEnd, isHorizontal } =
+            await buildCanvasFromState()
         const ctx = els.preview.getContext('2d')
         els.preview.width = width
         els.preview.height = height
+        const physicalScale = 96 / (res?.dots?.[0] || 180)
+        const uiZoom = 1.3 // slight zoom for readability
+        const cssScale = physicalScale * uiZoom
+        els.preview.style.width = `${Math.max(width * cssScale, 1)}px`
+        els.preview.style.height = `${Math.max(height * cssScale, 1)}px`
         ctx.clearRect(0, 0, width, height)
-        ctx.drawImage(canvas, 0, 0)
-        els.dimensions.textContent = `${state.media} • ${width} dots wide • ${height} dots tall`
+        ctx.drawImage(preview, 0, 0)
+        // Light margin hints that don't dominate the preview.
+        const bandSize = (m) => (m ? 3 : 0)
+        if (marginStart || marginEnd) {
+            ctx.save()
+            ctx.globalAlpha = 0.12
+            ctx.fillStyle = '#94a3b8'
+            if (isHorizontal) {
+                const top = bandSize(marginStart)
+                const bottom = bandSize(marginEnd)
+                if (top > 0) ctx.fillRect(0, 0, width, top)
+                if (bottom > 0) ctx.fillRect(0, height - bottom, width, bottom)
+            } else {
+                const left = bandSize(marginStart)
+                const right = bandSize(marginEnd)
+                if (left > 0) ctx.fillRect(0, 0, left, height)
+                if (right > 0) ctx.fillRect(width - right, 0, right, height)
+            }
+            ctx.restore()
+        }
+        const orientationLabel = state.orientation === 'horizontal' ? 'horizontal' : 'vertical'
+        const printableLabel = `${printWidth} dot printable`
+        const marginLabel = marginStart || marginEnd ? `• margins ${marginStart}/${marginEnd} dots` : ''
+        els.dimensions.textContent = `${state.media} • ${printableLabel} ${marginLabel} • ${orientationLabel}`
     } catch (err) {
         console.error(err)
         setStatus('Preview failed. Check your inputs.', 'error')
@@ -372,9 +511,9 @@ async function doPrint() {
     setStatus('Rendering label...', 'info')
     els.print.disabled = true
     try {
-        const { canvas } = await buildCanvasFromState()
+        const { printCanvas } = await buildCanvasFromState()
         const res = Resolution[state.resolution] || Resolution.LOW
-        const label = new Label(res, canvas)
+        const label = new Label(res, printCanvas)
         const job = new Job(Media[state.media] || Media.W24)
         job.addPage(label)
 
@@ -400,6 +539,11 @@ function bindEvents() {
     els.mode.addEventListener('change', () => {
         state.backend = els.mode.value
         toggleBleFields()
+    })
+    els.orientation.addEventListener('change', () => {
+        state.orientation = els.orientation.value
+        renderItemsList()
+        renderPreview()
     })
     els.media.addEventListener('change', () => {
         state.media = els.media.value

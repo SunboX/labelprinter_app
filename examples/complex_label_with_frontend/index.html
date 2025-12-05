@@ -27,6 +27,14 @@
             </div>
           </div>
           <div class="field">
+            <label class="section-label">Orientation</label>
+            <select data-orientation>
+              <option value="vertical">Vertical (long edge down)</option>
+              <option value="horizontal">Horizontal (long edge right)</option>
+            </select>
+            <p class="muted small">Horizontal keeps text upright but lays the label out along the long edge.</p>
+          </div>
+          <div class="field">
             <label class="section-label">Media length (mm)</label>
             <input type="number" data-media-length min="30" max="1000" step="1" placeholder="Auto from items (leave blank)" />
             <p class="muted small">Optional. If provided, it sets the printable height in mm (converted to dots using the selected resolution’s Y DPI). Otherwise the label height follows your items (respecting min length).</p>
