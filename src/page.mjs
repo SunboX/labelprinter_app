@@ -21,7 +21,8 @@ export function imageDataToBitmap(imageData) {
 
             // Use luminance to decide whether a pixel is black enough to print.
             const luminance = (0.299 * r + 0.587 * g + 0.114 * b) * (a / 255)
-            const isBlack = luminance < 128
+            // Push semi-transparent antialiased edges to solid black for crisper print output.
+            const isBlack = luminance < 200
 
             // Match the raster pipeline: rotate 90 deg clockwise, flip vertically, then invert.
             // After inverting, black pixels become "1" bits in the bitmap we send to the printer.

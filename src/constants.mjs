@@ -2,8 +2,9 @@
 // The structures mirror the original enums and NamedTuple values.
 
 export const Resolution = Object.freeze({
-    LOW: { id: 'LOW', dots: [180, 180], minLength: 31, margin: new Uint8Array([0x0e, 0x00]) },
-    HIGH: { id: 'HIGH', dots: [180, 320], minLength: 62, margin: new Uint8Array([0x1c, 0x00]) }
+    // Keep lead/trail feed minimal but leave a tiny buffer so the first printed dots aren't clipped.
+    LOW: { id: 'LOW', dots: [180, 180], minLength: 31, margin: new Uint8Array([0x02, 0x00]) },
+    HIGH: { id: 'HIGH', dots: [180, 320], minLength: 62, margin: new Uint8Array([0x04, 0x00]) }
 })
 
 export const VariousModesSettings = Object.freeze({
@@ -103,15 +104,24 @@ export const TextColor = Object.freeze({
 })
 
 const buildMedia = () => {
+    const headDots = 128 // print head height at 180dpi for these models
+
+    const makeMedia = (id, widthMm, mediaType) => {
+        const dots = Math.min(headDots, Math.round((widthMm / 25.4) * Resolution.LOW.dots[0]))
+        const lmargin = Math.max(0, Math.floor((headDots - dots) / 2))
+        const rmargin = headDots - dots - lmargin
+        return { id, width: widthMm, length: 0, lmargin, printArea: dots, rmargin, mediaType }
+    }
+
     const media = {
         UNSUPPORTED_MEDIA: { id: 'UNSUPPORTED_MEDIA', width: 0, length: 0, lmargin: null, printArea: null, rmargin: null, mediaType: null },
         NO_MEDIA: { id: 'NO_MEDIA', width: 0, length: 0, lmargin: null, printArea: null, rmargin: null, mediaType: null },
-        W3_5: { id: 'W3_5', width: 4, length: 0, lmargin: 52, printArea: 24, rmargin: 52, mediaType: MediaType.LAMINATED_TAPE },
-        W6: { id: 'W6', width: 6, length: 0, lmargin: 48, printArea: 32, rmargin: 48, mediaType: MediaType.LAMINATED_TAPE },
-        W9: { id: 'W9', width: 9, length: 0, lmargin: 39, printArea: 50, rmargin: 39, mediaType: MediaType.LAMINATED_TAPE },
-        W12: { id: 'W12', width: 12, length: 0, lmargin: 29, printArea: 70, rmargin: 29, mediaType: MediaType.LAMINATED_TAPE },
-        W18: { id: 'W18', width: 18, length: 0, lmargin: 8, printArea: 112, rmargin: 8, mediaType: MediaType.LAMINATED_TAPE },
-        W24: { id: 'W24', width: 24, length: 0, lmargin: 0, printArea: 128, rmargin: 0, mediaType: MediaType.LAMINATED_TAPE }
+        W3_5: makeMedia('W3_5', 4, MediaType.LAMINATED_TAPE),
+        W6: makeMedia('W6', 6, MediaType.LAMINATED_TAPE),
+        W9: makeMedia('W9', 9, MediaType.LAMINATED_TAPE),
+        W12: makeMedia('W12', 12, MediaType.LAMINATED_TAPE),
+        W18: makeMedia('W18', 18, MediaType.LAMINATED_TAPE),
+        W24: makeMedia('W24', 24, MediaType.LAMINATED_TAPE)
     }
 
     const byKey = Object.freeze(media)

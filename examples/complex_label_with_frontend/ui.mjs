@@ -317,15 +317,17 @@ function rotateForPrint(canvas) {
 
 async function buildCanvasFromState() {
     const media = Media[state.media] || Media.W24
+    const res = Resolution[state.resolution] || Resolution.LOW
     const printWidth = media.printArea || 128
     const marginStart = media.lmargin || 0
     const marginEnd = media.rmargin || 0
-    const res = Resolution[state.resolution] || Resolution.LOW
     const dotScale = (res?.dots?.[1] || 180) / 96 // interpret font sizes as CSS px and scale to printer dots
     const isHorizontal = state.orientation === 'horizontal'
     const maxFontDots = Math.max(8, printWidth)
 
     const measureCtx = document.createElement('canvas').getContext('2d')
+    const feedPadStart = 2 // dots of leading whitespace so print matches preview
+    const feedPadEnd = 8 // trailing whitespace
     const blocks = []
     for (const item of state.items) {
         if (item.type === 'text') {
@@ -339,7 +341,7 @@ async function buildCanvasFromState() {
                 measureCtx
             )
             const span = isHorizontal
-                ? Math.max(textWidth + (item.xOffset || 0) + 8, textHeight)
+                ? Math.max(textWidth + (item.xOffset || 0), textHeight)
                 : Math.max(textHeight + Math.abs(item.yOffset || 0) * 2 + 4, textHeight)
             blocks.push({ ref: item, span, fontSizeDots, textHeight, textWidth, family, ascent, descent })
             continue
@@ -353,7 +355,7 @@ async function buildCanvasFromState() {
         blocks.push({ ref: item, span, qrSize: item.size })
     }
 
-    const totalLength = blocks.reduce((sum, block) => sum + block.span, 0)
+    const totalLength = feedPadStart + blocks.reduce((sum, block) => sum + block.span, 0) + feedPadEnd
     const minLength = res.minLength
     const forcedLengthDots = state.mediaLengthMm
         ? Math.max(minLength, Math.round((state.mediaLengthMm / 25.4) * res.dots[1]))
@@ -368,7 +370,7 @@ async function buildCanvasFromState() {
     ctx.fillStyle = '#000'
 
     if (isHorizontal) {
-        let x = 0
+        let x = feedPadStart
         for (const { ref: item, span, fontSizeDots, family, ascent, descent } of blocks) {
             const yAdjust = item.yOffset || 0
             if (item.type === 'text') {
@@ -387,7 +389,7 @@ async function buildCanvasFromState() {
             x += span
         }
     } else {
-        let y = 0
+        let y = feedPadStart
         for (const { ref: item, span, fontSizeDots, family, ascent, descent } of blocks) {
             const yAdjust = item.yOffset || 0
             if (item.type === 'text') {
@@ -410,6 +412,7 @@ async function buildCanvasFromState() {
     // Preview shows only the printable area; margins are hinted in renderPreview.
     const preview = canvas
     const printCanvas = isHorizontal ? canvas : rotateForPrint(canvas)
+    const effectiveMedia = { ...media, printArea: printWidth, lmargin: marginStart, rmargin: marginEnd }
     return {
         preview,
         printCanvas,
@@ -419,7 +422,8 @@ async function buildCanvasFromState() {
         printWidth,
         marginStart,
         marginEnd,
-        isHorizontal
+        isHorizontal,
+        media: effectiveMedia
     }
 }
 
@@ -439,31 +443,12 @@ async function renderPreview() {
         els.preview.width = width
         els.preview.height = height
         const physicalScale = 96 / (res?.dots?.[0] || 180)
-        const uiZoom = 1.3 // slight zoom for readability
+        const uiZoom = 1.3 // zoom the preview for easier viewing
         const cssScale = physicalScale * uiZoom
         els.preview.style.width = `${Math.max(width * cssScale, 1)}px`
         els.preview.style.height = `${Math.max(height * cssScale, 1)}px`
         ctx.clearRect(0, 0, width, height)
         ctx.drawImage(preview, 0, 0)
-        // Light margin hints that don't dominate the preview.
-        const bandSize = (m) => (m ? 3 : 0)
-        if (marginStart || marginEnd) {
-            ctx.save()
-            ctx.globalAlpha = 0.12
-            ctx.fillStyle = '#94a3b8'
-            if (isHorizontal) {
-                const top = bandSize(marginStart)
-                const bottom = bandSize(marginEnd)
-                if (top > 0) ctx.fillRect(0, 0, width, top)
-                if (bottom > 0) ctx.fillRect(0, height - bottom, width, bottom)
-            } else {
-                const left = bandSize(marginStart)
-                const right = bandSize(marginEnd)
-                if (left > 0) ctx.fillRect(0, 0, left, height)
-                if (right > 0) ctx.fillRect(width - right, 0, right, height)
-            }
-            ctx.restore()
-        }
         const orientationLabel = state.orientation === 'horizontal' ? 'horizontal' : 'vertical'
         const printableLabel = `${printWidth} dot printable`
         const marginLabel = marginStart || marginEnd ? `• margins ${marginStart}/${marginEnd} dots` : ''
@@ -511,10 +496,9 @@ async function doPrint() {
     setStatus('Rendering label...', 'info')
     els.print.disabled = true
     try {
-        const { printCanvas } = await buildCanvasFromState()
-        const res = Resolution[state.resolution] || Resolution.LOW
+        const { printCanvas, media, res } = await buildCanvasFromState()
         const label = new Label(res, printCanvas)
-        const job = new Job(Media[state.media] || Media.W24)
+        const job = new Job(media || Media[state.media] || Media.W24)
         job.addPage(label)
 
         setStatus(`Requesting ${state.backend.toUpperCase()} device...`, 'info')
