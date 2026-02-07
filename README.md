@@ -23,6 +23,12 @@ The printer protocol and backend implementation are consumed from:
 - The app validates uploaded JSON and highlights parse or row-level issues.
 - Printing asks for confirmation before large runs (>10 labels).
 
+## Localization
+
+- Translation bundles live in `src/i18n/en.json` and `src/i18n/de.json`.
+- Runtime localization is handled by `src/I18n.mjs`.
+- Switch language from the top toolbar locale selector (`English` / `Deutsch`).
+
 ## Dependency
 
 `labelprinterkit` is installed via Git SSH in `package.json`:

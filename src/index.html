@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Labelprinter App</title>
+        <title data-i18n="app.title">Labelprinter App</title>
         <link rel="icon" type="image/svg+xml" href="./assets/labelprinter-icon.svg" />
         <link rel="stylesheet" href="./style.css" />
     </head>
@@ -13,14 +13,28 @@
             <div class="brand">
                 <img class="brand-mark" src="./assets/labelprinter-icon.svg" alt="Labelprinter App icon" />
                 <div class="brand-text">
-                    <div class="brand-name">Labelprinter App</div>
+                    <div class="brand-name" data-i18n="app.title">Labelprinter App</div>
                 </div>
             </div>
                 <div class="toolbar">
+                    <div class="toolbar-group locale-group">
+                        <label class="visually-hidden" for="locale-select" data-i18n="app.languageLabel">Language</label>
+                        <select id="locale-select" data-locale-select aria-label="Language" data-i18n-aria-label="app.languageLabel">
+                            <option value="en" data-i18n="locale.en">English</option>
+                            <option value="de" data-i18n="locale.de">Deutsch</option>
+                        </select>
+                    </div>
                     <div class="toolbar-group">
-                        <button class="ghost" data-save-project>Save</button>
-                        <button class="ghost" data-load-project>Load</button>
-                        <button class="ghost icon-button" data-share-project aria-label="Share project URL" title="Share project URL">
+                        <button class="ghost" data-save-project data-i18n="toolbar.save">Save</button>
+                        <button class="ghost" data-load-project data-i18n="toolbar.load">Load</button>
+                        <button
+                            class="ghost icon-button"
+                            data-share-project
+                            aria-label="Share project URL"
+                            title="Share project URL"
+                            data-i18n-aria-label="toolbar.shareAria"
+                            data-i18n-title="toolbar.shareTitle"
+                        >
                             <svg class="icon-share" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                                 <path d="M15 6l-6 3"></path>
                                 <path d="M15 18l-6-3"></path>
@@ -32,7 +46,7 @@
                         <input type="file" accept="application/json" data-load-input hidden />
                     </div>
                     <div class="toolbar-group">
-                        <button class="primary" data-print>Print</button>
+                        <button class="primary" data-print data-i18n="toolbar.print">Print</button>
                     </div>
                 </div>
         </header>
@@ -40,16 +54,16 @@
         <div class="main-grid">
             <aside class="sidebar rail">
                 <div class="section">
-                    <div class="section-title">Printer</div>
+                    <div class="section-title" data-i18n="sidebar.printer.title">Printer</div>
                     <div class="field">
-                        <label>Backend</label>
+                        <label data-i18n="sidebar.printer.backend">Backend</label>
                         <select data-mode>
-                            <option value="usb">WebUSB (USB printer class)</option>
-                            <option value="ble">WebBluetooth (BLE)</option>
+                            <option value="usb" data-i18n="sidebar.printer.backendUsb">WebUSB (USB printer class)</option>
+                            <option value="ble" data-i18n="sidebar.printer.backendBle">WebBluetooth (BLE)</option>
                         </select>
                     </div>
                     <div class="field">
-                        <label>Printer model</label>
+                        <label data-i18n="sidebar.printer.model">Printer model</label>
                         <select data-printer>
                             <option value="P700">P700</option>
                             <option value="P750W">P750W</option>
@@ -61,26 +75,26 @@
                 </div>
 
                 <div class="section">
-                    <div class="section-title">Media</div>
+                    <div class="section-title" data-i18n="sidebar.media.title">Media</div>
                     <div class="field">
-                        <label>Width</label>
+                        <label data-i18n="sidebar.media.width">Width</label>
                         <select data-media></select>
                     </div>
                     <div class="field split">
                         <div>
-                            <label>Resolution</label>
+                            <label data-i18n="sidebar.media.resolution">Resolution</label>
                             <select data-resolution></select>
                         </div>
                         <div>
-                            <label>Orientation</label>
+                            <label data-i18n="sidebar.media.orientation">Orientation</label>
                             <select data-orientation>
-                                <option value="horizontal">Horizontal</option>
-                                <option value="vertical">Vertical</option>
+                                <option value="horizontal" data-i18n="orientation.horizontal">Horizontal</option>
+                                <option value="vertical" data-i18n="orientation.vertical">Vertical</option>
                             </select>
                         </div>
                     </div>
                     <div class="field">
-                        <label>Media length (mm)</label>
+                        <label data-i18n="sidebar.media.length">Media length (mm)</label>
                         <input
                             type="number"
                             data-media-length
@@ -88,32 +102,33 @@
                             max="1000"
                             step="1"
                             placeholder="Auto from items (leave blank)"
+                            data-i18n-placeholder="sidebar.media.lengthPlaceholder"
                         />
-                        <p class="muted small">Override height; keep blank to match your stacked objects.</p>
+                        <p class="muted small" data-i18n="sidebar.media.lengthHint">Override height; keep blank to match your stacked objects.</p>
                     </div>
                 </div>
 
                 <div class="section">
-                    <div class="section-title">BLE</div>
+                    <div class="section-title" data-i18n="sidebar.ble.title">BLE</div>
                     <div class="ble-fields" hidden>
                         <div class="field split">
-                            <input data-ble-service placeholder="Service UUID" />
-                            <input data-ble-write placeholder="Write characteristic UUID" />
+                            <input data-ble-service placeholder="Service UUID" data-i18n-placeholder="sidebar.ble.servicePlaceholder" />
+                            <input data-ble-write placeholder="Write characteristic UUID" data-i18n-placeholder="sidebar.ble.writePlaceholder" />
                         </div>
                         <div class="field">
-                            <input data-ble-notify placeholder="Notify characteristic UUID (optional)" />
+                            <input data-ble-notify placeholder="Notify characteristic UUID (optional)" data-i18n-placeholder="sidebar.ble.notifyPlaceholder" />
                         </div>
                         <div class="field">
-                            <input data-ble-filter placeholder="Name prefix (optional, e.g. PT-)" />
+                            <input data-ble-filter placeholder="Name prefix (optional, e.g. PT-)" data-i18n-placeholder="sidebar.ble.filterPlaceholder" />
                         </div>
                     </div>
-                    <p class="muted small">Visible when WebBluetooth is selected.</p>
+                    <p class="muted small" data-i18n="sidebar.ble.hint">Visible when WebBluetooth is selected.</p>
                 </div>
             </aside>
 
             <section class="workspace">
                 <div class="workspace-head">
-                    <div class="muted">Layout preview</div>
+                    <div class="muted" data-i18n="workspace.layoutPreview">Layout preview</div>
                     <div class="workspace-tools">
                         <details class="align-dropdown">
                             <summary
@@ -121,6 +136,8 @@
                                 data-align-menu-trigger
                                 aria-label="Alignment tools"
                                 title="Alignment tools"
+                                data-i18n-aria-label="workspace.alignTools"
+                                data-i18n-title="workspace.alignTools"
                             >
                                 <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                                     <path d="M5 4v16"></path>
@@ -128,45 +145,45 @@
                                     <rect x="7" y="14" width="12" height="4"></rect>
                                 </svg>
                             </summary>
-                            <div class="align-panel" role="group" aria-label="Align selected items">
-                                <div class="align-panel-title">Align</div>
+                            <div class="align-panel" role="group" aria-label="Align selected items" data-i18n-aria-label="workspace.align">
+                                <div class="align-panel-title" data-i18n="workspace.align">Align</div>
                                 <div class="align-controls">
-                                    <button class="ghost icon-button" data-align-left aria-label="Align left" title="Align left">
+                                    <button class="ghost icon-button" data-align-left aria-label="Align left" title="Align left" data-i18n-aria-label="workspace.alignLeft" data-i18n-title="workspace.alignLeft">
                                         <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                                             <path d="M5 4v16"></path>
                                             <rect x="7" y="6" width="9" height="4"></rect>
                                             <rect x="7" y="14" width="12" height="4"></rect>
                                         </svg>
                                     </button>
-                                    <button class="ghost icon-button" data-align-center aria-label="Align center" title="Align center">
+                                    <button class="ghost icon-button" data-align-center aria-label="Align center" title="Align center" data-i18n-aria-label="workspace.alignCenter" data-i18n-title="workspace.alignCenter">
                                         <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                                             <path d="M12 4v16"></path>
                                             <rect x="7" y="6" width="10" height="4"></rect>
                                             <rect x="5" y="14" width="14" height="4"></rect>
                                         </svg>
                                     </button>
-                                    <button class="ghost icon-button" data-align-right aria-label="Align right" title="Align right">
+                                    <button class="ghost icon-button" data-align-right aria-label="Align right" title="Align right" data-i18n-aria-label="workspace.alignRight" data-i18n-title="workspace.alignRight">
                                         <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                                             <path d="M19 4v16"></path>
                                             <rect x="8" y="6" width="9" height="4"></rect>
                                             <rect x="5" y="14" width="12" height="4"></rect>
                                         </svg>
                                     </button>
-                                    <button class="ghost icon-button" data-align-top aria-label="Align top" title="Align top">
+                                    <button class="ghost icon-button" data-align-top aria-label="Align top" title="Align top" data-i18n-aria-label="workspace.alignTop" data-i18n-title="workspace.alignTop">
                                         <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                                             <path d="M4 5h16"></path>
                                             <rect x="6" y="7" width="4" height="9"></rect>
                                             <rect x="14" y="7" width="4" height="12"></rect>
                                         </svg>
                                     </button>
-                                    <button class="ghost icon-button" data-align-middle aria-label="Align middle" title="Align middle">
+                                    <button class="ghost icon-button" data-align-middle aria-label="Align middle" title="Align middle" data-i18n-aria-label="workspace.alignMiddle" data-i18n-title="workspace.alignMiddle">
                                         <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                                             <path d="M4 12h16"></path>
                                             <rect x="6" y="7" width="4" height="10"></rect>
                                             <rect x="14" y="5" width="4" height="14"></rect>
                                         </svg>
                                     </button>
-                                    <button class="ghost icon-button" data-align-bottom aria-label="Align bottom" title="Align bottom">
+                                    <button class="ghost icon-button" data-align-bottom aria-label="Align bottom" title="Align bottom" data-i18n-aria-label="workspace.alignBottom" data-i18n-title="workspace.alignBottom">
                                         <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                                             <path d="M4 19h16"></path>
                                             <rect x="6" y="8" width="4" height="9"></rect>
@@ -175,19 +192,19 @@
                                     </button>
                                 </div>
                                 <div class="align-panel-footer">
-                                    <label class="small muted" for="align-target-select">Align to</label>
-                                    <select id="align-target-select" class="align-target" data-align-reference aria-label="Align target">
-                                        <option value="selection">Selection</option>
-                                        <option value="largest">Largest item</option>
-                                        <option value="smallest">Smallest item</option>
-                                        <option value="label">Label</option>
+                                    <label class="small muted" for="align-target-select" data-i18n="workspace.alignTo">Align to</label>
+                                    <select id="align-target-select" class="align-target" data-align-reference aria-label="Align target" data-i18n-aria-label="workspace.alignTo">
+                                        <option value="selection" data-i18n="workspace.alignReference.selection">Selection</option>
+                                        <option value="largest" data-i18n="workspace.alignReference.largest">Largest item</option>
+                                        <option value="smallest" data-i18n="workspace.alignReference.smallest">Smallest item</option>
+                                        <option value="label" data-i18n="workspace.alignReference.label">Label</option>
                                     </select>
                                 </div>
                             </div>
                         </details>
                         <span class="workspace-divider" aria-hidden="true"></span>
                         <div class="zoom-controls" role="group" aria-label="Zoom preview">
-                            <button class="ghost zoom-btn" data-zoom-out aria-label="Zoom out">
+                            <button class="ghost zoom-btn" data-zoom-out aria-label="Zoom out" data-i18n-aria-label="workspace.zoomOut" data-i18n-title="workspace.zoomOut">
                                 <svg class="icon-zoom" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                                     <path d="M6 12h12"></path>
                                 </svg>
@@ -202,13 +219,13 @@
                                 data-zoom-range
                                 aria-label="Preview zoom"
                             />
-                            <button class="ghost zoom-btn" data-zoom-in aria-label="Zoom in">
+                            <button class="ghost zoom-btn" data-zoom-in aria-label="Zoom in" data-i18n-aria-label="workspace.zoomIn" data-i18n-title="workspace.zoomIn">
                                 <svg class="icon-zoom" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                                     <path d="M6 12h12"></path>
                                     <path d="M12 6v12"></path>
                                 </svg>
                             </button>
-                            <button class="ghost zoom-reset" data-zoom-reset data-zoom-label aria-label="Reset zoom">100%</button>
+                            <button class="ghost zoom-reset" data-zoom-reset data-zoom-label aria-label="Reset zoom" data-i18n-aria-label="workspace.zoomReset" data-i18n-title="workspace.zoomReset">100%</button>
                         </div>
                         <span class="workspace-divider" aria-hidden="true"></span>
                         <div class="pill" data-dimensions>—</div>
@@ -234,18 +251,18 @@
                     </div>
                 </div>
                 <div class="workspace-foot">
-                    <div class="hint">Drop graphics or CSV data here to prefill your label.</div>
+                    <div class="hint" data-i18n="workspace.dropHint">Drop graphics or CSV data here to prefill your label.</div>
                 </div>
             </section>
 
             <aside class="sidebar inspector">
                 <div class="section">
-                    <div class="section-title">Objects</div>
-                    <p class="muted small">Drag to reorder. Adjust offsets, fonts, QR size, and forms.</p>
+                    <div class="section-title" data-i18n="objects.title">Objects</div>
+                    <p class="muted small" data-i18n="objects.description">Drag to reorder. Adjust offsets, fonts, QR size, and forms.</p>
                     <div class="objects-actions">
-                        <button class="ghost" type="button" data-add-text>Text</button>
-                        <button class="ghost" type="button" data-add-qr>QR-Code</button>
-                        <button class="ghost" type="button" data-add-shape>Form</button>
+                        <button class="ghost" type="button" data-add-text data-i18n="objects.addText">Text</button>
+                        <button class="ghost" type="button" data-add-qr data-i18n="objects.addQr">QR-Code</button>
+                        <button class="ghost" type="button" data-add-shape data-i18n="objects.addShape">Form</button>
                         <div class="shape-menu" data-shape-menu hidden>
                             <button class="menu-item" data-shape-type="rect">
                                 <span class="menu-icon" aria-hidden="true">
@@ -253,7 +270,7 @@
                                         <rect x="4" y="6" width="16" height="12"></rect>
                                     </svg>
                                 </span>
-                                <span class="menu-label">Rechteck</span>
+                                <span class="menu-label" data-i18n="shapes.rect">Rechteck</span>
                             </button>
                             <button class="menu-item" data-shape-type="roundRect">
                                 <span class="menu-icon" aria-hidden="true">
@@ -261,7 +278,7 @@
                                         <rect x="4" y="6" width="16" height="12" rx="3" ry="3"></rect>
                                     </svg>
                                 </span>
-                                <span class="menu-label">Abgerundetes Rechteck</span>
+                                <span class="menu-label" data-i18n="shapes.roundRect">Abgerundetes Rechteck</span>
                             </button>
                             <button class="menu-item" data-shape-type="oval">
                                 <span class="menu-icon" aria-hidden="true">
@@ -269,7 +286,7 @@
                                         <ellipse cx="12" cy="12" rx="8" ry="5"></ellipse>
                                     </svg>
                                 </span>
-                                <span class="menu-label">Oval</span>
+                                <span class="menu-label" data-i18n="shapes.oval">Oval</span>
                             </button>
                             <button class="menu-item" data-shape-type="polygon">
                                 <span class="menu-icon" aria-hidden="true">
@@ -277,7 +294,7 @@
                                         <polygon points="6,7 18,7 20,12 18,17 6,17 4,12"></polygon>
                                     </svg>
                                 </span>
-                                <span class="menu-label">Vieleck (Polygon)</span>
+                                <span class="menu-label" data-i18n="shapes.polygon">Vieleck (Polygon)</span>
                             </button>
                             <button class="menu-item" data-shape-type="line">
                                 <span class="menu-icon" aria-hidden="true">
@@ -285,19 +302,19 @@
                                         <line x1="4" y1="12" x2="20" y2="12"></line>
                                     </svg>
                                 </span>
-                                <span class="menu-label">Linie</span>
+                                <span class="menu-label" data-i18n="shapes.line">Linie</span>
                             </button>
                         </div>
                     </div>
                     <div class="items" data-items></div>
                 </div>
                 <div class="section">
-                    <div class="section-title">Parameters</div>
-                    <p class="muted small">Use <code>{{parameter_name}}</code> in text and QR content.</p>
+                    <div class="section-title" data-i18n="parameters.title">Parameters</div>
+                    <p class="muted small" data-i18n="parameters.description">Use {{parameter_name}} in text and QR content.</p>
                     <div class="parameter-toolbar">
-                        <button class="ghost" type="button" data-add-parameter>Add parameter</button>
-                        <button class="ghost" type="button" data-load-parameter-data>Load JSON</button>
-                        <button class="ghost" type="button" data-download-parameter-example>Example JSON</button>
+                        <button class="ghost" type="button" data-add-parameter data-i18n="parameters.add">Add parameter</button>
+                        <button class="ghost" type="button" data-load-parameter-data data-i18n="parameters.loadJson">Load JSON</button>
+                        <button class="ghost" type="button" data-download-parameter-example data-i18n="parameters.exampleJson">Example JSON</button>
                     </div>
                     <input type="file" accept="application/json" data-parameter-data-input hidden />
                     <div class="parameters" data-parameter-definitions></div>
@@ -306,8 +323,8 @@
                     <pre class="json-preview" data-parameter-preview></pre>
                 </div>
                 <div class="section">
-                    <div class="section-title">Status</div>
-                    <div class="status" data-status>Ready. Choose a backend and click print.</div>
+                    <div class="section-title" data-i18n="status.title">Status</div>
+                    <div class="status" data-status data-i18n="status.ready">Ready. Choose a backend and click print.</div>
                 </div>
             </aside>
         </div>

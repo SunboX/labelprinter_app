@@ -89,6 +89,22 @@ body {
     position: relative;
 }
 
+.locale-group select {
+    min-width: 112px;
+    padding: 8px 10px;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
 .main-grid {
     flex: 1;
     display: grid;
