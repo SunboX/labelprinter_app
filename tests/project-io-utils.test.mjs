@@ -16,6 +16,10 @@ const defaultState = {
         notifyCharacteristicUuid: 'notify',
         namePrefix: 'PT-'
     },
+    parameters: [],
+    parameterDataRows: [],
+    parameterDataRaw: '',
+    parameterDataSourceName: '',
     items: []
 }
 
@@ -29,6 +33,8 @@ describe('project-io-utils', () => {
         const state = {
             ...defaultState,
             zoom: 1.23,
+            parameters: [{ name: 'host', defaultValue: 'localhost' }],
+            parameterDataRows: [{ host: 'printer-1' }],
             items: [
                 {
                     id: 'item-1',
@@ -44,6 +50,8 @@ describe('project-io-utils', () => {
         assert.equal(payload.items[0]._qrCache, undefined)
         assert.equal(payload.items[0].type, 'qr')
         assert.equal(payload.zoom, 1.23)
+        assert.deepEqual(payload.parameters, [{ name: 'host', defaultValue: 'localhost' }])
+        assert.deepEqual(payload.parameterDataRows, [{ host: 'printer-1' }])
     })
 
     it('normalizeProjectState throws when items are missing', () => {
@@ -54,6 +62,8 @@ describe('project-io-utils', () => {
         const raw = {
             media: 'W9',
             zoom: 10,
+            parameters: [{ name: 'host', defaultValue: 'fallback' }],
+            parameterDataRows: [{ host: 'printer-a' }, 'invalid-row'],
             items: [
                 { id: 'item-2', type: 'text', text: 'Hello' },
                 { id: 'item-2', type: 'qr', data: 'https://example.com' },
@@ -66,6 +76,8 @@ describe('project-io-utils', () => {
         assert.equal(ids.length, new Set(ids).size)
         assert.equal(state.items.some((item) => item.type === 'unsupported'), false)
         assert.equal(state.zoom, 2.5)
+        assert.deepEqual(state.parameters, [{ name: 'host', defaultValue: 'fallback' }])
+        assert.deepEqual(state.parameterDataRows, [{ host: 'printer-a' }])
         assert.ok(nextIdCounter > ProjectIoUtils.deriveNextIdCounter([{ id: 'item-2' }]))
     })
 })

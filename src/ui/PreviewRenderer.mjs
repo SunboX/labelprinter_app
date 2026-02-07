@@ -4,6 +4,7 @@ import { ZoomUtils } from '../ZoomUtils.mjs'
 import { RulerUtils } from '../RulerUtils.mjs'
 import { InteractionUtils } from '../InteractionUtils.mjs'
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
+import { ParameterTemplateUtils } from '../ParameterTemplateUtils.mjs'
 import { Media, Resolution } from 'labelprinterkit-web/src/index.mjs'
 
 /**
@@ -37,6 +38,8 @@ export class PreviewRenderer {
         this._interactionFrame = null
         this._dotsPerPxX = 1
         this._dotsPerPxY = 1
+        this._templateValues = {}
+        this._qrRenderCache = new Map()
         // Resize handles are part of the editor interaction model (drag via body, scale via dots/edges).
         this._enablePreviewResize = true
         this._handleRadius = 3
@@ -80,6 +83,7 @@ export class PreviewRenderer {
 
     /**
      * Builds the preview and print canvases based on the current state.
+     * @param {{ parameterValues?: Record<string, string> }} [options={}]
      * @returns {Promise<{
      *  preview: HTMLCanvasElement,
      *  printCanvas: HTMLCanvasElement,
@@ -93,7 +97,7 @@ export class PreviewRenderer {
      *  media: object
      * }>}
      */
-    async buildCanvasFromState() {
+    async buildCanvasFromState(options = {}) {
         const media = Media[this.state.media] || Media.W24
         const res = Resolution[this.state.resolution] || Resolution.LOW
         const printWidth = media.printArea || 128
@@ -102,6 +106,7 @@ export class PreviewRenderer {
         const dotScale = (res?.dots?.[1] || 180) / 96 // interpret font sizes as CSS px and scale to printer dots
         const isHorizontal = this.state.orientation === 'horizontal'
         const maxFontDots = Math.max(8, printWidth)
+        const parameterValues = this._resolveParameterValues(options.parameterValues)
 
         const measureCtx = document.createElement('canvas').getContext('2d')
         const feedPadStart = 2 // dots of leading whitespace so print matches preview
@@ -110,6 +115,7 @@ export class PreviewRenderer {
         const layoutItems = []
         for (const item of this.state.items) {
             if (item.type === 'text') {
+                const resolvedText = ParameterTemplateUtils.resolveTemplateString(item.text || '', parameterValues)
                 const family = item.fontFamily || 'sans-serif'
                 const requestedSizeDots = Math.round((item.fontSize || 16) * dotScale)
                 const {
@@ -120,11 +126,12 @@ export class PreviewRenderer {
                     descent,
                     inkLeft,
                     inkWidth
-                } = this._resolveTextMetrics(item.text || '', family, requestedSizeDots, maxFontDots, measureCtx)
+                } = this._resolveTextMetrics(resolvedText, family, requestedSizeDots, maxFontDots, measureCtx)
                 // Keep base flow dimensions stable while dragging; offsets are visual translation only.
                 const span = isHorizontal ? Math.max(textAdvanceWidth, textHeight) : Math.max(textHeight + 4, textHeight)
                 blocks.push({
                     ref: item,
+                    resolvedText,
                     span,
                     fontSizeDots,
                     textHeight,
@@ -147,12 +154,10 @@ export class PreviewRenderer {
                 continue
             }
 
-            if (!item._qrCache || item._qrCacheKey !== `${item.data}-${item.size}`) {
-                item._qrCache = await this._buildQrCanvas(item.data, item.size)
-                item._qrCacheKey = `${item.data}-${item.size}`
-            }
+            const resolvedQrData = ParameterTemplateUtils.resolveTemplateString(item.data || '', parameterValues)
+            const qrCanvas = await this._getCachedQrCanvas(resolvedQrData, item.size)
             const span = Math.max(item.height, item.size)
-            blocks.push({ ref: item, span, qrSize: item.size })
+            blocks.push({ ref: item, span, qrSize: item.size, qrCanvas })
         }
 
         const baseTotalLength = feedPadStart + blocks.reduce((sum, block) => sum + block.span, 0) + feedPadEnd
@@ -182,7 +187,9 @@ export class PreviewRenderer {
                 descent,
                 shapeWidth,
                 shapeHeight,
-                textAdvanceWidth
+                textAdvanceWidth,
+                resolvedText,
+                qrCanvas
             } of blocks) {
                 const yAdjust = item.yOffset || 0
                 if (item.type === 'text') {
@@ -195,7 +202,7 @@ export class PreviewRenderer {
                     const blockH = a + d
                     const baselineY = (canvas.height - blockH) / 2 + a + yAdjust
                     const drawX = (item.xOffset || 0) + x
-                    const textMetrics = ctx.measureText(item.text || '')
+                    const textMetrics = ctx.measureText(resolvedText || '')
                     const inkLeft = Number.isFinite(textMetrics.actualBoundingBoxLeft)
                         ? textMetrics.actualBoundingBoxLeft
                         : 0
@@ -211,7 +218,7 @@ export class PreviewRenderer {
                     const clampedInkLeft = Math.max(0, inkLeft)
                     const clampedInkRight = Math.max(clampedInkLeft, inkRight)
                     const inkWidth = Math.max(1, clampedInkRight - clampedInkLeft)
-                    ctx.fillText(item.text || '', drawX, baselineY)
+                    ctx.fillText(resolvedText || '', drawX, baselineY)
                     const inkOffsetX = drawX + clampedInkLeft
                     layoutItems.push({
                         id: item.id,
@@ -227,7 +234,7 @@ export class PreviewRenderer {
                 } else if (item.type === 'qr') {
                     const qrY = Math.max(0, (canvas.height - item.size) / 2 + yAdjust)
                     const drawX = (item.xOffset || 0) + x
-                    ctx.drawImage(item._qrCache, drawX, qrY, item.size, item.size)
+                    ctx.drawImage(qrCanvas, drawX, qrY, item.size, item.size)
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
@@ -268,7 +275,9 @@ export class PreviewRenderer {
                 descent,
                 shapeWidth,
                 shapeHeight,
-                textAdvanceWidth
+                textAdvanceWidth,
+                resolvedText,
+                qrCanvas
             } of blocks) {
                 const yAdjust = item.yOffset || 0
                 if (item.type === 'text') {
@@ -281,7 +290,7 @@ export class PreviewRenderer {
                     const blockH = a + d
                     const baselineY = y + (span - blockH) / 2 + a + yAdjust
                     const drawX = item.xOffset || 0
-                    const textMetrics = ctx.measureText(item.text || '')
+                    const textMetrics = ctx.measureText(resolvedText || '')
                     const inkLeft = Number.isFinite(textMetrics.actualBoundingBoxLeft)
                         ? textMetrics.actualBoundingBoxLeft
                         : 0
@@ -297,7 +306,7 @@ export class PreviewRenderer {
                     const clampedInkLeft = Math.max(0, inkLeft)
                     const clampedInkRight = Math.max(clampedInkLeft, inkRight)
                     const inkWidth = Math.max(1, clampedInkRight - clampedInkLeft)
-                    ctx.fillText(item.text || '', drawX, baselineY)
+                    ctx.fillText(resolvedText || '', drawX, baselineY)
                     const inkOffsetX = drawX + clampedInkLeft
                     layoutItems.push({
                         id: item.id,
@@ -313,7 +322,7 @@ export class PreviewRenderer {
                 } else if (item.type === 'qr') {
                     const qrY = y + Math.max(0, (span - item.size) / 2 + yAdjust)
                     const drawX = item.xOffset || 0
-                    ctx.drawImage(item._qrCache, drawX, qrY, item.size, item.size)
+                    ctx.drawImage(qrCanvas, drawX, qrY, item.size, item.size)
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
@@ -446,6 +455,14 @@ export class PreviewRenderer {
      */
     getSelectedItemIds() {
         return Array.from(this._selectedItemIds)
+    }
+
+    /**
+     * Sets template values used during preview rendering.
+     * @param {Record<string, string>} values
+     */
+    setTemplateValues(values) {
+        this._templateValues = values && typeof values === 'object' ? { ...values } : {}
     }
 
     /**
@@ -1375,7 +1392,6 @@ export class PreviewRenderer {
             if (deltaTop) {
                 item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
             }
-            item._qrCache = null
         } else if (item.type === 'text') {
             const startRect = this._interaction.startRect
             const scaleX = startRect.width ? (event.rect?.width || startRect.width) / startRect.width : 1
@@ -1437,6 +1453,45 @@ export class PreviewRenderer {
     _debugLog(event, payload) {
         if (!window.__LABEL_DEBUG_INTERACTIONS) return
         console.log(`[PreviewRenderer] ${event}`, payload)
+    }
+
+    /**
+     * Resolves template values for the current render pass.
+     * @param {Record<string, string> | undefined} values
+     * @returns {Record<string, string>}
+     */
+    _resolveParameterValues(values) {
+        if (values && typeof values === 'object') {
+            return values
+        }
+        return this._templateValues && typeof this._templateValues === 'object' ? this._templateValues : {}
+    }
+
+    /**
+     * Returns a cached QR canvas or generates a new one.
+     * @param {string} data
+     * @param {number} size
+     * @returns {Promise<HTMLCanvasElement>}
+     */
+    async _getCachedQrCanvas(data, size) {
+        const safeSize = Math.max(1, Math.round(Number(size) || 1))
+        const cacheKey = `${safeSize}::${String(data || '')}`
+        if (this._qrRenderCache.has(cacheKey)) {
+            const cached = this._qrRenderCache.get(cacheKey)
+            this._qrRenderCache.delete(cacheKey)
+            this._qrRenderCache.set(cacheKey, cached)
+            return cached
+        }
+        const builtCanvas = await this._buildQrCanvas(data, safeSize)
+        this._qrRenderCache.set(cacheKey, builtCanvas)
+        const maxEntries = 96
+        if (this._qrRenderCache.size > maxEntries) {
+            const oldestKey = this._qrRenderCache.keys().next().value
+            if (oldestKey) {
+                this._qrRenderCache.delete(oldestKey)
+            }
+        }
+        return builtCanvas
     }
 
     /**

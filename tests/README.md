@@ -4,7 +4,7 @@
 - Unit: `tests/shape-menu-utils.test.mjs` validates the outside-click detection helper.
 - Unit: `tests/hidden-attribute.test.mjs` verifies the `[hidden]` CSS rule hides overlays like the shape menu.
 - Unit: `tests/shape-menu-icons.test.mjs` ensures SVG icons and labels are used in the shape menu.
-- Manual: run `npm start`, open `http://localhost:3000/src/`, click Form to open the menu, then click outside or press Escape to close.
+- Manual: run `npm start`, open `http://localhost:3000/`, click Form to open the menu, then click outside or press Escape to close.
 - Expected: clicking a menu item adds the shape and closes the menu.
 
 ## Layout preview sizing
@@ -13,7 +13,7 @@
 ## Ruler alignment
 - Unit: `tests/ruler-utils.test.mjs` verifies the pixel scale, offsets, and highlight ranges used for ruler alignment.
 - Unit: `tests/ruler-utils.test.mjs` also validates clamped label positions so edge labels (like the vertical `0`) stay readable.
-- Manual: run `npm start`, open `http://localhost:3000/src/`, set media `W9`, and verify the vertical ruler highlight spans exactly from the label top edge to the label bottom edge.
+- Manual: run `npm start`, open `http://localhost:3000/`, set media `W9`, and verify the vertical ruler highlight spans exactly from the label top edge to the label bottom edge.
 
 ## Preview interactions
 - Unit: `tests/interaction-utils.test.mjs` checks handle positions, hit testing, cursor mapping, handle-edge mapping, interactive item type support, and drag clamping for the preview overlay.
@@ -28,17 +28,23 @@
 ## Project save/load
 - Unit: `tests/project-io-utils.test.mjs` validates JSON payload sanitizing, normalization, and id reseeding.
 - Unit: `tests/project-url-utils.test.mjs` validates shareable URL payload encoding/decoding and URL parameter source resolution.
-- Manual: run `npm start`, open `http://localhost:3000/src/`, click Save to export JSON, then click Load and select the file.
+- Manual: run `npm start`, open `http://localhost:3000/`, click Save to export JSON, then click Load and select the file.
 - Expected: save creates a `.json` file, load restores the same items and settings, and status reflects success.
 - Manual: append `?projectUrl=<url-to-json>` or open a shared `?project=<encoded>` link.
 - Expected: project loads automatically on startup and the Share button creates a link that restores the same layout.
 
 ## Workspace zoom
 - Unit: `tests/zoom-utils.test.mjs` validates zoom clamping, stepping, and label formatting used by the workspace zoom controls.
-- Manual: run `npm start`, open `http://localhost:3000/src/`, use `-`, `+`, and the zoom slider in the workspace header.
+- Manual: run `npm start`, open `http://localhost:3000/`, use `-`, `+`, and the zoom slider in the workspace header.
 - Expected: rulers and label preview scale together, and the reset button jumps back to `100%`.
 
 ## QR initial sizing
 - Unit: `tests/qr-size-utils.test.mjs` verifies new QR items start at a size that fits the selected media width and optional fixed media length.
-- Manual: run `npm start`, open `http://localhost:3000/src/`, switch between tape widths (for example `W24` and `W9`), then click `QR-Code`.
+- Manual: run `npm start`, open `http://localhost:3000/`, switch between tape widths (for example `W24` and `W9`), then click `QR-Code`.
 - Expected: the newly added QR square stays within the label bounds without clipping on narrow media.
+
+## Parameterized labels
+- Unit: `tests/parameter-template-utils.test.mjs` validates placeholder extraction and substitution, JSON parsing constraints, and parameter-row validation diagnostics.
+- Unit: `tests/project-io-utils.test.mjs` also covers serialization/normalization for `parameters` and `parameterDataRows`.
+- Manual: run `npm start`, open `http://localhost:3000/`, add parameters in the inspector, use them in text/QR as `{{name}}`, then upload a JSON array file.
+- Expected: JSON is validated, issues are shown with row-aware highlighting, preview uses the first row, and Print produces one label per row (with confirmation when row count exceeds 10).
