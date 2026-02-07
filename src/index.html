@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Labelprinter App</title>
+        <link rel="stylesheet" href="./style.css" />
+    </head>
+<body>
+    <div class="app-shell">
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-mark"></div>
+                <div>
+                    <div class="brand-name">Labelprinter App</div>
+                    <div class="brand-sub">Brother-style layout</div>
+                </div>
+            </div>
+                <div class="toolbar">
+                    <div class="toolbar-group">
+                        <button class="ghost" data-add-text>Text</button>
+                        <button class="ghost" data-add-qr>QR-Code</button>
+                        <button class="ghost" data-add-shape>Form</button>
+                        <div class="shape-menu" data-shape-menu hidden>
+                            <button class="menu-item" data-shape-type="rect">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <rect x="4" y="6" width="16" height="12"></rect>
+                                    </svg>
+                                </span>
+                                <span class="menu-label">Rechteck</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="roundRect">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <rect x="4" y="6" width="16" height="12" rx="3" ry="3"></rect>
+                                    </svg>
+                                </span>
+                                <span class="menu-label">Abgerundetes Rechteck</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="oval">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <ellipse cx="12" cy="12" rx="8" ry="5"></ellipse>
+                                    </svg>
+                                </span>
+                                <span class="menu-label">Oval</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="polygon">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <polygon points="6,7 18,7 20,12 18,17 6,17 4,12"></polygon>
+                                    </svg>
+                                </span>
+                                <span class="menu-label">Vieleck (Polygon)</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="line">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <line x1="4" y1="12" x2="20" y2="12"></line>
+                                    </svg>
+                                </span>
+                                <span class="menu-label">Linie</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="toolbar-group">
+                        <button class="ghost" data-save-project>Save</button>
+                        <button class="ghost" data-load-project>Load</button>
+                        <button class="ghost icon-button" data-share-project aria-label="Share project URL" title="Share project URL">
+                            <svg class="icon-share" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path d="M15 6l-6 3"></path>
+                                <path d="M15 18l-6-3"></path>
+                                <circle cx="18" cy="5" r="2"></circle>
+                                <circle cx="6" cy="12" r="2"></circle>
+                                <circle cx="18" cy="19" r="2"></circle>
+                            </svg>
+                        </button>
+                        <input type="file" accept="application/json" data-load-input hidden />
+                    </div>
+                    <div class="toolbar-group">
+                        <button class="primary" data-print>Print</button>
+                    </div>
+                </div>
+        </header>
+
+        <div class="main-grid">
+            <aside class="sidebar rail">
+                <div class="section">
+                    <div class="section-title">Printer</div>
+                    <div class="field">
+                        <label>Backend</label>
+                        <select data-mode>
+                            <option value="usb">WebUSB (USB printer class)</option>
+                            <option value="ble">WebBluetooth (BLE)</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Printer model</label>
+                        <select data-printer>
+                            <option value="P700">P700</option>
+                            <option value="P750W">P750W</option>
+                            <option value="E500">E500</option>
+                            <option value="E550W">E550W</option>
+                            <option value="H500">H500</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Media</div>
+                    <div class="field">
+                        <label>Width</label>
+                        <select data-media></select>
+                    </div>
+                    <div class="field split">
+                        <div>
+                            <label>Resolution</label>
+                            <select data-resolution></select>
+                        </div>
+                        <div>
+                            <label>Orientation</label>
+                            <select data-orientation>
+                                <option value="horizontal">Horizontal</option>
+                                <option value="vertical">Vertical</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Media length (mm)</label>
+                        <input
+                            type="number"
+                            data-media-length
+                            min="30"
+                            max="1000"
+                            step="1"
+                            placeholder="Auto from items (leave blank)"
+                        />
+                        <p class="muted small">Override height; keep blank to match your stacked objects.</p>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">BLE</div>
+                    <div class="ble-fields" hidden>
+                        <div class="field split">
+                            <input data-ble-service placeholder="Service UUID" />
+                            <input data-ble-write placeholder="Write characteristic UUID" />
+                        </div>
+                        <div class="field">
+                            <input data-ble-notify placeholder="Notify characteristic UUID (optional)" />
+                        </div>
+                        <div class="field">
+                            <input data-ble-filter placeholder="Name prefix (optional, e.g. PT-)" />
+                        </div>
+                    </div>
+                    <p class="muted small">Visible when WebBluetooth is selected.</p>
+                </div>
+            </aside>
+
+            <section class="workspace">
+                <div class="workspace-head">
+                    <div class="muted">Layout preview</div>
+                    <div class="workspace-tools">
+                        <details class="align-dropdown">
+                            <summary
+                                class="ghost icon-button align-trigger"
+                                data-align-menu-trigger
+                                aria-label="Alignment tools"
+                                title="Alignment tools"
+                            >
+                                <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M5 4v16"></path>
+                                    <rect x="7" y="6" width="9" height="4"></rect>
+                                    <rect x="7" y="14" width="12" height="4"></rect>
+                                </svg>
+                            </summary>
+                            <div class="align-panel" role="group" aria-label="Align selected items">
+                                <div class="align-panel-title">Align</div>
+                                <div class="align-controls">
+                                    <button class="ghost icon-button" data-align-left aria-label="Align left" title="Align left">
+                                        <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                            <path d="M5 4v16"></path>
+                                            <rect x="7" y="6" width="9" height="4"></rect>
+                                            <rect x="7" y="14" width="12" height="4"></rect>
+                                        </svg>
+                                    </button>
+                                    <button class="ghost icon-button" data-align-center aria-label="Align center" title="Align center">
+                                        <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                            <path d="M12 4v16"></path>
+                                            <rect x="7" y="6" width="10" height="4"></rect>
+                                            <rect x="5" y="14" width="14" height="4"></rect>
+                                        </svg>
+                                    </button>
+                                    <button class="ghost icon-button" data-align-right aria-label="Align right" title="Align right">
+                                        <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                            <path d="M19 4v16"></path>
+                                            <rect x="8" y="6" width="9" height="4"></rect>
+                                            <rect x="5" y="14" width="12" height="4"></rect>
+                                        </svg>
+                                    </button>
+                                    <button class="ghost icon-button" data-align-top aria-label="Align top" title="Align top">
+                                        <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                            <path d="M4 5h16"></path>
+                                            <rect x="6" y="7" width="4" height="9"></rect>
+                                            <rect x="14" y="7" width="4" height="12"></rect>
+                                        </svg>
+                                    </button>
+                                    <button class="ghost icon-button" data-align-middle aria-label="Align middle" title="Align middle">
+                                        <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                            <path d="M4 12h16"></path>
+                                            <rect x="6" y="7" width="4" height="10"></rect>
+                                            <rect x="14" y="5" width="4" height="14"></rect>
+                                        </svg>
+                                    </button>
+                                    <button class="ghost icon-button" data-align-bottom aria-label="Align bottom" title="Align bottom">
+                                        <svg class="icon-align" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                            <path d="M4 19h16"></path>
+                                            <rect x="6" y="8" width="4" height="9"></rect>
+                                            <rect x="14" y="5" width="4" height="12"></rect>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div class="align-panel-footer">
+                                    <label class="small muted" for="align-target-select">Align to</label>
+                                    <select id="align-target-select" class="align-target" data-align-reference aria-label="Align target">
+                                        <option value="selection">Selection</option>
+                                        <option value="largest">Largest item</option>
+                                        <option value="smallest">Smallest item</option>
+                                        <option value="label">Label</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </details>
+                        <span class="workspace-divider" aria-hidden="true"></span>
+                        <div class="zoom-controls" role="group" aria-label="Zoom preview">
+                            <button class="ghost zoom-btn" data-zoom-out aria-label="Zoom out">-</button>
+                            <input
+                                class="zoom-range"
+                                type="range"
+                                min="50"
+                                max="250"
+                                step="5"
+                                value="100"
+                                data-zoom-range
+                                aria-label="Preview zoom"
+                            />
+                            <button class="ghost zoom-btn" data-zoom-in aria-label="Zoom in">+</button>
+                            <button class="ghost zoom-reset" data-zoom-reset data-zoom-label aria-label="Reset zoom">100%</button>
+                        </div>
+                        <span class="workspace-divider" aria-hidden="true"></span>
+                        <div class="pill" data-dimensions>—</div>
+                    </div>
+                </div>
+                <div class="stage">
+                    <div class="ruler-bar">
+                        <div class="ruler-corner">mm</div>
+                        <div class="ruler horizontal">
+                            <canvas data-ruler-x></canvas>
+                        </div>
+                    </div>
+                    <div class="stage-body">
+                        <div class="ruler vertical">
+                            <canvas data-ruler-y></canvas>
+                        </div>
+                        <div class="canvas-wrap">
+                            <div class="label-width-tag" data-label-width></div>
+                            <div class="label-plate">
+                                <canvas data-preview></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="workspace-foot">
+                    <div class="hint">Drop graphics or CSV data here to prefill your label.</div>
+                </div>
+            </section>
+
+            <aside class="sidebar inspector">
+                <div class="section">
+                    <div class="section-title">Objects</div>
+                    <p class="muted small">Drag to reorder. Adjust offsets, fonts, QR size, and forms.</p>
+                    <div class="items" data-items></div>
+                </div>
+                <div class="section">
+                    <div class="section-title">Status</div>
+                    <div class="status" data-status>Ready. Choose a backend and click print.</div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "labelprinterkit-web/": "/node_modules/labelprinterkit-web/"
+            }
+        }
+    </script>
+    <script src="/node_modules/interactjs/dist/interact.min.js"></script>
+    <script src="/node_modules/qrcode/build/qrcode.js"></script>
+    <script type="module" src="./main.mjs"></script>
+</body>
+</html>

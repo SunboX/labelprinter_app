@@ -3,17 +3,19 @@ import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const projectRoot = join(__dirname, '..')
 const app = express()
 const port = Number(process.env.PORT) || 3000
 
-app.use(express.static(join(__dirname, '..')))
+app.use('/node_modules', express.static(join(projectRoot, 'node_modules')))
+app.use(express.static(__dirname))
 
-app.get('/', (_req, res) => {
-    res.redirect('/examples/complex_label_with_frontend/')
+app.get(['/src', '/src/'], (_req, res) => {
+    res.redirect('/')
 })
 
 const server = app.listen(port, () => {
-    console.log(`Labelprinterkit demo running at http://localhost:${port}/examples/complex_label_with_frontend/`)
+    console.log(`Labelprinter app running at http://localhost:${port}/`)
 })
 
 server.on('error', (err) => {
