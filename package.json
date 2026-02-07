@@ -1,12 +1,16 @@
 {
-  "name": "labelprinterkit-web",
+  "name": "labelprinter-app",
   "version": "1.0.0",
-  "description": "Browser-ready label printer toolkit demo (WebUSB/WebBluetooth) with editor UI",
+  "description": "Browser label printer application built on top of labelprinterkit",
   "type": "module",
   "scripts": {
-    "start": "node examples/server.mjs"
+    "start": "node src/server.mjs",
+    "test": "node --test"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "interactjs": "^1.10.27",
+    "labelprinterkit-web": "git+ssh://git@github.com/SunboX/labelprinterkit.git",
+    "qrcode": "^1.5.1"
   }
 }

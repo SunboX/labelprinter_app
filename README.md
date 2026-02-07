@@ -1,80 +1,47 @@
-### Labelprinterkit (JavaScript, WebUSB/WebBluetooth)
+# Labelprinter App
 
-Browser-ready label printing toolkit for Brother P-Touch devices. Everything is ESM (`.mjs`) and async/await friendly. Backends: WebUSB and WebBluetooth (for BLE-capable models or adapters).
+Web-based label editor application built on top of `labelprinterkit`.
 
-#### Quickstart
+## Overview
 
-```js
-// main.mjs (served over https or localhost)
-import {
-    P700,
-    Job,
-    Media,
-    Resolution,
-    Label,
-    TextItem,
-    BoxItem,
-    WebUSBBackend,
-    WebBluetoothBackend
-} from './src/index.mjs'
+This repository now contains the application layer only:
+- UI/editor in `src/`
+- Utility modules in `src/*.mjs`
+- App UI components in `src/ui/`
+- Static app shell in `src/index.html`
+- Local dev server in `src/server.mjs`
 
-async function connectBackend(mode = 'usb') {
-    if (mode === 'usb') {
-        // USB printer class (07h). Must be triggered by a user gesture.
-        return WebUSBBackend.requestDevice({ filters: [{ classCode: 7 }] })
-    }
-    if (mode === 'ble') {
-        // Provide the BLE service/characteristic UUIDs for your device.
-        return WebBluetoothBackend.requestDevice({
-            serviceUuid: '0000xxxx-0000-1000-8000-00805f9b34fb',
-            writeCharacteristicUuid: '0000yyyy-0000-1000-8000-00805f9b34fb',
-            notifyCharacteristicUuid: '0000zzzz-0000-1000-8000-00805f9b34fb',
-            filters: [{ namePrefix: 'PT-' }]
-        })
-    }
-    throw new Error('Unknown backend mode')
-}
+The printer protocol and backend implementation are consumed from:
+- `git@github.com:SunboX/labelprinterkit.git`
 
-async function printSample() {
-    const backend = await connectBackend('usb') // or "ble"
+## Dependency
 
-    const rowA = new BoxItem(45, [new TextItem(45, 'First line', '28px sans-serif')])
-    const rowB = new BoxItem(25, [new TextItem(25, 'Second line', '22px sans-serif')])
-    const label = new Label(Resolution.LOW, rowA, rowB)
+`labelprinterkit` is installed via Git SSH in `package.json`:
 
-    const job = new Job(Media.W12)
-    job.addPage(label)
+- `labelprinterkit-web`: `git+ssh://git@github.com/SunboX/labelprinterkit.git`
 
-    const printer = new P700(backend) // P750W/E500/E550W are available shims too
-    await printer.print(job)
-}
+Make sure your SSH key has access to GitHub before installing.
 
-printSample().catch(console.error)
-```
-
-For a richer layout with a QR code, see `examples/complex_label_with_qrcode.mjs` (uses the `qrcode` ESM from jsdelivr and exposes `window.printLabel` you can wire to a button). An interactive editor with drag-to-reorder, resizing, font/QR editing, and label size controls lives in `examples/index.html` (served over https/localhost).
-
-## Run the web editor locally
+## Run
 
 ```bash
 npm install
-PORT=3000 npm start
-# then open http://localhost:3000/examples/complex_label_with_frontend/
+npm start
 ```
 
-The Express server (`examples/server.mjs`) serves the repo as static files; the editor is under `/examples/complex_label_with_frontend/`. Use a Chromium-based browser with WebUSB/WebBluetooth enabled. When using BLE, populate the UUID fields in the UI for your device. Printing still requires a user gesture (click) to grant device access. You can also set a custom media length (mm) in the UI; it converts to dots using the selected resolution’s Y DPI and enforces the protocol minimums.
+Open:
 
-#### API highlights
+- `http://localhost:3000/`
 
--   `Label`, `TextItem`, `BoxItem` (from `src/label.mjs`): Canvas-based layout helpers. You can also use `Page.fromImageData(...)` if you already have a bitmap.
--   `Job` (from `src/job.mjs`): Validates media width/resolution, supports auto-cut, chain printing, and special tape flags.
--   Printers (from `src/printers.mjs`): Implements the Brother raster protocol with PackBits compression.
--   Backends:
-    -   `WebUSBBackend` for USB printer class devices.
-    -   `WebBluetoothBackend` for BLE devices when you supply the service/characteristic UUIDs and enable notifications.
+## Test
 
-#### Notes
+```bash
+npm test
+```
 
--   WebUSB/WebBluetooth require a secure context (https or localhost) and a user gesture to request devices/ports.
--   Fonts come from whatever your page loads; adjust the CSS font stack you pass into `TextItem`.
--   If you need to debug output, use `bitmapToImageData` from `src/page.mjs` to visualize the raster data in a canvas.
+App-level tests are in `tests/`.
+
+## Notes
+
+- The app uses an import map in `src/index.html` to resolve `labelprinterkit-web` in the browser.
+- Device access (WebUSB/WebBluetooth) still requires a user gesture and secure context (`localhost` or HTTPS).
