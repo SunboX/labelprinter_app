@@ -1,4 +1,5 @@
 import { ItemsEditor } from './ui/ItemsEditor.mjs'
+import { ParameterPanel } from './ui/ParameterPanel.mjs'
 import { PreviewRenderer } from './ui/PreviewRenderer.mjs'
 import { PrintController } from './ui/PrintController.mjs'
 import { ProjectIoUtils } from './ProjectIoUtils.mjs'
@@ -50,7 +51,15 @@ const els = {
     bleService: document.querySelector('[data-ble-service]'),
     bleWrite: document.querySelector('[data-ble-write]'),
     bleNotify: document.querySelector('[data-ble-notify]'),
-    bleFilter: document.querySelector('[data-ble-filter]')
+    bleFilter: document.querySelector('[data-ble-filter]'),
+    parameterDefinitions: document.querySelector('[data-parameter-definitions]'),
+    addParameter: document.querySelector('[data-add-parameter]'),
+    loadParameterData: document.querySelector('[data-load-parameter-data]'),
+    downloadParameterExample: document.querySelector('[data-download-parameter-example]'),
+    parameterDataInput: document.querySelector('[data-parameter-data-input]'),
+    parameterDataMeta: document.querySelector('[data-parameter-data-meta]'),
+    parameterIssues: document.querySelector('[data-parameter-issues]'),
+    parameterPreview: document.querySelector('[data-parameter-preview]')
 }
 
 const printerMap = { P700, P750W, E500, E550W, H500 }
@@ -86,8 +95,12 @@ const defaultState = {
         notifyCharacteristicUuid: '0000zzzz-0000-1000-8000-00805f9b34fb',
         namePrefix: 'PT-'
     },
+    parameters: [],
+    parameterDataRows: [],
+    parameterDataRaw: '',
+    parameterDataSourceName: '',
     items: [
-        { id: nextId(), type: 'text', text: 'Network Port', fontFamily: 'Barlow', fontSize: 32, height: 46, xOffset: 4, yOffset: 0 }
+        { id: nextId(), type: 'text', text: 'New text', fontFamily: 'Barlow', fontSize: 24, height: 40, xOffset: 4, yOffset: 0 }
     ]
 }
 
@@ -116,18 +129,21 @@ class AppController {
      * @param {object} elsRef
      * @param {object} stateRef
      * @param {ItemsEditor} itemsEditor
+     * @param {ParameterPanel} parameterPanel
      * @param {PreviewRenderer} previewRenderer
      * @param {PrintController} printController
      * @param {(text: string, type?: string) => void} setStatus
      */
-    constructor(elsRef, stateRef, itemsEditor, previewRenderer, printController, setStatus) {
+    constructor(elsRef, stateRef, itemsEditor, parameterPanel, previewRenderer, printController, setStatus) {
         this.els = elsRef
         this.state = stateRef
         this.itemsEditor = itemsEditor
+        this.parameterPanel = parameterPanel
         this.previewRenderer = previewRenderer
         this.printController = printController
         this.setStatus = setStatus
         this.itemsEditor.onChange = this.#handleStateChange.bind(this)
+        this.parameterPanel.onChange = this.#handleParameterChange.bind(this)
         this.previewRenderer.onSelectionChange = this.#handleSelectionChange.bind(this)
     }
 
@@ -143,6 +159,8 @@ class AppController {
         this.#toggleBleFields()
         await this.#loadProjectFromUrlParameter()
         this.#syncZoomControls()
+        this.parameterPanel.init()
+        this.#syncPreviewTemplateValues()
         this.#handleSelectionChange([])
         // Render the list before binding drag to ensure handles exist.
         this.itemsEditor.render()
@@ -156,7 +174,24 @@ class AppController {
      * Refreshes the preview after state changes.
      */
     #handleStateChange() {
+        this.parameterPanel.handleItemTemplatesChanged()
+        this.#syncPreviewTemplateValues()
         this.previewRenderer.render()
+    }
+
+    /**
+     * Handles parameter definition/data changes.
+     */
+    #handleParameterChange() {
+        this.#syncPreviewTemplateValues()
+        this.previewRenderer.render()
+    }
+
+    /**
+     * Syncs preview template values from parameter state.
+     */
+    #syncPreviewTemplateValues() {
+        this.previewRenderer.setTemplateValues(this.parameterPanel.getPreviewParameterValues())
     }
 
     /**
@@ -325,6 +360,8 @@ class AppController {
         idCounter = nextIdCounter
         this.#applyState(normalizedState)
         this.#syncFormFromState()
+        this.parameterPanel.syncFromState()
+        this.#syncPreviewTemplateValues()
         this.previewRenderer.setSelectedItemIds([])
         if (refreshView) {
             this.itemsEditor.render()
@@ -515,6 +552,21 @@ class AppController {
         this.state.backend = nextState.backend
         this.state.printer = nextState.printer
         this.state.ble = { ...nextState.ble }
+        this.state.parameters = Array.isArray(nextState.parameters)
+            ? nextState.parameters.map((parameter) => ({
+                  name: String(parameter?.name || '').trim(),
+                  defaultValue: String(parameter?.defaultValue ?? '')
+              }))
+            : []
+        this.state.parameterDataRows = Array.isArray(nextState.parameterDataRows)
+            ? nextState.parameterDataRows
+                  .filter((row) => row && typeof row === 'object' && !Array.isArray(row))
+                  .map((row) => ({ ...row }))
+            : []
+        this.state.parameterDataRaw =
+            typeof nextState.parameterDataRaw === 'string' ? nextState.parameterDataRaw : ''
+        this.state.parameterDataSourceName =
+            typeof nextState.parameterDataSourceName === 'string' ? nextState.parameterDataSourceName : ''
         this.state.items.splice(0, this.state.items.length, ...nextState.items)
     }
 
@@ -602,6 +654,26 @@ class AppController {
         if (!this.els.alignMenu || !this.els.alignMenuTrigger) return
         this.els.alignMenu.open = isOpen
         this.els.alignMenuTrigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false')
+    }
+
+    /**
+     * Handles print with parameter validation and batch confirmation.
+     * @returns {Promise<void>}
+     */
+    async #handlePrintClick() {
+        if (this.parameterPanel.hasBlockingErrors()) {
+            this.setStatus('Fix parameter issues before printing.', 'error')
+            return
+        }
+        const parameterValueMaps = this.parameterPanel.buildPrintParameterValueMaps()
+        if (parameterValueMaps.length > 10) {
+            const confirmed = window.confirm(`You are about to print ${parameterValueMaps.length} labels. Continue?`)
+            if (!confirmed) {
+                this.setStatus('Print canceled.', 'info')
+                return
+            }
+        }
+        await this.printController.print(parameterValueMaps)
     }
 
     /**
@@ -715,7 +787,7 @@ class AppController {
                 }
             })
         }
-        this.els.print.addEventListener('click', () => this.printController.print())
+        this.els.print.addEventListener('click', () => this.#handlePrintClick())
 
         this.els.mode.addEventListener('change', () => {
             this.state.backend = this.els.mode.value
@@ -751,8 +823,9 @@ class AppController {
 
 const previewRenderer = new PreviewRenderer(els, state, setStatus)
 const itemsEditor = new ItemsEditor(els, state, shapeTypes, noop, nextId)
+const parameterPanel = new ParameterPanel(els, state, setStatus, noop)
 const printController = new PrintController(els, state, printerMap, previewRenderer, setStatus)
-const app = new AppController(els, state, itemsEditor, previewRenderer, printController, setStatus)
+const app = new AppController(els, state, itemsEditor, parameterPanel, previewRenderer, printController, setStatus)
 
 app.init().catch((err) => {
     console.error(err)

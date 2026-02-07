@@ -8,7 +8,7 @@ export class PrintController {
      * @param {object} els
      * @param {object} state
      * @param {Record<string, Function>} printerMap
-     * @param {{ buildCanvasFromState: () => Promise<object> }} previewRenderer
+     * @param {{ buildCanvasFromState: (options?: { parameterValues?: Record<string, string> }) => Promise<object> }} previewRenderer
      * @param {(text: string, type?: string) => void} setStatus
      */
     constructor(els, state, printerMap, previewRenderer, setStatus) {
@@ -21,23 +21,43 @@ export class PrintController {
 
     /**
      * Sends the current label to the selected printer backend.
+     * @param {Array<Record<string, string>>} [parameterValueMaps=[]]
      * @returns {Promise<void>}
      */
-    async print() {
-        this.setStatus('Rendering label...', 'info')
+    async print(parameterValueMaps = []) {
+        const normalizedValueMaps =
+            Array.isArray(parameterValueMaps) && parameterValueMaps.length ? parameterValueMaps : [{}]
+
+        this.setStatus(
+            normalizedValueMaps.length > 1
+                ? `Rendering ${normalizedValueMaps.length} labels...`
+                : 'Rendering label...',
+            'info'
+        )
         this.els.print.disabled = true
         try {
-            const { printCanvas, media, res } = await this.previewRenderer.buildCanvasFromState()
-            const label = new Label(res, printCanvas)
+            let media = null
+            const pages = []
+            for (let index = 0; index < normalizedValueMaps.length; index += 1) {
+                const valueMap = normalizedValueMaps[index]
+                const renderResult = await this.previewRenderer.buildCanvasFromState({ parameterValues: valueMap })
+                media = renderResult.media
+                pages.push(new Label(renderResult.res, renderResult.printCanvas))
+            }
             const job = new Job(media || Media[this.state.media] || Media.W24)
-            job.addPage(label)
+            pages.forEach((page) => job.addPage(page))
 
             this.setStatus(`Requesting ${this.state.backend.toUpperCase()} device...`, 'info')
             const backend = await this.#connectBackend()
             const PrinterClass = this.printerMap[this.state.printer] || P700
             const printer = new PrinterClass(backend)
             await printer.print(job)
-            this.setStatus('Print job sent.', 'success')
+            this.setStatus(
+                normalizedValueMaps.length > 1
+                    ? `Print job sent (${normalizedValueMaps.length} labels).`
+                    : 'Print job sent.',
+                'success'
+            )
         } catch (err) {
             console.error(err)
             this.setStatus(err?.message || 'Failed to print', 'error')

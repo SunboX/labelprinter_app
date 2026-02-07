@@ -581,6 +581,123 @@ button:disabled {
     gap: 10px;
 }
 
+.objects-actions {
+    display: flex;
+    gap: 8px;
+    position: relative;
+    margin-bottom: 4px;
+}
+
+.objects-actions > button {
+    flex: 1;
+}
+
+.objects-actions .shape-menu {
+    top: calc(100% + 8px);
+    left: 0;
+}
+
+.parameter-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.parameter-toolbar button {
+    flex: 1;
+}
+
+.parameters {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.parameter-row {
+    border: 1px solid var(--stroke);
+    border-radius: 10px;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 8px;
+    background: #1d2027;
+}
+
+.parameter-row .field {
+    min-width: 0;
+}
+
+.parameter-row .field input {
+    min-width: 0;
+}
+
+.parameter-remove {
+    align-self: end;
+    white-space: nowrap;
+}
+
+.parameter-meta {
+    margin-top: 2px;
+}
+
+.parameter-issues {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.parameter-issue {
+    padding: 7px 9px;
+    border-radius: 8px;
+    border: 1px solid var(--stroke);
+    background: #1a1d24;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.parameter-issue.error {
+    color: var(--error);
+    border-color: rgba(255, 138, 128, 0.45);
+}
+
+.parameter-issue.warning {
+    color: #ffc96d;
+    border-color: rgba(255, 201, 109, 0.45);
+}
+
+.json-preview {
+    margin: 0;
+    max-height: 220px;
+    overflow: auto;
+    border: 1px solid var(--stroke);
+    border-radius: 10px;
+    background: #12151b;
+    padding: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.json-line {
+    display: grid;
+    grid-template-columns: 38px 1fr;
+    gap: 8px;
+}
+
+.json-line-number {
+    color: var(--muted);
+    text-align: right;
+    user-select: none;
+}
+
+.json-line.warning {
+    background: rgba(255, 201, 109, 0.08);
+}
+
+.json-line.error {
+    background: rgba(255, 138, 128, 0.12);
+}
+
 .item-card {
     border: 1px solid var(--stroke);
     border-radius: 10px;

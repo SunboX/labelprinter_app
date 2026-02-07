@@ -5,6 +5,15 @@ import { ZoomUtils } from './ZoomUtils.mjs'
  */
 export class ProjectIoUtils {
     /**
+     * Returns true when the value is a plain object.
+     * @param {unknown} value
+     * @returns {boolean}
+     */
+    static #isPlainObject(value) {
+        return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+    }
+
+    /**
      * Removes runtime-only fields from a project item.
      * @param {object} item
      * @returns {object}
@@ -24,6 +33,8 @@ export class ProjectIoUtils {
      * @returns {object}
      */
     static buildProjectPayload(state) {
+        const normalizedParameters = ProjectIoUtils.#normalizeParameterDefinitions(state.parameters)
+        const normalizedParameterDataRows = ProjectIoUtils.#normalizeParameterDataRows(state.parameterDataRows)
         return {
             media: state.media,
             mediaLengthMm: state.mediaLengthMm ?? null,
@@ -33,8 +44,36 @@ export class ProjectIoUtils {
             backend: state.backend,
             printer: state.printer,
             ble: { ...state.ble },
+            parameters: normalizedParameters,
+            parameterDataRows: normalizedParameterDataRows,
+            parameterDataSourceName: typeof state.parameterDataSourceName === 'string' ? state.parameterDataSourceName : '',
             items: (state.items || []).map((item) => ProjectIoUtils.stripRuntimeFields(item))
         }
+    }
+
+    /**
+     * Normalizes parameter definitions for serialization.
+     * @param {Array<{ name?: unknown, defaultValue?: unknown }>} definitions
+     * @returns {Array<{ name: string, defaultValue: string }>}
+     */
+    static #normalizeParameterDefinitions(definitions) {
+        if (!Array.isArray(definitions)) return []
+        return definitions.map((definition) => ({
+            name: String(definition?.name || '').trim(),
+            defaultValue: String(definition?.defaultValue ?? '')
+        }))
+    }
+
+    /**
+     * Normalizes parameter data rows for serialization.
+     * @param {Array<unknown>} rows
+     * @returns {Array<Record<string, unknown>>}
+     */
+    static #normalizeParameterDataRows(rows) {
+        if (!Array.isArray(rows)) return []
+        return rows
+            .filter((row) => ProjectIoUtils.#isPlainObject(row))
+            .map((row) => ({ ...row }))
     }
 
     /**
@@ -189,6 +228,8 @@ export class ProjectIoUtils {
         })
 
         const rawBle = rawState.ble && typeof rawState.ble === 'object' ? rawState.ble : {}
+        const rawParameters = ProjectIoUtils.#normalizeParameterDefinitions(rawState.parameters)
+        const rawParameterDataRows = ProjectIoUtils.#normalizeParameterDataRows(rawState.parameterDataRows)
         const normalizedState = {
             ...baseState,
             media: typeof rawState.media === 'string' ? rawState.media : baseState.media,
@@ -214,6 +255,11 @@ export class ProjectIoUtils {
                         : baseState.ble.notifyCharacteristicUuid,
                 namePrefix: typeof rawBle.namePrefix === 'string' ? rawBle.namePrefix : baseState.ble.namePrefix
             },
+            parameters: rawParameters,
+            parameterDataRows: rawParameterDataRows,
+            parameterDataRaw: typeof rawState.parameterDataRaw === 'string' ? rawState.parameterDataRaw : '',
+            parameterDataSourceName:
+                typeof rawState.parameterDataSourceName === 'string' ? rawState.parameterDataSourceName : '',
             items: normalizedItems
         }
 

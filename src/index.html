@@ -18,53 +18,6 @@
             </div>
                 <div class="toolbar">
                     <div class="toolbar-group">
-                        <button class="ghost" data-add-text>Text</button>
-                        <button class="ghost" data-add-qr>QR-Code</button>
-                        <button class="ghost" data-add-shape>Form</button>
-                        <div class="shape-menu" data-shape-menu hidden>
-                            <button class="menu-item" data-shape-type="rect">
-                                <span class="menu-icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" focusable="false">
-                                        <rect x="4" y="6" width="16" height="12"></rect>
-                                    </svg>
-                                </span>
-                                <span class="menu-label">Rechteck</span>
-                            </button>
-                            <button class="menu-item" data-shape-type="roundRect">
-                                <span class="menu-icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" focusable="false">
-                                        <rect x="4" y="6" width="16" height="12" rx="3" ry="3"></rect>
-                                    </svg>
-                                </span>
-                                <span class="menu-label">Abgerundetes Rechteck</span>
-                            </button>
-                            <button class="menu-item" data-shape-type="oval">
-                                <span class="menu-icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" focusable="false">
-                                        <ellipse cx="12" cy="12" rx="8" ry="5"></ellipse>
-                                    </svg>
-                                </span>
-                                <span class="menu-label">Oval</span>
-                            </button>
-                            <button class="menu-item" data-shape-type="polygon">
-                                <span class="menu-icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" focusable="false">
-                                        <polygon points="6,7 18,7 20,12 18,17 6,17 4,12"></polygon>
-                                    </svg>
-                                </span>
-                                <span class="menu-label">Vieleck (Polygon)</span>
-                            </button>
-                            <button class="menu-item" data-shape-type="line">
-                                <span class="menu-icon" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" focusable="false">
-                                        <line x1="4" y1="12" x2="20" y2="12"></line>
-                                    </svg>
-                                </span>
-                                <span class="menu-label">Linie</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="toolbar-group">
                         <button class="ghost" data-save-project>Save</button>
                         <button class="ghost" data-load-project>Load</button>
                         <button class="ghost icon-button" data-share-project aria-label="Share project URL" title="Share project URL">
@@ -289,7 +242,68 @@
                 <div class="section">
                     <div class="section-title">Objects</div>
                     <p class="muted small">Drag to reorder. Adjust offsets, fonts, QR size, and forms.</p>
+                    <div class="objects-actions">
+                        <button class="ghost" type="button" data-add-text>Text</button>
+                        <button class="ghost" type="button" data-add-qr>QR-Code</button>
+                        <button class="ghost" type="button" data-add-shape>Form</button>
+                        <div class="shape-menu" data-shape-menu hidden>
+                            <button class="menu-item" data-shape-type="rect">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <rect x="4" y="6" width="16" height="12"></rect>
+                                    </svg>
+                                </span>
+                                <span class="menu-label">Rechteck</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="roundRect">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <rect x="4" y="6" width="16" height="12" rx="3" ry="3"></rect>
+                                    </svg>
+                                </span>
+                                <span class="menu-label">Abgerundetes Rechteck</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="oval">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <ellipse cx="12" cy="12" rx="8" ry="5"></ellipse>
+                                    </svg>
+                                </span>
+                                <span class="menu-label">Oval</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="polygon">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <polygon points="6,7 18,7 20,12 18,17 6,17 4,12"></polygon>
+                                    </svg>
+                                </span>
+                                <span class="menu-label">Vieleck (Polygon)</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="line">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <line x1="4" y1="12" x2="20" y2="12"></line>
+                                    </svg>
+                                </span>
+                                <span class="menu-label">Linie</span>
+                            </button>
+                        </div>
+                    </div>
                     <div class="items" data-items></div>
+                </div>
+                <div class="section">
+                    <div class="section-title">Parameters</div>
+                    <p class="muted small">Use <code>{{parameter_name}}</code> in text and QR content.</p>
+                    <div class="parameter-toolbar">
+                        <button class="ghost" type="button" data-add-parameter>Add parameter</button>
+                        <button class="ghost" type="button" data-load-parameter-data>Load JSON</button>
+                        <button class="ghost" type="button" data-download-parameter-example>Example JSON</button>
+                    </div>
+                    <input type="file" accept="application/json" data-parameter-data-input hidden />
+                    <div class="parameters" data-parameter-definitions></div>
+                    <div class="parameter-meta small muted" data-parameter-data-meta>0 rows loaded (No file selected)</div>
+                    <div class="parameter-issues" data-parameter-issues></div>
+                    <pre class="json-preview" data-parameter-preview></pre>
                 </div>
                 <div class="section">
                     <div class="section-title">Status</div>

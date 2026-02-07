@@ -14,6 +14,15 @@ This repository now contains the application layer only:
 The printer protocol and backend implementation are consumed from:
 - `git@github.com:SunboX/labelprinterkit.git`
 
+## Parameters And Batch Printing
+
+- Placeholders use the Mustache-style format `{{parameter_name}}`.
+- Placeholders work in text items (`text`) and QR items (`data`).
+- Define parameters with optional defaults in the inspector.
+- Load a JSON file with an array of objects to print one label per row.
+- The app validates uploaded JSON and highlights parse or row-level issues.
+- Printing asks for confirmation before large runs (>10 labels).
+
 ## Dependency
 
 `labelprinterkit` is installed via Git SSH in `package.json`:
