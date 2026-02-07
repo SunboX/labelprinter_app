@@ -230,6 +230,16 @@ button {
     stroke: none;
 }
 
+.icon-zoom {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 .shape-menu {
     position: absolute;
     top: calc(100% + 8px);

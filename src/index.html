@@ -234,7 +234,11 @@
                         </details>
                         <span class="workspace-divider" aria-hidden="true"></span>
                         <div class="zoom-controls" role="group" aria-label="Zoom preview">
-                            <button class="ghost zoom-btn" data-zoom-out aria-label="Zoom out">-</button>
+                            <button class="ghost zoom-btn" data-zoom-out aria-label="Zoom out">
+                                <svg class="icon-zoom" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M6 12h12"></path>
+                                </svg>
+                            </button>
                             <input
                                 class="zoom-range"
                                 type="range"
@@ -245,7 +249,12 @@
                                 data-zoom-range
                                 aria-label="Preview zoom"
                             />
-                            <button class="ghost zoom-btn" data-zoom-in aria-label="Zoom in">+</button>
+                            <button class="ghost zoom-btn" data-zoom-in aria-label="Zoom in">
+                                <svg class="icon-zoom" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M6 12h12"></path>
+                                    <path d="M12 6v12"></path>
+                                </svg>
+                            </button>
                             <button class="ghost zoom-reset" data-zoom-reset data-zoom-label aria-label="Reset zoom">100%</button>
                         </div>
                         <span class="workspace-divider" aria-hidden="true"></span>
