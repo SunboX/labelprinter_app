@@ -59,6 +59,7 @@ const els = {
     loadParameterData: document.querySelector('[data-load-parameter-data]'),
     downloadParameterExample: document.querySelector('[data-download-parameter-example]'),
     parameterDataInput: document.querySelector('[data-parameter-data-input]'),
+    parameterDataPanel: document.querySelector('[data-parameter-data-panel]'),
     parameterDataMeta: document.querySelector('[data-parameter-data-meta]'),
     parameterIssues: document.querySelector('[data-parameter-issues]'),
     parameterPreview: document.querySelector('[data-parameter-preview]')

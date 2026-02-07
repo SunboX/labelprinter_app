@@ -271,6 +271,39 @@ export class ParameterTemplateUtils {
     }
 
     /**
+     * Collects unique property names from parameter data rows in appearance order.
+     * @param {Record<string, unknown>[]} rows
+     * @returns {string[]}
+     */
+    static collectPropertyNamesFromRows(rows) {
+        if (!Array.isArray(rows)) return []
+        const seen = new Set()
+        const names = []
+        rows.forEach((row) => {
+            if (!ParameterTemplateUtils.#isPlainObject(row)) return
+            Object.keys(row).forEach((key) => {
+                const name = String(key || '').trim()
+                if (!name || seen.has(name)) return
+                seen.add(name)
+                names.push(name)
+            })
+        })
+        return names
+    }
+
+    /**
+     * Builds parameter definitions from JSON row properties.
+     * @param {Record<string, unknown>[]} rows
+     * @returns {Array<{ name: string, defaultValue: string }>}
+     */
+    static buildParameterDefinitionsFromRows(rows) {
+        return ParameterTemplateUtils.collectPropertyNamesFromRows(rows).map((name) => ({
+            name,
+            defaultValue: ''
+        }))
+    }
+
+    /**
      * Validates parameter setup against templates and uploaded rows.
      * @param {Array<{ name?: string, defaultValue?: unknown }>} definitions
      * @param {Array<{ type?: string, text?: string, data?: string }>} items

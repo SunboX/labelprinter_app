@@ -57,4 +57,25 @@ describe('parameter-template-utils', () => {
         ])
         assert.deepEqual(rows, [{ host: 'printer.local', port: 'example_port' }])
     })
+
+    it('collects unique property names from JSON rows in appearance order', () => {
+        const propertyNames = ParameterTemplateUtils.collectPropertyNamesFromRows([
+            { host: 'printer-a', port: 9100 },
+            { host: 'printer-b', queue: 'main' },
+            null
+        ])
+        assert.deepEqual(propertyNames, ['host', 'port', 'queue'])
+    })
+
+    it('builds parameter definitions from JSON rows', () => {
+        const definitions = ParameterTemplateUtils.buildParameterDefinitionsFromRows([
+            { host: 'printer-a', port: 9100 },
+            { queue: 'main', host: 'printer-b' }
+        ])
+        assert.deepEqual(definitions, [
+            { name: 'host', defaultValue: '' },
+            { name: 'port', defaultValue: '' },
+            { name: 'queue', defaultValue: '' }
+        ])
+    })
 })
