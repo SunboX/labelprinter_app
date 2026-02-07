@@ -58,21 +58,21 @@ body {
 }
 
 .brand-mark {
-    width: 12px;
-    height: 12px;
-    border: 2px solid var(--accent-strong);
-    border-radius: 2px;
-    box-shadow: 0 0 0 3px rgba(74, 155, 255, 0.15);
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    border-radius: 10px;
+    filter: drop-shadow(0 0 10px rgba(74, 155, 255, 0.22));
+}
+
+.brand-text {
+    display: flex;
+    align-items: center;
 }
 
 .brand-name {
     font-weight: 700;
     letter-spacing: 0.02em;
-}
-
-.brand-sub {
-    color: var(--muted);
-    font-size: 12px;
 }
 
 .toolbar {
