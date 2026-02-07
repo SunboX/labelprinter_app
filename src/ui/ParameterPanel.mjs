@@ -237,6 +237,10 @@ export class ParameterPanel {
 
             this.#clearParseError()
             this.state.parameterDataRows = parsed.rows || []
+            const addedCount = this.#autoCreateParametersFromRows(this.state.parameterDataRows)
+            if (addedCount > 0) {
+                this.#renderDefinitions()
+            }
             this.#refreshValidationViews()
             const rowCount = this.state.parameterDataRows.length
             const rowSuffix = rowCount === 1 ? '' : this.translate('parameters.rowPluralSuffix')
@@ -313,6 +317,7 @@ export class ParameterPanel {
             hint.className = 'muted small'
             hint.textContent = this.translate('parameters.noParameters')
             this.els.parameterDefinitions.appendChild(hint)
+            this.#syncConditionalVisibility()
             return
         }
 
@@ -361,6 +366,7 @@ export class ParameterPanel {
             row.append(nameField, defaultField, remove)
             this.els.parameterDefinitions.appendChild(row)
         })
+        this.#syncConditionalVisibility()
     }
 
     /**
@@ -396,9 +402,44 @@ export class ParameterPanel {
             this.rowLineRanges = rowLineRanges
         }
 
+        this.#syncConditionalVisibility()
         this.#renderDataMeta()
         this.#renderIssues()
         this.#renderPreview()
+    }
+
+    /**
+     * Returns true when at least one parameter definition exists.
+     * @returns {boolean}
+     */
+    #hasParameterDefinitions() {
+        return Array.isArray(this.state.parameters) && this.state.parameters.length > 0
+    }
+
+    /**
+     * Shows or hides parameter-data controls based on whether parameters exist.
+     */
+    #syncConditionalVisibility() {
+        const hasParameters = this.#hasParameterDefinitions()
+        if (this.els.downloadParameterExample) {
+            this.els.downloadParameterExample.hidden = !hasParameters
+        }
+        if (this.els.parameterDataPanel) {
+            this.els.parameterDataPanel.hidden = !hasParameters
+        }
+    }
+
+    /**
+     * Auto-creates parameter definitions from row property names when none exist yet.
+     * @param {Record<string, unknown>[]} rows
+     * @returns {number}
+     */
+    #autoCreateParametersFromRows(rows) {
+        if (this.#hasParameterDefinitions()) return 0
+        const inferred = ParameterTemplateUtils.buildParameterDefinitionsFromRows(rows)
+        if (!inferred.length) return 0
+        this.state.parameters = inferred
+        return inferred.length
     }
 
     /**
