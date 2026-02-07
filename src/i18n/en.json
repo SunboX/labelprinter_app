@@ -1,0 +1,202 @@
+{
+    "app": {
+        "title": "Labelprinter App",
+        "languageLabel": "Language"
+    },
+    "locale": {
+        "en": "English",
+        "de": "Deutsch"
+    },
+    "toolbar": {
+        "save": "Save",
+        "load": "Load",
+        "print": "Print",
+        "shareAria": "Share project URL",
+        "shareTitle": "Share project URL"
+    },
+    "sidebar": {
+        "printer": {
+            "title": "Printer",
+            "backend": "Backend",
+            "backendUsb": "WebUSB (USB printer class)",
+            "backendBle": "WebBluetooth (BLE)",
+            "model": "Printer model"
+        },
+        "media": {
+            "title": "Media",
+            "width": "Width",
+            "resolution": "Resolution",
+            "orientation": "Orientation",
+            "length": "Media length (mm)",
+            "lengthPlaceholder": "Auto from items (leave blank)",
+            "lengthHint": "Override height; keep blank to match your stacked objects."
+        },
+        "ble": {
+            "title": "BLE",
+            "servicePlaceholder": "Service UUID",
+            "writePlaceholder": "Write characteristic UUID",
+            "notifyPlaceholder": "Notify characteristic UUID (optional)",
+            "filterPlaceholder": "Name prefix (optional, e.g. PT-)",
+            "hint": "Visible when WebBluetooth is selected."
+        }
+    },
+    "orientation": {
+        "horizontal": "Horizontal",
+        "vertical": "Vertical"
+    },
+    "workspace": {
+        "layoutPreview": "Layout preview",
+        "alignTools": "Alignment tools",
+        "align": "Align",
+        "alignLeft": "Align left",
+        "alignCenter": "Align center",
+        "alignRight": "Align right",
+        "alignTop": "Align top",
+        "alignMiddle": "Align middle",
+        "alignBottom": "Align bottom",
+        "alignTo": "Align to",
+        "alignReference": {
+            "selection": "Selection",
+            "largest": "Largest item",
+            "smallest": "Smallest item",
+            "label": "Label"
+        },
+        "zoomOut": "Zoom out",
+        "zoomIn": "Zoom in",
+        "zoomReset": "Reset zoom",
+        "dropHint": "Drop graphics or CSV data here to prefill your label."
+    },
+    "objects": {
+        "title": "Objects",
+        "description": "Drag to reorder. Adjust offsets, fonts, QR size, and forms.",
+        "addText": "Text",
+        "addQr": "QR-Code",
+        "addShape": "Form"
+    },
+    "parameters": {
+        "title": "Parameters",
+        "description": "Use {{parameter_name}} in text and QR content.",
+        "add": "Add parameter",
+        "loadJson": "Load JSON",
+        "exampleJson": "Example JSON",
+        "rowPluralSuffix": "s",
+        "rowsLoaded": "{{count}} row{{suffix}} loaded ({{sourceName}})",
+        "sourceNone": "No file selected",
+        "noParameters": "No parameters yet. Add one to use {{placeholders}} in text or QR content.",
+        "name": "Name",
+        "default": "Default",
+        "namePlaceholder": "parameter_name",
+        "defaultPlaceholder": "Optional default value",
+        "remove": "Remove",
+        "issuesNone": "No parameter issues detected.",
+        "downloadExampleName": "label-parameters-example-{{date}}.json"
+    },
+    "status": {
+        "title": "Status",
+        "ready": "Ready. Choose a backend and click print."
+    },
+    "shapes": {
+        "rect": "Rectangle",
+        "roundRect": "Rounded rectangle",
+        "oval": "Oval",
+        "polygon": "Polygon",
+        "line": "Line"
+    },
+    "formats": {
+        "mediaOption": "{{id}} ({{width}}mm, area {{printArea}} dots)",
+        "resolutionOption": "{{id}} ({{x}}x{{y}} dpi)",
+        "dimensions": "{{media}} • {{printableLabel}} {{marginLabel}} • {{orientationLabel}}",
+        "printable": "{{printWidth}} dot printable",
+        "margins": "• margins {{start}}/{{end}} dots"
+    },
+    "preview": {
+        "orientationHorizontal": "horizontal",
+        "orientationVertical": "vertical",
+        "failed": "Preview failed. Check your inputs."
+    },
+    "itemsEditor": {
+        "sizeLength": "Length",
+        "sizeHeight": "Height",
+        "newText": "New text",
+        "newQrData": "https://example.com",
+        "typeText": "Text",
+        "typeQr": "QR",
+        "typeShape": "Form",
+        "handleDrag": "⇅ drag",
+        "fieldText": "Text",
+        "fieldQrContent": "QR content",
+        "fieldShape": "Form",
+        "remove": "Remove",
+        "sliderXOffset": "X offset",
+        "sliderYOffset": "Y offset",
+        "fontFamily": "Font family",
+        "sliderFontSize": "Font size",
+        "sliderQrSize": "QR size",
+        "sliderStroke": "Stroke",
+        "sliderThickness": "Thickness",
+        "sliderRadius": "Radius",
+        "sliderSides": "Sides"
+    },
+    "messages": {
+        "selectAtLeastOne": "Select at least one item first.",
+        "selectAtLeastTwo": "Select at least two items for this alignment mode.",
+        "nothingToAlign": "Nothing to align.",
+        "alignedOne": "Aligned 1 item.",
+        "alignedMany": "Aligned {{count}} items.",
+        "loaded": "Loaded {{sourceLabel}}.",
+        "loadUrlFailed": "Failed to load project from URL: {{message}}.",
+        "sharedLink": "Shared project link.",
+        "copiedLink": "Project link copied to clipboard.",
+        "copyPrompt": "Copy project URL",
+        "projectJsonDescription": "Label project JSON",
+        "linkReady": "Project link ready to copy.",
+        "shareCanceled": "Share canceled.",
+        "shareFailed": "Failed to share project URL: {{message}}.",
+        "saved": "Saved {{fileName}}.",
+        "savePrompt": "Save project as",
+        "saveCanceled": "Save canceled.",
+        "downloaded": "Downloaded {{fileName}}.",
+        "saveFailed": "Failed to save project: {{message}}.",
+        "loadCanceled": "Load canceled.",
+        "loadFailed": "Failed to load project: {{message}}.",
+        "parameterFixBeforePrint": "Fix parameter issues before printing.",
+        "printConfirmMany": "You are about to print {{count}} labels. Continue?",
+        "printCanceled": "Print canceled.",
+        "appInitFailed": "App initialization failed.",
+        "sourceUrlParameter": "project from URL parameter",
+        "sourceSharedLink": "project from shared link",
+        "unknownError": "Unknown error"
+    },
+    "print": {
+        "renderingSingle": "Rendering label...",
+        "renderingMany": "Rendering {{count}} labels...",
+        "requestingDevice": "Requesting {{backend}} device...",
+        "sentSingle": "Print job sent.",
+        "sentMany": "Print job sent ({{count}} labels).",
+        "failed": "Failed to print",
+        "unknownBackend": "Unknown backend mode"
+    },
+    "parameterStatus": {
+        "defineOne": "Define at least one parameter first.",
+        "downloaded": "Downloaded {{fileName}}.",
+        "loadCanceled": "Parameter data load canceled.",
+        "invalidJson": "Invalid parameter JSON{{location}}.",
+        "loadedRows": "Loaded parameter data ({{count}} row{{suffix}}).",
+        "loadFailed": "Failed to load parameter JSON: {{message}}.",
+        "parseLocation": " (line {{line}}, col {{column}})",
+        "pickerDescription": "Parameter data JSON"
+    },
+    "validation": {
+        "parseError": "JSON parse error{{location}}: {{message}}",
+        "emptyDefinitionName": "Parameter definition {{index}} has an empty name.",
+        "invalidDefinitionName": "Parameter \"{{name}}\" has an invalid name. Use letters, digits and underscore only.",
+        "duplicateDefinitionName": "Parameter \"{{name}}\" is defined {{count}} times.",
+        "undefinedPlaceholder": "Placeholder \"{{placeholder}}\" is used but no parameter is defined for it.",
+        "unusedDefinition": "Parameter \"{{name}}\" is defined but not used in any text or QR template.",
+        "invalidRowType": "Row {{row}} is not a JSON object.",
+        "unknownRowParameter": "Row {{row}} contains \"{{name}}\" which is not defined as a parameter.",
+        "missingRowParameter": "Row {{row}} is missing \"{{name}}\" and no default is set.",
+        "fallbackDefaultParameter": "Row {{row}} uses default value for \"{{name}}\".",
+        "jsonFormatting": "Uploaded JSON is valid but not pretty-formatted (2-space indentation)."
+    }
+}

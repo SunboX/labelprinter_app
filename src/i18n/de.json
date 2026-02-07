@@ -1,0 +1,202 @@
+{
+    "app": {
+        "title": "Labeldrucker App",
+        "languageLabel": "Sprache"
+    },
+    "locale": {
+        "en": "English",
+        "de": "Deutsch"
+    },
+    "toolbar": {
+        "save": "Speichern",
+        "load": "Laden",
+        "print": "Drucken",
+        "shareAria": "Projekt-URL teilen",
+        "shareTitle": "Projekt-URL teilen"
+    },
+    "sidebar": {
+        "printer": {
+            "title": "Drucker",
+            "backend": "Backend",
+            "backendUsb": "WebUSB (USB-Druckerklasse)",
+            "backendBle": "WebBluetooth (BLE)",
+            "model": "Druckermodell"
+        },
+        "media": {
+            "title": "Band",
+            "width": "Breite",
+            "resolution": "Auflösung",
+            "orientation": "Ausrichtung",
+            "length": "Bandlänge (mm)",
+            "lengthPlaceholder": "Automatisch aus Objekten (leer lassen)",
+            "lengthHint": "Höhe überschreiben; leer lassen, um sie an die gestapelten Objekte anzupassen."
+        },
+        "ble": {
+            "title": "BLE",
+            "servicePlaceholder": "Service-UUID",
+            "writePlaceholder": "Write-Characteristic-UUID",
+            "notifyPlaceholder": "Notify-Characteristic-UUID (optional)",
+            "filterPlaceholder": "Namenspräfix (optional, z. B. PT-)",
+            "hint": "Sichtbar, wenn WebBluetooth ausgewählt ist."
+        }
+    },
+    "orientation": {
+        "horizontal": "Horizontal",
+        "vertical": "Vertikal"
+    },
+    "workspace": {
+        "layoutPreview": "Layoutvorschau",
+        "alignTools": "Ausrichtungswerkzeuge",
+        "align": "Ausrichten",
+        "alignLeft": "Linksbündig",
+        "alignCenter": "Horizontal zentrieren",
+        "alignRight": "Rechtsbündig",
+        "alignTop": "Oben ausrichten",
+        "alignMiddle": "Vertikal zentrieren",
+        "alignBottom": "Unten ausrichten",
+        "alignTo": "Ausrichten an",
+        "alignReference": {
+            "selection": "Auswahl",
+            "largest": "Größtes Objekt",
+            "smallest": "Kleinstes Objekt",
+            "label": "Label"
+        },
+        "zoomOut": "Herauszoomen",
+        "zoomIn": "Hereinzoomen",
+        "zoomReset": "Zoom zurücksetzen",
+        "dropHint": "Grafiken oder CSV-Daten hier ablegen, um das Label vorzufüllen."
+    },
+    "objects": {
+        "title": "Objekte",
+        "description": "Zum Umordnen ziehen. Offsets, Schriftarten, QR-Größe und Formen anpassen.",
+        "addText": "Text",
+        "addQr": "QR-Code",
+        "addShape": "Form"
+    },
+    "parameters": {
+        "title": "Parameter",
+        "description": "Verwende {{parameter_name}} in Text- und QR-Inhalten.",
+        "add": "Parameter hinzufügen",
+        "loadJson": "JSON laden",
+        "exampleJson": "Beispiel-JSON",
+        "rowPluralSuffix": "n",
+        "rowsLoaded": "{{count}} Zeile{{suffix}} geladen ({{sourceName}})",
+        "sourceNone": "Keine Datei ausgewählt",
+        "noParameters": "Noch keine Parameter. Füge einen hinzu, um {{placeholders}} in Text- oder QR-Inhalten zu verwenden.",
+        "name": "Name",
+        "default": "Standard",
+        "namePlaceholder": "parameter_name",
+        "defaultPlaceholder": "Optionaler Standardwert",
+        "remove": "Entfernen",
+        "issuesNone": "Keine Parameterprobleme erkannt.",
+        "downloadExampleName": "label-parameter-beispiel-{{date}}.json"
+    },
+    "status": {
+        "title": "Status",
+        "ready": "Bereit. Backend auswählen und auf Drucken klicken."
+    },
+    "shapes": {
+        "rect": "Rechteck",
+        "roundRect": "Abgerundetes Rechteck",
+        "oval": "Oval",
+        "polygon": "Polygon",
+        "line": "Linie"
+    },
+    "formats": {
+        "mediaOption": "{{id}} ({{width}}mm, Bereich {{printArea}} Punkte)",
+        "resolutionOption": "{{id}} ({{x}}x{{y}} dpi)",
+        "dimensions": "{{media}} • {{printableLabel}} {{marginLabel}} • {{orientationLabel}}",
+        "printable": "{{printWidth}} Punkte druckbar",
+        "margins": "• Ränder {{start}}/{{end}} Punkte"
+    },
+    "preview": {
+        "orientationHorizontal": "horizontal",
+        "orientationVertical": "vertikal",
+        "failed": "Vorschau fehlgeschlagen. Eingaben prüfen."
+    },
+    "itemsEditor": {
+        "sizeLength": "Länge",
+        "sizeHeight": "Höhe",
+        "newText": "Neuer Text",
+        "newQrData": "https://example.com",
+        "typeText": "Text",
+        "typeQr": "QR",
+        "typeShape": "Form",
+        "handleDrag": "⇅ ziehen",
+        "fieldText": "Text",
+        "fieldQrContent": "QR-Inhalt",
+        "fieldShape": "Form",
+        "remove": "Entfernen",
+        "sliderXOffset": "X-Versatz",
+        "sliderYOffset": "Y-Versatz",
+        "fontFamily": "Schriftart",
+        "sliderFontSize": "Schriftgröße",
+        "sliderQrSize": "QR-Größe",
+        "sliderStroke": "Strich",
+        "sliderThickness": "Dicke",
+        "sliderRadius": "Radius",
+        "sliderSides": "Seiten"
+    },
+    "messages": {
+        "selectAtLeastOne": "Wähle zuerst mindestens ein Objekt.",
+        "selectAtLeastTwo": "Wähle für diesen Ausrichtungsmodus mindestens zwei Objekte.",
+        "nothingToAlign": "Nichts auszurichten.",
+        "alignedOne": "1 Objekt ausgerichtet.",
+        "alignedMany": "{{count}} Objekte ausgerichtet.",
+        "loaded": "{{sourceLabel}} geladen.",
+        "loadUrlFailed": "Projekt konnte nicht über URL geladen werden: {{message}}.",
+        "sharedLink": "Projektlink geteilt.",
+        "copiedLink": "Projektlink in die Zwischenablage kopiert.",
+        "copyPrompt": "Projekt-URL kopieren",
+        "projectJsonDescription": "Labelprojekt-JSON",
+        "linkReady": "Projektlink zum Kopieren bereit.",
+        "shareCanceled": "Teilen abgebrochen.",
+        "shareFailed": "Projekt-URL konnte nicht geteilt werden: {{message}}.",
+        "saved": "{{fileName}} gespeichert.",
+        "savePrompt": "Projekt speichern als",
+        "saveCanceled": "Speichern abgebrochen.",
+        "downloaded": "{{fileName}} heruntergeladen.",
+        "saveFailed": "Projekt konnte nicht gespeichert werden: {{message}}.",
+        "loadCanceled": "Laden abgebrochen.",
+        "loadFailed": "Projekt konnte nicht geladen werden: {{message}}.",
+        "parameterFixBeforePrint": "Behebe Parameterprobleme vor dem Drucken.",
+        "printConfirmMany": "Du wirst {{count}} Labels drucken. Fortfahren?",
+        "printCanceled": "Drucken abgebrochen.",
+        "appInitFailed": "App-Initialisierung fehlgeschlagen.",
+        "sourceUrlParameter": "Projekt aus URL-Parameter",
+        "sourceSharedLink": "Projekt aus geteiltem Link",
+        "unknownError": "Unbekannter Fehler"
+    },
+    "print": {
+        "renderingSingle": "Label wird gerendert...",
+        "renderingMany": "{{count}} Labels werden gerendert...",
+        "requestingDevice": "{{backend}}-Gerät wird angefordert...",
+        "sentSingle": "Druckauftrag gesendet.",
+        "sentMany": "Druckauftrag gesendet ({{count}} Labels).",
+        "failed": "Drucken fehlgeschlagen",
+        "unknownBackend": "Unbekannter Backend-Modus"
+    },
+    "parameterStatus": {
+        "defineOne": "Definiere zuerst mindestens einen Parameter.",
+        "downloaded": "{{fileName}} heruntergeladen.",
+        "loadCanceled": "Laden der Parameterdaten abgebrochen.",
+        "invalidJson": "Ungültiges Parameter-JSON{{location}}.",
+        "loadedRows": "Parameterdaten geladen ({{count}} Zeile{{suffix}}).",
+        "loadFailed": "Parameter-JSON konnte nicht geladen werden: {{message}}.",
+        "parseLocation": " (Zeile {{line}}, Spalte {{column}})",
+        "pickerDescription": "Parameterdaten-JSON"
+    },
+    "validation": {
+        "parseError": "JSON-Parsefehler{{location}}: {{message}}",
+        "emptyDefinitionName": "Parameterdefinition {{index}} hat einen leeren Namen.",
+        "invalidDefinitionName": "Parameter \"{{name}}\" hat einen ungültigen Namen. Erlaubt sind Buchstaben, Ziffern und Unterstrich.",
+        "duplicateDefinitionName": "Parameter \"{{name}}\" ist {{count}}-mal definiert.",
+        "undefinedPlaceholder": "Platzhalter \"{{placeholder}}\" wird verwendet, aber kein Parameter ist dafür definiert.",
+        "unusedDefinition": "Parameter \"{{name}}\" ist definiert, wird aber in keinem Text- oder QR-Template verwendet.",
+        "invalidRowType": "Zeile {{row}} ist kein JSON-Objekt.",
+        "unknownRowParameter": "Zeile {{row}} enthält \"{{name}}\", das nicht als Parameter definiert ist.",
+        "missingRowParameter": "Zeile {{row}} fehlt \"{{name}}\" und es ist kein Standardwert gesetzt.",
+        "fallbackDefaultParameter": "Zeile {{row}} verwendet den Standardwert für \"{{name}}\".",
+        "jsonFormatting": "Hochgeladenes JSON ist gültig, aber nicht schön formatiert (2 Leerzeichen Einrückung)."
+    }
+}

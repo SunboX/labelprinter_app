@@ -48,3 +48,8 @@
 - Unit: `tests/project-io-utils.test.mjs` also covers serialization/normalization for `parameters` and `parameterDataRows`.
 - Manual: run `npm start`, open `http://localhost:3000/`, add parameters in the inspector, use them in text/QR as `{{name}}`, then upload a JSON array file.
 - Expected: JSON is validated, issues are shown with row-aware highlighting, preview uses the first row, and Print produces one label per row (with confirmation when row count exceeds 10).
+
+## Localization
+- Unit: `tests/i18n.test.mjs` validates locale detection, interpolation, and `data-i18n` attribute application.
+- Manual: run `npm start`, open `http://localhost:3000/`, switch language via the top toolbar locale selector (`English` / `Deutsch`).
+- Expected: static UI labels and dynamic editor panels update to the selected language.

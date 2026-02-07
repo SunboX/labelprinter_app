@@ -17,11 +17,13 @@ export class PreviewRenderer {
      * @param {object} els
      * @param {object} state
      * @param {(text: string, type?: string) => void} setStatus
+     * @param {(key: string, params?: Record<string, string | number>) => string} translate
      */
-    constructor(els, state, setStatus) {
+    constructor(els, state, setStatus, translate) {
         this.els = els
         this.state = state
         this.setStatus = setStatus
+        this.translate = typeof translate === 'function' ? translate : (key) => key
         this._previewBusy = false
         this._previewQueued = false
         this._overlayCanvas = null
@@ -688,10 +690,21 @@ export class PreviewRenderer {
             }
             ctx.restore()
 
-            const orientationLabel = this.state.orientation === 'horizontal' ? 'horizontal' : 'vertical'
-            const printableLabel = `${printWidth} dot printable`
-            const marginLabel = marginStart || marginEnd ? `• margins ${marginStart}/${marginEnd} dots` : ''
-            this.els.dimensions.textContent = `${this.state.media} • ${printableLabel} ${marginLabel} • ${orientationLabel}`
+            const orientationLabel =
+                this.state.orientation === 'horizontal'
+                    ? this.translate('preview.orientationHorizontal')
+                    : this.translate('preview.orientationVertical')
+            const printableLabel = this.translate('formats.printable', { printWidth })
+            const marginLabel =
+                marginStart || marginEnd
+                    ? this.translate('formats.margins', { start: marginStart, end: marginEnd })
+                    : ''
+            this.els.dimensions.textContent = this.translate('formats.dimensions', {
+                media: this.state.media,
+                printableLabel,
+                marginLabel,
+                orientationLabel
+            })
             const wrapRect = this.els.canvasWrap?.getBoundingClientRect()
             const plateRect = this.els.labelPlate?.getBoundingClientRect()
             const rulerOffsetX = wrapRect && plateRect ? Math.max(0, plateRect.left - wrapRect.left) : 0
@@ -745,7 +758,7 @@ export class PreviewRenderer {
             this._drawOverlay()
         } catch (err) {
             console.error(err)
-            this.setStatus('Preview failed. Check your inputs.', 'error')
+            this.setStatus(this.translate('preview.failed'), 'error')
         } finally {
             this._previewBusy = false
             if (this._previewQueued) {

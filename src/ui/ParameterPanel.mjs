@@ -5,18 +5,21 @@ import { ParameterTemplateUtils } from '../ParameterTemplateUtils.mjs'
  */
 export class ParameterPanel {
     #onChange = () => {}
+    #translate = (key) => key
 
     /**
      * @param {object} els
      * @param {object} state
      * @param {(text: string, type?: string) => void} setStatus
      * @param {() => void} onChange
+     * @param {(key: string, params?: Record<string, string | number>) => string} translate
      */
-    constructor(els, state, setStatus, onChange) {
+    constructor(els, state, setStatus, onChange, translate) {
         this.els = els
         this.state = state
         this.setStatus = setStatus
         this.onChange = onChange
+        this.translate = translate
         this.validation = { errors: [], warnings: [], placeholders: [] }
         this.parseError = null
         this.parseErrorLine = null
@@ -40,6 +43,22 @@ export class ParameterPanel {
      */
     get onChange() {
         return this.#onChange
+    }
+
+    /**
+     * Sets the translation callback.
+     * @param {(key: string, params?: Record<string, string | number>) => string} callback
+     */
+    set translate(callback) {
+        this.#translate = typeof callback === 'function' ? callback : (key) => key
+    }
+
+    /**
+     * Returns the translation callback.
+     * @returns {(key: string, params?: Record<string, string | number>) => string}
+     */
+    get translate() {
+        return this.#translate
     }
 
     /**
@@ -160,14 +179,14 @@ export class ParameterPanel {
         const normalizedParameters = ParameterTemplateUtils.normalizeParameterDefinitions(this.state.parameters)
         const hasAnyParameter = normalizedParameters.some((parameter) => parameter.name)
         if (!hasAnyParameter) {
-            this.setStatus('Define at least one parameter first.', 'info')
+            this.setStatus(this.translate('parameterStatus.defineOne'), 'info')
             return
         }
 
         const exampleRows = ParameterTemplateUtils.buildExampleRows(normalizedParameters)
         const content = JSON.stringify(exampleRows, null, 2)
         const stamp = new Date().toISOString().slice(0, 10)
-        const fileName = `label-parameters-example-${stamp}.json`
+        const fileName = this.translate('parameters.downloadExampleName', { date: stamp })
         const blob = new Blob([content], { type: 'application/json' })
         const objectUrl = URL.createObjectURL(blob)
         const anchor = document.createElement('a')
@@ -177,7 +196,7 @@ export class ParameterPanel {
         anchor.click()
         anchor.remove()
         window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
-        this.setStatus(`Downloaded ${fileName}.`, 'success')
+        this.setStatus(this.translate('parameterStatus.downloaded', { fileName }), 'success')
     }
 
     /**
@@ -188,7 +207,7 @@ export class ParameterPanel {
         try {
             const file = await this.#promptForJsonFile()
             if (!file) {
-                this.setStatus('Parameter data load canceled.', 'info')
+                this.setStatus(this.translate('parameterStatus.loadCanceled'), 'info')
                 return
             }
             const rawText = await file.text()
@@ -205,8 +224,13 @@ export class ParameterPanel {
                 this.previewText = parsed.prettyText || rawText || ''
                 this.rowLineRanges = []
                 this.#refreshValidationViews(false)
-                const location = this.parseErrorLine ? ` (line ${this.parseErrorLine}, col ${this.parseErrorColumn || '?'})` : ''
-                this.setStatus(`Invalid parameter JSON${location}.`, 'error')
+                const location = this.parseErrorLine
+                    ? this.translate('parameterStatus.parseLocation', {
+                          line: this.parseErrorLine,
+                          column: this.parseErrorColumn || '?'
+                      })
+                    : ''
+                this.setStatus(this.translate('parameterStatus.invalidJson', { location }), 'error')
                 this.#emitChange()
                 return
             }
@@ -215,15 +239,19 @@ export class ParameterPanel {
             this.state.parameterDataRows = parsed.rows || []
             this.#refreshValidationViews()
             const rowCount = this.state.parameterDataRows.length
-            this.setStatus(`Loaded parameter data (${rowCount} row${rowCount === 1 ? '' : 's'}).`, 'success')
+            const rowSuffix = rowCount === 1 ? '' : this.translate('parameters.rowPluralSuffix')
+            this.setStatus(
+                this.translate('parameterStatus.loadedRows', { count: rowCount, suffix: rowSuffix }),
+                'success'
+            )
             this.#emitChange()
         } catch (err) {
             if (err?.name === 'AbortError') {
-                this.setStatus('Parameter data load canceled.', 'info')
+                this.setStatus(this.translate('parameterStatus.loadCanceled'), 'info')
                 return
             }
-            const message = err?.message || 'Unknown error'
-            this.setStatus(`Failed to load parameter JSON: ${message}.`, 'error')
+            const message = err?.message || this.translate('messages.unknownError')
+            this.setStatus(this.translate('parameterStatus.loadFailed', { message }), 'error')
         }
     }
 
@@ -237,7 +265,7 @@ export class ParameterPanel {
                 multiple: false,
                 types: [
                     {
-                        description: 'Parameter data JSON',
+                        description: this.translate('parameterStatus.pickerDescription'),
                         accept: { 'application/json': ['.json'] }
                     }
                 ]
@@ -283,7 +311,7 @@ export class ParameterPanel {
         if (!this.state.parameters.length) {
             const hint = document.createElement('p')
             hint.className = 'muted small'
-            hint.textContent = 'No parameters yet. Add one to use {{placeholders}} in text or QR content.'
+            hint.textContent = this.translate('parameters.noParameters')
             this.els.parameterDefinitions.appendChild(hint)
             return
         }
@@ -295,10 +323,10 @@ export class ParameterPanel {
             const nameField = document.createElement('div')
             nameField.className = 'field'
             const nameLabel = document.createElement('label')
-            nameLabel.textContent = 'Name'
+            nameLabel.textContent = this.translate('parameters.name')
             const nameInput = document.createElement('input')
             nameInput.value = parameter.name
-            nameInput.placeholder = 'parameter_name'
+            nameInput.placeholder = this.translate('parameters.namePlaceholder')
             nameInput.addEventListener('input', (e) => {
                 this.state.parameters[index].name = e.target.value
                 this.#refreshValidationViews()
@@ -309,10 +337,10 @@ export class ParameterPanel {
             const defaultField = document.createElement('div')
             defaultField.className = 'field'
             const defaultLabel = document.createElement('label')
-            defaultLabel.textContent = 'Default'
+            defaultLabel.textContent = this.translate('parameters.default')
             const defaultInput = document.createElement('input')
             defaultInput.value = parameter.defaultValue
-            defaultInput.placeholder = 'Optional default value'
+            defaultInput.placeholder = this.translate('parameters.defaultPlaceholder')
             defaultInput.addEventListener('input', (e) => {
                 this.state.parameters[index].defaultValue = e.target.value
                 this.#refreshValidationViews()
@@ -322,7 +350,7 @@ export class ParameterPanel {
 
             const remove = document.createElement('button')
             remove.className = 'ghost parameter-remove'
-            remove.textContent = 'Remove'
+            remove.textContent = this.translate('parameters.remove')
             remove.addEventListener('click', () => {
                 this.state.parameters.splice(index, 1)
                 this.#renderDefinitions()
@@ -379,8 +407,13 @@ export class ParameterPanel {
     #renderDataMeta() {
         if (!this.els.parameterDataMeta) return
         const rowCount = this.state.parameterDataRows.length
-        const sourceName = this.state.parameterDataSourceName || 'No file selected'
-        this.els.parameterDataMeta.textContent = `${rowCount} row${rowCount === 1 ? '' : 's'} loaded (${sourceName})`
+        const sourceName = this.state.parameterDataSourceName || this.translate('parameters.sourceNone')
+        const rowSuffix = rowCount === 1 ? '' : this.translate('parameters.rowPluralSuffix')
+        this.els.parameterDataMeta.textContent = this.translate('parameters.rowsLoaded', {
+            count: rowCount,
+            suffix: rowSuffix,
+            sourceName
+        })
     }
 
     /**
@@ -393,17 +426,36 @@ export class ParameterPanel {
         const issues = []
         if (this.parseError) {
             const location = this.parseErrorLine
-                ? ` (line ${this.parseErrorLine}, col ${this.parseErrorColumn || '?'})`
+                ? this.translate('parameterStatus.parseLocation', {
+                      line: this.parseErrorLine,
+                      column: this.parseErrorColumn || '?'
+                  })
                 : ''
-            issues.push({ level: 'error', message: `JSON parse error${location}: ${this.parseError}` })
+            issues.push({
+                level: 'error',
+                message: this.translate('validation.parseError', {
+                    location,
+                    message: this.parseError
+                })
+            })
         }
-        this.validation.errors.forEach((issue) => issues.push(issue))
-        this.validation.warnings.forEach((issue) => issues.push(issue))
+        this.validation.errors.forEach((issue) =>
+            issues.push({
+                ...issue,
+                message: this.#formatIssueMessage(issue)
+            })
+        )
+        this.validation.warnings.forEach((issue) =>
+            issues.push({
+                ...issue,
+                message: this.#formatIssueMessage(issue)
+            })
+        )
 
         if (!issues.length) {
             const ok = document.createElement('div')
             ok.className = 'parameter-issue-ok small muted'
-            ok.textContent = 'No parameter issues detected.'
+            ok.textContent = this.translate('parameters.issuesNone')
             this.els.parameterIssues.appendChild(ok)
             return
         }
@@ -414,6 +466,42 @@ export class ParameterPanel {
             row.textContent = issue.message
             this.els.parameterIssues.appendChild(row)
         })
+    }
+
+    /**
+     * Formats an issue message using translated templates.
+     * @param {object} issue
+     * @returns {string}
+     */
+    #formatIssueMessage(issue) {
+        const row = issue.rowNumber || (Number.isInteger(issue.rowIndex) ? issue.rowIndex + 1 : '')
+        switch (issue.code) {
+            case 'empty-definition-name':
+                return this.translate('validation.emptyDefinitionName', { index: issue.definitionIndex || '' })
+            case 'invalid-definition-name':
+                return this.translate('validation.invalidDefinitionName', { name: issue.parameterName || '' })
+            case 'duplicate-definition-name':
+                return this.translate('validation.duplicateDefinitionName', {
+                    name: issue.parameterName || '',
+                    count: issue.count || ''
+                })
+            case 'undefined-placeholder':
+                return this.translate('validation.undefinedPlaceholder', { placeholder: issue.placeholder || '' })
+            case 'unused-definition':
+                return this.translate('validation.unusedDefinition', { name: issue.parameterName || '' })
+            case 'invalid-row-type':
+                return this.translate('validation.invalidRowType', { row })
+            case 'unknown-row-parameter':
+                return this.translate('validation.unknownRowParameter', { row, name: issue.parameterName || '' })
+            case 'missing-row-parameter':
+                return this.translate('validation.missingRowParameter', { row, name: issue.parameterName || '' })
+            case 'fallback-default-parameter':
+                return this.translate('validation.fallbackDefaultParameter', { row, name: issue.parameterName || '' })
+            case 'json-formatting':
+                return this.translate('validation.jsonFormatting')
+            default:
+                return issue.message || issue.code || ''
+        }
     }
 
     /**

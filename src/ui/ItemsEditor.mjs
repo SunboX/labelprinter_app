@@ -5,20 +5,23 @@ import { QrSizeUtils } from '../QrSizeUtils.mjs'
  */
 export class ItemsEditor {
     #onChange = () => {}
+    #translate = (key) => key
 
     /**
      * @param {object} els
      * @param {object} state
-     * @param {Array<{ id: string, label: string }>} shapeTypes
+     * @param {Array<{ id: string, labelKey: string }>} shapeTypes
      * @param {() => void} onChange
      * @param {() => string} nextId
+     * @param {(key: string, params?: Record<string, string | number>) => string} translate
      */
-    constructor(els, state, shapeTypes, onChange, nextId) {
+    constructor(els, state, shapeTypes, onChange, nextId, translate) {
         this.els = els
         this.state = state
         this.shapeTypes = shapeTypes
         this.onChange = onChange
         this.nextId = nextId
+        this.translate = translate
         this.selectedItemIds = new Set()
     }
 
@@ -39,6 +42,22 @@ export class ItemsEditor {
     }
 
     /**
+     * Sets the translation callback.
+     * @param {(key: string, params?: Record<string, string | number>) => string} callback
+     */
+    set translate(callback) {
+        this.#translate = typeof callback === 'function' ? callback : (key) => key
+    }
+
+    /**
+     * Returns the translation callback.
+     * @returns {(key: string, params?: Record<string, string | number>) => string}
+     */
+    get translate() {
+        return this.#translate
+    }
+
+    /**
      * Syncs selected item ids from preview interactions.
      * @param {string[]} itemIds
      */
@@ -52,7 +71,10 @@ export class ItemsEditor {
      */
     render() {
         this.els.items.innerHTML = ''
-        const sizeLabel = this.state.orientation === 'horizontal' ? 'Length' : 'Height'
+        const sizeLabel =
+            this.state.orientation === 'horizontal'
+                ? this.translate('itemsEditor.sizeLength')
+                : this.translate('itemsEditor.sizeHeight')
         this.state.items.forEach((item, index) => {
             const card = this.#createItemCard(item, index, sizeLabel)
             this.els.items.appendChild(card)
@@ -100,7 +122,7 @@ export class ItemsEditor {
         this.state.items.push({
             id: this.nextId(),
             type: 'text',
-            text: 'New text',
+            text: this.translate('itemsEditor.newText'),
             fontFamily: 'Barlow',
             fontSize: 24,
             height: 40,
@@ -118,7 +140,7 @@ export class ItemsEditor {
         this.state.items.push({
             id: this.nextId(),
             type: 'qr',
-            data: 'https://example.com',
+            data: this.translate('itemsEditor.newQrData'),
             size: initialSize,
             height: initialSize,
             xOffset: 4
@@ -208,11 +230,16 @@ export class ItemsEditor {
         meta.className = 'item-meta'
         const tag = document.createElement('div')
         tag.className = 'tag'
-        const typeLabel = item.type === 'text' ? 'Text' : item.type === 'qr' ? 'QR' : 'Form'
+        const typeLabel =
+            item.type === 'text'
+                ? this.translate('itemsEditor.typeText')
+                : item.type === 'qr'
+                  ? this.translate('itemsEditor.typeQr')
+                  : this.translate('itemsEditor.typeShape')
         tag.textContent = typeLabel
         const handle = document.createElement('div')
         handle.className = 'handle'
-        handle.textContent = '⇅ drag'
+        handle.textContent = this.translate('itemsEditor.handleDrag')
         handle.draggable = true
         handle.dataset.index = index.toString()
         meta.append(tag, handle)
@@ -221,7 +248,10 @@ export class ItemsEditor {
         contentWrap.className = 'field'
         if (item.type === 'text' || item.type === 'qr') {
             const label = document.createElement('label')
-            label.textContent = item.type === 'text' ? 'Text' : 'QR content'
+            label.textContent =
+                item.type === 'text'
+                    ? this.translate('itemsEditor.fieldText')
+                    : this.translate('itemsEditor.fieldQrContent')
             const input = item.type === 'text' ? document.createElement('textarea') : document.createElement('input')
             input.value = item.type === 'text' ? item.text : item.data
             input.rows = 2
@@ -237,12 +267,12 @@ export class ItemsEditor {
             contentWrap.append(label, input)
         } else if (item.type === 'shape') {
             const label = document.createElement('label')
-            label.textContent = 'Form'
+            label.textContent = this.translate('itemsEditor.fieldShape')
             const select = document.createElement('select')
             this.shapeTypes.forEach((shape) => {
                 const opt = document.createElement('option')
                 opt.value = shape.id
-                opt.textContent = shape.label
+                opt.textContent = this.translate(shape.labelKey)
                 if (shape.id === item.shapeType) opt.selected = true
                 select.appendChild(opt)
             })
@@ -266,7 +296,7 @@ export class ItemsEditor {
         }
 
         const remove = document.createElement('button')
-        remove.textContent = 'Remove'
+        remove.textContent = this.translate('itemsEditor.remove')
         remove.addEventListener('click', () => {
             this.state.items.splice(index, 1)
             this.render()
@@ -289,11 +319,11 @@ export class ItemsEditor {
      * @param {HTMLElement} controls
      */
     #appendTextControls(item, controls) {
-        const offsetCtrl = this.#createSlider('X offset', item.xOffset ?? 0, 0, 50, 1, (v) => {
+        const offsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, 0, 50, 1, (v) => {
             item.xOffset = v
             this.#onChange()
         })
-        const yOffsetCtrl = this.#createSlider('Y offset', item.yOffset ?? 0, -50, 50, 1, (v) => {
+        const yOffsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -50, 50, 1, (v) => {
             item.yOffset = v
             this.#onChange()
         })
@@ -301,7 +331,7 @@ export class ItemsEditor {
         const fontCtrl = document.createElement('div')
         fontCtrl.className = 'field'
         const fontLabel = document.createElement('label')
-        fontLabel.textContent = 'Font family'
+        fontLabel.textContent = this.translate('itemsEditor.fontFamily')
         const fontInput = document.createElement('input')
         fontInput.value = item.fontFamily
         fontInput.addEventListener('input', (e) => {
@@ -310,7 +340,7 @@ export class ItemsEditor {
         })
         fontCtrl.append(fontLabel, fontInput)
 
-        const sizeCtrl = this.#createSlider('Font size', item.fontSize, 10, 64, 1, (v) => {
+        const sizeCtrl = this.#createSlider(this.translate('itemsEditor.sliderFontSize'), item.fontSize, 10, 64, 1, (v) => {
             item.fontSize = v
             this.#onChange()
         })
@@ -331,15 +361,15 @@ export class ItemsEditor {
             item.height = v
             this.#onChange()
         })
-        const offsetCtrl = this.#createSlider('X offset', item.xOffset ?? 0, 0, 50, 1, (v) => {
+        const offsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, 0, 50, 1, (v) => {
             item.xOffset = v
             this.#onChange()
         })
-        const yOffsetCtrl = this.#createSlider('Y offset', item.yOffset ?? 0, -50, 50, 1, (v) => {
+        const yOffsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -50, 50, 1, (v) => {
             item.yOffset = v
             this.#onChange()
         })
-        const sizeCtrl = this.#createSlider('QR size', item.size, minQrSize, maxQrSize, 1, (v) => {
+        const sizeCtrl = this.#createSlider(this.translate('itemsEditor.sliderQrSize'), item.size, minQrSize, maxQrSize, 1, (v) => {
             item.size = QrSizeUtils.clampQrSizeToLabel(this.state, v)
             if ((item.height || 0) < item.size) {
                 item.height = item.size
@@ -361,34 +391,37 @@ export class ItemsEditor {
             item.width = v
             this.#onChange()
         })
-        const heightLabel = item.shapeType === 'line' ? 'Thickness' : 'Height'
+        const heightLabel =
+            item.shapeType === 'line'
+                ? this.translate('itemsEditor.sliderThickness')
+                : this.translate('itemsEditor.sizeHeight')
         const heightCtrl = this.#createSlider(heightLabel, item.height || 20, 4, 240, 1, (v) => {
             item.height = v
             this.#onChange()
         })
-        const strokeCtrl = this.#createSlider('Stroke', item.strokeWidth || 2, 1, 12, 1, (v) => {
+        const strokeCtrl = this.#createSlider(this.translate('itemsEditor.sliderStroke'), item.strokeWidth || 2, 1, 12, 1, (v) => {
             item.strokeWidth = v
             this.#onChange()
         })
-        const offsetCtrl = this.#createSlider('X offset', item.xOffset ?? 0, -50, 50, 1, (v) => {
+        const offsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, -50, 50, 1, (v) => {
             item.xOffset = v
             this.#onChange()
         })
-        const yOffsetCtrl = this.#createSlider('Y offset', item.yOffset ?? 0, -80, 80, 1, (v) => {
+        const yOffsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -80, 80, 1, (v) => {
             item.yOffset = v
             this.#onChange()
         })
         controls.append(widthCtrl, heightCtrl, strokeCtrl, offsetCtrl, yOffsetCtrl)
 
         if (item.shapeType === 'roundRect') {
-            const radiusCtrl = this.#createSlider('Radius', item.cornerRadius || 8, 0, 60, 1, (v) => {
+            const radiusCtrl = this.#createSlider(this.translate('itemsEditor.sliderRadius'), item.cornerRadius || 8, 0, 60, 1, (v) => {
                 item.cornerRadius = v
                 this.#onChange()
             })
             controls.append(radiusCtrl)
         }
         if (item.shapeType === 'polygon') {
-            const sidesCtrl = this.#createSlider('Sides', item.sides || 6, 3, 12, 1, (v) => {
+            const sidesCtrl = this.#createSlider(this.translate('itemsEditor.sliderSides'), item.sides || 6, 3, 12, 1, (v) => {
                 item.sides = v
                 this.#onChange()
             })

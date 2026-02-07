@@ -6,6 +6,7 @@ import { ProjectIoUtils } from './ProjectIoUtils.mjs'
 import { ProjectUrlUtils } from './ProjectUrlUtils.mjs'
 import { ShapeMenuUtils } from './ShapeMenuUtils.mjs'
 import { ZoomUtils } from './ZoomUtils.mjs'
+import { I18n } from './I18n.mjs'
 import { Media, Resolution, P700, P750W, E500, E550W, H500 } from 'labelprinterkit-web/src/index.mjs'
 
 const els = {
@@ -33,6 +34,7 @@ const els = {
     zoomReset: document.querySelector('[data-zoom-reset]'),
     zoomRange: document.querySelector('[data-zoom-range]'),
     zoomLabel: document.querySelector('[data-zoom-label]'),
+    localeSelect: document.querySelector('[data-locale-select]'),
     alignMenu: document.querySelector('.align-dropdown'),
     alignMenuTrigger: document.querySelector('[data-align-menu-trigger]'),
     alignReference: document.querySelector('[data-align-reference]'),
@@ -64,11 +66,11 @@ const els = {
 
 const printerMap = { P700, P750W, E500, E550W, H500 }
 const shapeTypes = [
-    { id: 'rect', label: 'Rechteck' },
-    { id: 'roundRect', label: 'Abgerundetes Rechteck' },
-    { id: 'oval', label: 'Oval' },
-    { id: 'polygon', label: 'Vieleck (Polygon)' },
-    { id: 'line', label: 'Linie' }
+    { id: 'rect', labelKey: 'shapes.rect' },
+    { id: 'roundRect', labelKey: 'shapes.roundRect' },
+    { id: 'oval', labelKey: 'shapes.oval' },
+    { id: 'polygon', labelKey: 'shapes.polygon' },
+    { id: 'line', labelKey: 'shapes.line' }
 ]
 
 let idCounter = 1
@@ -112,6 +114,7 @@ let state = JSON.parse(JSON.stringify(defaultState))
  * @param {'info' | 'success' | 'error'} [type='info']
  */
 function setStatus(text, type = 'info') {
+    els.status.removeAttribute('data-i18n')
     els.status.textContent = text
     els.status.dataset.type = type
 }
@@ -133,8 +136,9 @@ class AppController {
      * @param {PreviewRenderer} previewRenderer
      * @param {PrintController} printController
      * @param {(text: string, type?: string) => void} setStatus
+     * @param {I18n} i18n
      */
-    constructor(elsRef, stateRef, itemsEditor, parameterPanel, previewRenderer, printController, setStatus) {
+    constructor(elsRef, stateRef, itemsEditor, parameterPanel, previewRenderer, printController, setStatus, i18n) {
         this.els = elsRef
         this.state = stateRef
         this.itemsEditor = itemsEditor
@@ -142,9 +146,20 @@ class AppController {
         this.previewRenderer = previewRenderer
         this.printController = printController
         this.setStatus = setStatus
+        this.i18n = i18n
         this.itemsEditor.onChange = this.#handleStateChange.bind(this)
         this.parameterPanel.onChange = this.#handleParameterChange.bind(this)
         this.previewRenderer.onSelectionChange = this.#handleSelectionChange.bind(this)
+    }
+
+    /**
+     * Resolves a translated string.
+     * @param {string} key
+     * @param {Record<string, string | number>} [params]
+     * @returns {string}
+     */
+    #t(key, params = {}) {
+        return this.i18n.t(key, params)
     }
 
     /**
@@ -152,6 +167,7 @@ class AppController {
      * @returns {Promise<void>}
      */
     async init() {
+        this.#applyLocaleToUi()
         this.#populateSelects()
         this.#restoreBleState()
         this.els.mode.value = this.state.backend
@@ -168,6 +184,16 @@ class AppController {
         this.previewRenderer.bindInteractions()
         this.#bindEvents()
         this.previewRenderer.render()
+    }
+
+    /**
+     * Applies locale-dependent static translations to the document.
+     */
+    #applyLocaleToUi() {
+        this.i18n.applyTranslations(document)
+        if (this.els.localeSelect) {
+            this.els.localeSelect.value = this.i18n.locale
+        }
     }
 
     /**
@@ -235,19 +261,24 @@ class AppController {
         this.#setAlignMenuOpen(false)
         if (!result.changed) {
             if (result.reason === 'no-selection') {
-                this.setStatus('Select at least one item first.', 'info')
+                this.setStatus(this.#t('messages.selectAtLeastOne'), 'info')
                 return
             }
             if (result.reason === 'need-multiple') {
-                this.setStatus('Select at least two items for this alignment mode.', 'info')
+                this.setStatus(this.#t('messages.selectAtLeastTwo'), 'info')
                 return
             }
-            this.setStatus('Nothing to align.', 'info')
+            this.setStatus(this.#t('messages.nothingToAlign'), 'info')
             return
         }
         this.itemsEditor.render()
         this.previewRenderer.render()
-        this.setStatus(`Aligned ${result.count} item${result.count === 1 ? '' : 's'}.`, 'success')
+        this.setStatus(
+            result.count === 1
+                ? this.#t('messages.alignedOne')
+                : this.#t('messages.alignedMany', { count: result.count }),
+            'success'
+        )
     }
 
     /**
@@ -312,7 +343,7 @@ class AppController {
                 multiple: false,
                 types: [
                     {
-                        description: 'Label project JSON',
+                        description: this.#t('messages.projectJsonDescription'),
                         accept: { 'application/json': ['.json'] }
                     }
                 ]
@@ -367,7 +398,7 @@ class AppController {
             this.itemsEditor.render()
             this.previewRenderer.render()
         }
-        this.setStatus(`Loaded ${sourceLabel}.`, 'success')
+        this.setStatus(this.#t('messages.loaded', { sourceLabel }), 'success')
     }
 
     /**
@@ -392,16 +423,16 @@ class AppController {
                     throw new Error(`HTTP ${response.status}`)
                 }
                 rawProject = await response.json()
-                this.#applyLoadedProject(rawProject, 'project from URL parameter', false)
+                this.#applyLoadedProject(rawProject, this.#t('messages.sourceUrlParameter'), false)
                 return true
             }
             const rawValue = String(source.value || '').trim()
             rawProject = rawValue.startsWith('{') ? JSON.parse(rawValue) : ProjectUrlUtils.decodeEmbeddedProjectParam(rawValue)
-            this.#applyLoadedProject(rawProject, 'project from shared link', false)
+            this.#applyLoadedProject(rawProject, this.#t('messages.sourceSharedLink'), false)
             return true
         } catch (err) {
-            const message = err?.message || 'Unknown error'
-            this.setStatus(`Failed to load project from URL: ${message}.`, 'error')
+            const message = err?.message || this.#t('messages.unknownError')
+            this.setStatus(this.#t('messages.loadUrlFailed', { message }), 'error')
             return false
         }
     }
@@ -429,26 +460,26 @@ class AppController {
             const shareUrl = this.#buildProjectShareUrl()
             if (navigator.share) {
                 await navigator.share({
-                    title: 'Label project',
+                    title: this.#t('app.title'),
                     url: shareUrl
                 })
-                this.setStatus('Shared project link.', 'success')
+                this.setStatus(this.#t('messages.sharedLink'), 'success')
                 return
             }
             if (navigator.clipboard?.writeText) {
                 await navigator.clipboard.writeText(shareUrl)
-                this.setStatus('Project link copied to clipboard.', 'success')
+                this.setStatus(this.#t('messages.copiedLink'), 'success')
                 return
             }
-            window.prompt('Copy project URL', shareUrl)
-            this.setStatus('Project link ready to copy.', 'info')
+            window.prompt(this.#t('messages.copyPrompt'), shareUrl)
+            this.setStatus(this.#t('messages.linkReady'), 'info')
         } catch (err) {
             if (err?.name === 'AbortError') {
-                this.setStatus('Share canceled.', 'info')
+                this.setStatus(this.#t('messages.shareCanceled'), 'info')
                 return
             }
-            const message = err?.message || 'Unknown error'
-            this.setStatus(`Failed to share project URL: ${message}.`, 'error')
+            const message = err?.message || this.#t('messages.unknownError')
+            this.setStatus(this.#t('messages.shareFailed', { message }), 'error')
         }
     }
 
@@ -468,7 +499,7 @@ class AppController {
                     suggestedName,
                     types: [
                         {
-                            description: 'Label project JSON',
+                            description: this.#t('messages.projectJsonDescription'),
                             accept: { 'application/json': ['.json'] }
                         }
                     ]
@@ -476,26 +507,26 @@ class AppController {
                 const writable = await handle.createWritable()
                 await writable.write(contents)
                 await writable.close()
-                this.setStatus(`Saved ${handle.name || suggestedName}.`, 'success')
+                this.setStatus(this.#t('messages.saved', { fileName: handle.name || suggestedName }), 'success')
                 return
             }
 
             // Prompt for a file name when the save picker is unavailable.
-            const fallbackName = window.prompt('Save project as', suggestedName)
+            const fallbackName = window.prompt(this.#t('messages.savePrompt'), suggestedName)
             if (!fallbackName) {
-                this.setStatus('Save canceled.', 'info')
+                this.setStatus(this.#t('messages.saveCanceled'), 'info')
                 return
             }
             const fileName = fallbackName.endsWith('.json') ? fallbackName : `${fallbackName}.json`
             this.#downloadProjectFallback(contents, fileName)
-            this.setStatus(`Downloaded ${fileName}.`, 'success')
+            this.setStatus(this.#t('messages.downloaded', { fileName }), 'success')
         } catch (err) {
             if (err?.name === 'AbortError') {
-                this.setStatus('Save canceled.', 'info')
+                this.setStatus(this.#t('messages.saveCanceled'), 'info')
                 return
             }
-            const message = err?.message || 'Unknown error'
-            this.setStatus(`Failed to save project: ${message}.`, 'error')
+            const message = err?.message || this.#t('messages.unknownError')
+            this.setStatus(this.#t('messages.saveFailed', { message }), 'error')
         }
     }
 
@@ -508,7 +539,7 @@ class AppController {
         try {
             const file = await this.#promptForProjectFile()
             if (!file) {
-                this.setStatus('Load canceled.', 'info')
+                this.setStatus(this.#t('messages.loadCanceled'), 'info')
                 return
             }
             const rawText = await file.text()
@@ -516,11 +547,11 @@ class AppController {
             this.#applyLoadedProject(rawState, file.name)
         } catch (err) {
             if (err?.name === 'AbortError') {
-                this.setStatus('Load canceled.', 'info')
+                this.setStatus(this.#t('messages.loadCanceled'), 'info')
                 return
             }
-            const message = err?.message || 'Unknown error'
-            this.setStatus(`Failed to load project: ${message}.`, 'error')
+            const message = err?.message || this.#t('messages.unknownError')
+            this.setStatus(this.#t('messages.loadFailed', { message }), 'error')
         }
     }
 
@@ -594,12 +625,18 @@ class AppController {
      * Populates select elements with media and resolution options.
      */
     #populateSelects() {
+        this.els.media.innerHTML = ''
+        this.els.resolution.innerHTML = ''
         Object.values(Media)
             .filter((m) => m.id && m.id.startsWith('W'))
             .forEach((media) => {
                 const opt = document.createElement('option')
                 opt.value = media.id
-                opt.textContent = `${media.id} (${media.width}mm, area ${media.printArea} dots)`
+                opt.textContent = this.#t('formats.mediaOption', {
+                    id: media.id,
+                    width: media.width,
+                    printArea: media.printArea
+                })
                 if (media.id === this.state.media) opt.selected = true
                 this.els.media.appendChild(opt)
             })
@@ -607,7 +644,11 @@ class AppController {
         Object.values(Resolution).forEach((res) => {
             const opt = document.createElement('option')
             opt.value = res.id
-            opt.textContent = `${res.id} (${res.dots[0]}x${res.dots[1]} dpi)`
+            opt.textContent = this.#t('formats.resolutionOption', {
+                id: res.id,
+                x: res.dots[0],
+                y: res.dots[1]
+            })
             if (res.id === this.state.resolution) opt.selected = true
             this.els.resolution.appendChild(opt)
         })
@@ -657,19 +698,33 @@ class AppController {
     }
 
     /**
+     * Applies a new locale and refreshes localized UI/state renderers.
+     * @param {string} nextLocale
+     */
+    #handleLocaleChange(nextLocale) {
+        this.i18n.setLocale(nextLocale)
+        this.#applyLocaleToUi()
+        this.#populateSelects()
+        this.#syncFormFromState()
+        this.itemsEditor.render()
+        this.parameterPanel.syncFromState()
+        this.previewRenderer.render()
+    }
+
+    /**
      * Handles print with parameter validation and batch confirmation.
      * @returns {Promise<void>}
      */
     async #handlePrintClick() {
         if (this.parameterPanel.hasBlockingErrors()) {
-            this.setStatus('Fix parameter issues before printing.', 'error')
+            this.setStatus(this.#t('messages.parameterFixBeforePrint'), 'error')
             return
         }
         const parameterValueMaps = this.parameterPanel.buildPrintParameterValueMaps()
         if (parameterValueMaps.length > 10) {
-            const confirmed = window.confirm(`You are about to print ${parameterValueMaps.length} labels. Continue?`)
+            const confirmed = window.confirm(this.#t('messages.printConfirmMany', { count: parameterValueMaps.length }))
             if (!confirmed) {
-                this.setStatus('Print canceled.', 'info')
+                this.setStatus(this.#t('messages.printCanceled'), 'info')
                 return
             }
         }
@@ -680,6 +735,9 @@ class AppController {
      * Binds UI event handlers for the editor.
      */
     #bindEvents() {
+        if (this.els.localeSelect) {
+            this.els.localeSelect.addEventListener('change', (e) => this.#handleLocaleChange(e.target.value))
+        }
         if (this.els.saveProject) {
             this.els.saveProject.addEventListener('click', () => this.#saveProject())
         }
@@ -821,13 +879,30 @@ class AppController {
     }
 }
 
-const previewRenderer = new PreviewRenderer(els, state, setStatus)
-const itemsEditor = new ItemsEditor(els, state, shapeTypes, noop, nextId)
-const parameterPanel = new ParameterPanel(els, state, setStatus, noop)
-const printController = new PrintController(els, state, printerMap, previewRenderer, setStatus)
-const app = new AppController(els, state, itemsEditor, parameterPanel, previewRenderer, printController, setStatus)
+const i18n = new I18n()
 
-app.init().catch((err) => {
+/**
+ * Starts the localized app bootstrap sequence.
+ * @returns {Promise<void>}
+ */
+async function startApp() {
+    await i18n.init()
+    i18n.applyTranslations(document)
+    if (els.localeSelect) {
+        els.localeSelect.value = i18n.locale
+    }
+
+    const translate = (key, params = {}) => i18n.t(key, params)
+    const previewRenderer = new PreviewRenderer(els, state, setStatus, translate)
+    const itemsEditor = new ItemsEditor(els, state, shapeTypes, noop, nextId, translate)
+    const parameterPanel = new ParameterPanel(els, state, setStatus, noop, translate)
+    const printController = new PrintController(els, state, printerMap, previewRenderer, setStatus, translate)
+    const app = new AppController(els, state, itemsEditor, parameterPanel, previewRenderer, printController, setStatus, i18n)
+
+    await app.init()
+}
+
+startApp().catch((err) => {
     console.error(err)
-    setStatus('App initialization failed.', 'error')
+    setStatus(i18n.t('messages.appInitFailed'), 'error')
 })

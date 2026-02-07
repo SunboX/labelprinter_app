@@ -10,13 +10,15 @@ export class PrintController {
      * @param {Record<string, Function>} printerMap
      * @param {{ buildCanvasFromState: (options?: { parameterValues?: Record<string, string> }) => Promise<object> }} previewRenderer
      * @param {(text: string, type?: string) => void} setStatus
+     * @param {(key: string, params?: Record<string, string | number>) => string} translate
      */
-    constructor(els, state, printerMap, previewRenderer, setStatus) {
+    constructor(els, state, printerMap, previewRenderer, setStatus, translate) {
         this.els = els
         this.state = state
         this.printerMap = printerMap
         this.previewRenderer = previewRenderer
         this.setStatus = setStatus
+        this.translate = typeof translate === 'function' ? translate : (key) => key
     }
 
     /**
@@ -30,8 +32,8 @@ export class PrintController {
 
         this.setStatus(
             normalizedValueMaps.length > 1
-                ? `Rendering ${normalizedValueMaps.length} labels...`
-                : 'Rendering label...',
+                ? this.translate('print.renderingMany', { count: normalizedValueMaps.length })
+                : this.translate('print.renderingSingle'),
             'info'
         )
         this.els.print.disabled = true
@@ -47,20 +49,23 @@ export class PrintController {
             const job = new Job(media || Media[this.state.media] || Media.W24)
             pages.forEach((page) => job.addPage(page))
 
-            this.setStatus(`Requesting ${this.state.backend.toUpperCase()} device...`, 'info')
+            this.setStatus(
+                this.translate('print.requestingDevice', { backend: this.state.backend.toUpperCase() }),
+                'info'
+            )
             const backend = await this.#connectBackend()
             const PrinterClass = this.printerMap[this.state.printer] || P700
             const printer = new PrinterClass(backend)
             await printer.print(job)
             this.setStatus(
                 normalizedValueMaps.length > 1
-                    ? `Print job sent (${normalizedValueMaps.length} labels).`
-                    : 'Print job sent.',
+                    ? this.translate('print.sentMany', { count: normalizedValueMaps.length })
+                    : this.translate('print.sentSingle'),
                 'success'
             )
         } catch (err) {
             console.error(err)
-            this.setStatus(err?.message || 'Failed to print', 'error')
+            this.setStatus(err?.message || this.translate('print.failed'), 'error')
         } finally {
             this.els.print.disabled = false
         }
@@ -83,6 +88,6 @@ export class PrintController {
                 filters: this.state.ble.namePrefix ? [{ namePrefix: this.state.ble.namePrefix }] : undefined
             })
         }
-        throw new Error('Unknown backend mode')
+        throw new Error(this.translate('print.unknownBackend'))
     }
 }

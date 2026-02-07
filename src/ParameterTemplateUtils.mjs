@@ -264,7 +264,8 @@ export class ParameterTemplateUtils {
         ParameterTemplateUtils.normalizeParameterDefinitions(definitions).forEach((definition) => {
             const name = String(definition?.name || '').trim()
             if (!name) return
-            row[name] = String(definition.defaultValue || `example_${name}`)
+            const defaultValue = String(definition.defaultValue ?? '')
+            row[name] = defaultValue.length ? defaultValue : `example_${name}`
         })
         return [row]
     }
@@ -292,6 +293,7 @@ export class ParameterTemplateUtils {
                 warnings.push({
                     level: 'warning',
                     code: 'empty-definition-name',
+                    definitionIndex: index + 1,
                     message: `Parameter definition ${index + 1} has an empty name.`
                 })
                 return
@@ -300,6 +302,7 @@ export class ParameterTemplateUtils {
                 errors.push({
                     level: 'error',
                     code: 'invalid-definition-name',
+                    parameterName: name,
                     message: `Parameter "${name}" has an invalid name. Use letters, digits and underscore only.`
                 })
             }
@@ -312,6 +315,8 @@ export class ParameterTemplateUtils {
                 errors.push({
                     level: 'error',
                     code: 'duplicate-definition-name',
+                    parameterName: name,
+                    count,
                     message: `Parameter "${name}" is defined ${count} times.`
                 })
             }
@@ -322,6 +327,7 @@ export class ParameterTemplateUtils {
                 errors.push({
                     level: 'error',
                     code: 'undefined-placeholder',
+                    placeholder,
                     message: `Placeholder "{{${placeholder}}}" is used but no parameter is defined for it.`
                 })
             }
@@ -332,6 +338,7 @@ export class ParameterTemplateUtils {
                 warnings.push({
                     level: 'warning',
                     code: 'unused-definition',
+                    parameterName,
                     message: `Parameter "${parameterName}" is defined but not used in any text or QR template.`
                 })
             }
@@ -344,6 +351,7 @@ export class ParameterTemplateUtils {
                         level: 'error',
                         code: 'invalid-row-type',
                         rowIndex,
+                        rowNumber: rowIndex + 1,
                         message: `Row ${rowIndex + 1} is not a JSON object.`
                     })
                     return
@@ -354,6 +362,8 @@ export class ParameterTemplateUtils {
                             level: 'warning',
                             code: 'unknown-row-parameter',
                             rowIndex,
+                            rowNumber: rowIndex + 1,
+                            parameterName: key,
                             message: `Row ${rowIndex + 1} contains "${key}" which is not defined as a parameter.`
                         })
                     }
@@ -366,6 +376,7 @@ export class ParameterTemplateUtils {
                             level: 'error',
                             code: 'missing-row-parameter',
                             rowIndex,
+                            rowNumber: rowIndex + 1,
                             parameterName: placeholder,
                             message: `Row ${rowIndex + 1} is missing "${placeholder}" and no default is set.`
                         })
@@ -374,6 +385,7 @@ export class ParameterTemplateUtils {
                             level: 'warning',
                             code: 'fallback-default-parameter',
                             rowIndex,
+                            rowNumber: rowIndex + 1,
                             parameterName: placeholder,
                             message: `Row ${rowIndex + 1} uses default value for "${placeholder}".`
                         })
