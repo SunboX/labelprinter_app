@@ -70,8 +70,10 @@
 - Expected: static UI labels and dynamic editor panels update to the selected language.
 
 ## Font family dropdown
-- Unit: `tests/font-family-utils.test.mjs` validates font family normalization and local-font API fallback behavior.
+- Unit: `tests/font-family-utils.test.mjs` validates font family normalization, persisted Google font link parsing, and local-font API fallback behavior.
 - Manual: run `npm start`, open `http://localhost:3000/`, add/select a text item, and open the `Font family` control.
 - Expected: a dropdown is shown instead of free text; when local font access is available, installed font families appear, otherwise a fallback list is shown.
 - Manual: paste a Google Fonts CSS URL (for example `https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap`) into the text item `Google Font URL` field and click `Add font`.
 - Expected: the stylesheet is loaded, the font appears in the dropdown, becomes selectable, and is stored in project JSON for load/share.
+- Manual: after adding a Google font, reload the browser tab.
+- Expected: the previously added Google font remains available in the font dropdown.

@@ -6,6 +6,7 @@ import { ProjectIoUtils } from './ProjectIoUtils.mjs'
 import { ProjectUrlUtils } from './ProjectUrlUtils.mjs'
 import { ShapeMenuUtils } from './ShapeMenuUtils.mjs'
 import { ZoomUtils } from './ZoomUtils.mjs'
+import { FontFamilyUtils } from './FontFamilyUtils.mjs'
 import { I18n } from './I18n.mjs'
 import { Media, Resolution, P700, P750W, E500, E550W, H500 } from 'labelprinterkit-web/src/index.mjs'
 
@@ -178,6 +179,8 @@ class AppController {
         const loadedProjectFromUrl = await this.#loadProjectFromUrlParameter()
         if (!loadedProjectFromUrl) {
             this.#restoreZoomPreference()
+            this.#restorePersistedGoogleFontLinks()
+            await this.itemsEditor.loadGoogleFontLinks(this.state.customFontLinks)
         }
         this.#syncZoomControls()
         this.parameterPanel.init()
@@ -205,6 +208,7 @@ class AppController {
      * Refreshes the preview after state changes.
      */
     #handleStateChange() {
+        this.#persistGoogleFontLinks()
         this.parameterPanel.handleItemTemplatesChanged()
         this.#syncPreviewTemplateValues()
         this.previewRenderer.render()
@@ -350,6 +354,45 @@ class AppController {
     }
 
     /**
+     * Restores persisted Google font links from localStorage.
+     */
+    #restorePersistedGoogleFontLinks() {
+        const persistedLinks = this.#readPersistedGoogleFontLinks()
+        if (!persistedLinks.length) return
+        this.state.customFontLinks = FontFamilyUtils.normalizeGoogleFontLinks(
+            this.state.customFontLinks.concat(persistedLinks)
+        )
+    }
+
+    /**
+     * Reads persisted Google font links from localStorage.
+     * @returns {string[]}
+     */
+    #readPersistedGoogleFontLinks() {
+        try {
+            if (!window.localStorage) return []
+            const rawValue = window.localStorage.getItem(FontFamilyUtils.GOOGLE_FONT_LINKS_STORAGE_KEY)
+            return FontFamilyUtils.parsePersistedGoogleFontLinks(rawValue)
+        } catch (_error) {
+            return []
+        }
+    }
+
+    /**
+     * Persists the current Google font links to localStorage.
+     */
+    #persistGoogleFontLinks() {
+        try {
+            if (!window.localStorage) return
+            const normalizedLinks = FontFamilyUtils.normalizeGoogleFontLinks(this.state.customFontLinks)
+            this.state.customFontLinks = normalizedLinks
+            window.localStorage.setItem(FontFamilyUtils.GOOGLE_FONT_LINKS_STORAGE_KEY, JSON.stringify(normalizedLinks))
+        } catch (_error) {
+            // Ignore storage write failures in private mode or restricted contexts.
+        }
+    }
+
+    /**
      * Builds a suggested file name for project exports.
      * @returns {string}
      */
@@ -433,6 +476,7 @@ class AppController {
         idCounter = nextIdCounter
         this.#applyState(normalizedState)
         await this.itemsEditor.loadGoogleFontLinks(this.state.customFontLinks)
+        this.#persistGoogleFontLinks()
         this.#syncFormFromState()
         this.parameterPanel.syncFromState()
         this.#syncPreviewTemplateValues()
@@ -946,7 +990,6 @@ async function startApp() {
     const app = new AppController(els, state, itemsEditor, parameterPanel, previewRenderer, printController, setStatus, i18n)
 
     await itemsEditor.loadInstalledFontFamilies()
-    await itemsEditor.loadGoogleFontLinks(state.customFontLinks)
     await app.init()
 }
 
