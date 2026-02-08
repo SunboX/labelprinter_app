@@ -1,0 +1,50 @@
+name: Deploy to FTP (main)
+
+on:
+  push:
+    branches: [ "main" ]
+    # optional: only deploy if certain paths changed
+    # paths:
+    #   - "dist/**"
+    #   - "public/**"
+    #   - ".github/workflows/deploy-ftp.yml"
+
+concurrency:
+  group: ftp-deploy-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---- OPTIONAL BUILD STEP (uncomment if you build artifacts) ----
+      # - name: Setup Node
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: 20
+      #
+      # - name: Install & build
+      #   run: |
+      #     npm ci
+      #     npm run build
+      #
+      # If you build, set local-dir to your build output, e.g. ./dist/
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ secrets.FTP_PORT }} # optional, defaults to 21
+          protocol: ftp              # or ftps if your host supports it
+          local-dir: ./              # or ./dist/ if you build
+          server-dir: /public_html/  # adjust to your target folder
+          exclude: |
+            **/.git*
+            **/.github/**
+            **/node_modules/**
+            **/.env*
