@@ -42,18 +42,29 @@ jobs:
       #
       # If you build, set local-dir to your build output, e.g. ./dist/
 
-      - name: Deploy via FTP
+      # 1) Deploy src -> /
+      - name: Deploy src to /
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          port: ${{ secrets.FTP_PORT }} # optional, defaults to 21
-          protocol: ftp              # or ftps if your host supports it
-          local-dir: ./src/              # or ./dist/ if you build
-          server-dir: /  # adjust to your target folder
+          protocol: ftp
+          local-dir: ./src/
+          server-dir: /
+          exclude: |
+            **/node_modules/**
+
+      # 2) Deploy node_modules -> /node_modules/
+      - name: Deploy node_modules to /node_modules/
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          local-dir: ./node_modules/
+          server-dir: /node_modules/
           exclude: |
             **/.git*
             **/.github/**
-            **/node_modules/**
-            **/.env*
