@@ -42,6 +42,8 @@
 - Unit: `tests/qr-size-utils.test.mjs` verifies new QR items start at a size that fits the selected media width and optional fixed media length.
 - Manual: run `npm start`, open `http://localhost:3000/`, switch between tape widths (for example `W24` and `W9`), then click `QR-Code`.
 - Expected: the newly added QR square stays within the label bounds without clipping on narrow media.
+- Manual: select a QR item and adjust `Error correction`, `QR version`, and `Encoding mode`.
+- Expected: preview updates immediately, options persist in project save/load, and print uses the selected QR options.
 
 ## Parameterized labels
 - Unit: `tests/parameter-template-utils.test.mjs` validates placeholder extraction and substitution, JSON parsing constraints, and parameter-row validation diagnostics.
@@ -53,3 +55,10 @@
 - Unit: `tests/i18n.test.mjs` validates locale detection, interpolation, and `data-i18n` attribute application.
 - Manual: run `npm start`, open `http://localhost:3000/`, switch language via the top toolbar locale selector (`English` / `Deutsch`).
 - Expected: static UI labels and dynamic editor panels update to the selected language.
+
+## Font family dropdown
+- Unit: `tests/font-family-utils.test.mjs` validates font family normalization and local-font API fallback behavior.
+- Manual: run `npm start`, open `http://localhost:3000/`, add/select a text item, and open the `Font family` control.
+- Expected: a dropdown is shown instead of free text; when local font access is available, installed font families appear, otherwise a fallback list is shown.
+- Manual: paste a Google Fonts CSS URL (for example `https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap`) into the text item `Google Font URL` field and click `Add font`.
+- Expected: the stylesheet is loaded, the font appears in the dropdown, becomes selectable, and is stored in project JSON for load/share.

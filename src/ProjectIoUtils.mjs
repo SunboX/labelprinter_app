@@ -1,4 +1,5 @@
 import { ZoomUtils } from './ZoomUtils.mjs'
+import { QrCodeUtils } from './QrCodeUtils.mjs'
 
 /**
  * Project serialization and normalization helpers.
@@ -35,6 +36,7 @@ export class ProjectIoUtils {
     static buildProjectPayload(state) {
         const normalizedParameters = ProjectIoUtils.#normalizeParameterDefinitions(state.parameters)
         const normalizedParameterDataRows = ProjectIoUtils.#normalizeParameterDataRows(state.parameterDataRows)
+        const normalizedCustomFontLinks = ProjectIoUtils.#normalizeCustomFontLinks(state.customFontLinks)
         return {
             media: state.media,
             mediaLengthMm: state.mediaLengthMm ?? null,
@@ -47,6 +49,7 @@ export class ProjectIoUtils {
             parameters: normalizedParameters,
             parameterDataRows: normalizedParameterDataRows,
             parameterDataSourceName: typeof state.parameterDataSourceName === 'string' ? state.parameterDataSourceName : '',
+            customFontLinks: normalizedCustomFontLinks,
             items: (state.items || []).map((item) => ProjectIoUtils.stripRuntimeFields(item))
         }
     }
@@ -74,6 +77,24 @@ export class ProjectIoUtils {
         return rows
             .filter((row) => ProjectIoUtils.#isPlainObject(row))
             .map((row) => ({ ...row }))
+    }
+
+    /**
+     * Normalizes custom font links for serialization.
+     * @param {Array<unknown>} links
+     * @returns {string[]}
+     */
+    static #normalizeCustomFontLinks(links) {
+        if (!Array.isArray(links)) return []
+        const seen = new Set()
+        const normalized = []
+        links.forEach((link) => {
+            const value = String(link || '').trim()
+            if (!value || seen.has(value)) return
+            seen.add(value)
+            normalized.push(value)
+        })
+        return normalized
     }
 
     /**
@@ -119,6 +140,9 @@ export class ProjectIoUtils {
                 data: '',
                 size: 120,
                 height: 130,
+                qrErrorCorrectionLevel: QrCodeUtils.getDefaultErrorCorrectionLevel(),
+                qrVersion: QrCodeUtils.getDefaultVersion(),
+                qrEncodingMode: QrCodeUtils.getDefaultEncodingMode(),
                 xOffset: 4,
                 yOffset: 0
             },
@@ -162,6 +186,18 @@ export class ProjectIoUtils {
             normalized.height = ProjectIoUtils.#coerceNumber(normalized.height, defaults.height)
             normalized.xOffset = ProjectIoUtils.#coerceNumber(normalized.xOffset, defaults.xOffset)
             normalized.yOffset = ProjectIoUtils.#coerceNumber(normalized.yOffset, defaults.yOffset)
+            const normalizedQrOptions = QrCodeUtils.normalizeItemOptions({
+                qrErrorCorrectionLevel:
+                    cleaned.qrErrorCorrectionLevel ?? cleaned.errorCorrectionLevel ?? normalized.qrErrorCorrectionLevel,
+                qrVersion: cleaned.qrVersion ?? cleaned.version ?? normalized.qrVersion,
+                qrEncodingMode: cleaned.qrEncodingMode ?? cleaned.encodingMode ?? normalized.qrEncodingMode
+            })
+            normalized.qrErrorCorrectionLevel = normalizedQrOptions.qrErrorCorrectionLevel
+            normalized.qrVersion = normalizedQrOptions.qrVersion
+            normalized.qrEncodingMode = normalizedQrOptions.qrEncodingMode
+            delete normalized.errorCorrectionLevel
+            delete normalized.version
+            delete normalized.encodingMode
         }
         if (type === 'shape') {
             normalized.width = ProjectIoUtils.#coerceNumber(normalized.width, defaults.width)
@@ -230,6 +266,7 @@ export class ProjectIoUtils {
         const rawBle = rawState.ble && typeof rawState.ble === 'object' ? rawState.ble : {}
         const rawParameters = ProjectIoUtils.#normalizeParameterDefinitions(rawState.parameters)
         const rawParameterDataRows = ProjectIoUtils.#normalizeParameterDataRows(rawState.parameterDataRows)
+        const rawCustomFontLinks = ProjectIoUtils.#normalizeCustomFontLinks(rawState.customFontLinks)
         const normalizedState = {
             ...baseState,
             media: typeof rawState.media === 'string' ? rawState.media : baseState.media,
@@ -257,6 +294,7 @@ export class ProjectIoUtils {
             },
             parameters: rawParameters,
             parameterDataRows: rawParameterDataRows,
+            customFontLinks: rawCustomFontLinks,
             parameterDataRaw: typeof rawState.parameterDataRaw === 'string' ? rawState.parameterDataRaw : '',
             parameterDataSourceName:
                 typeof rawState.parameterDataSourceName === 'string' ? rawState.parameterDataSourceName : '',

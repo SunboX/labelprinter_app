@@ -20,6 +20,7 @@ const defaultState = {
     parameterDataRows: [],
     parameterDataRaw: '',
     parameterDataSourceName: '',
+    customFontLinks: [],
     items: []
 }
 
@@ -35,6 +36,7 @@ describe('project-io-utils', () => {
             zoom: 1.23,
             parameters: [{ name: 'host', defaultValue: 'localhost' }],
             parameterDataRows: [{ host: 'printer-1' }],
+            customFontLinks: ['https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap'],
             items: [
                 {
                     id: 'item-1',
@@ -42,6 +44,9 @@ describe('project-io-utils', () => {
                     data: 'https://example.com',
                     size: 120,
                     height: 130,
+                    qrErrorCorrectionLevel: 'H',
+                    qrVersion: 7,
+                    qrEncodingMode: 'numeric',
                     _qrCache: { pixels: [] }
                 }
             ]
@@ -49,9 +54,13 @@ describe('project-io-utils', () => {
         const payload = ProjectIoUtils.buildProjectPayload(state)
         assert.equal(payload.items[0]._qrCache, undefined)
         assert.equal(payload.items[0].type, 'qr')
+        assert.equal(payload.items[0].qrErrorCorrectionLevel, 'H')
+        assert.equal(payload.items[0].qrVersion, 7)
+        assert.equal(payload.items[0].qrEncodingMode, 'numeric')
         assert.equal(payload.zoom, 1.23)
         assert.deepEqual(payload.parameters, [{ name: 'host', defaultValue: 'localhost' }])
         assert.deepEqual(payload.parameterDataRows, [{ host: 'printer-1' }])
+        assert.deepEqual(payload.customFontLinks, ['https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap'])
     })
 
     it('normalizeProjectState throws when items are missing', () => {
@@ -64,9 +73,21 @@ describe('project-io-utils', () => {
             zoom: 10,
             parameters: [{ name: 'host', defaultValue: 'fallback' }],
             parameterDataRows: [{ host: 'printer-a' }, 'invalid-row'],
+            customFontLinks: [
+                'https://fonts.googleapis.com/css2?family=Roboto',
+                'https://fonts.googleapis.com/css2?family=Roboto',
+                ''
+            ],
             items: [
                 { id: 'item-2', type: 'text', text: 'Hello' },
-                { id: 'item-2', type: 'qr', data: 'https://example.com' },
+                {
+                    id: 'item-2',
+                    type: 'qr',
+                    data: 'https://example.com',
+                    errorCorrectionLevel: 'q',
+                    version: 2,
+                    encodingMode: 'alphanumeric'
+                },
                 { type: 'shape' },
                 { type: 'unsupported', id: 'item-9' }
             ]
@@ -78,6 +99,11 @@ describe('project-io-utils', () => {
         assert.equal(state.zoom, 2.5)
         assert.deepEqual(state.parameters, [{ name: 'host', defaultValue: 'fallback' }])
         assert.deepEqual(state.parameterDataRows, [{ host: 'printer-a' }])
+        assert.deepEqual(state.customFontLinks, ['https://fonts.googleapis.com/css2?family=Roboto'])
+        const qrItem = state.items.find((item) => item.type === 'qr')
+        assert.equal(qrItem?.qrErrorCorrectionLevel, 'Q')
+        assert.equal(qrItem?.qrVersion, 2)
+        assert.equal(qrItem?.qrEncodingMode, 'alphanumeric')
         assert.ok(nextIdCounter > ProjectIoUtils.deriveNextIdCounter([{ id: 'item-2' }]))
     })
 })

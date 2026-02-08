@@ -736,6 +736,16 @@ button:disabled {
     gap: 8px;
 }
 
+.item-card .controls .google-font-field {
+    grid-column: 1 / -1;
+}
+
+.google-font-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+}
+
 .item-meta {
     display: flex;
     align-items: center;
@@ -795,6 +805,12 @@ input[type='range'] {
 .item-card button {
     width: 100%;
     margin-top: 4px;
+}
+
+.item-card .google-font-row button {
+    width: auto;
+    margin-top: 0;
+    white-space: nowrap;
 }
 
 @media (max-width: 1280px) {
