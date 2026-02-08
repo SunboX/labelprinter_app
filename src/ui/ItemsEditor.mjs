@@ -10,6 +10,9 @@ export class ItemsEditor {
     #translate = (key) => key
     #setStatus = () => {}
     #fontFamilies = FontFamilyUtils.getFallbackFontFamilies()
+    #collapsedItemIds = new Set()
+    #autoExpandedItemIds = new Set()
+    #panelItemOrder = []
 
     /**
      * @param {object} els
@@ -140,21 +143,54 @@ export class ItemsEditor {
      * @param {string[]} itemIds
      */
     setSelectedItemIds(itemIds) {
-        this.selectedItemIds = new Set(Array.isArray(itemIds) ? itemIds : [])
+        const nextSelectedItemIds = new Set(Array.isArray(itemIds) ? itemIds : [])
+        this.#restoreAutoCollapsedItems(nextSelectedItemIds)
+        this.#expandSelectedCollapsedItems(nextSelectedItemIds)
+        this.selectedItemIds = nextSelectedItemIds
         this.render()
+    }
+
+    /**
+     * Expands selected cards that were previously collapsed.
+     * Tracks ids so the original collapsed state can be restored on deselect.
+     * @param {Set<string>} selectedItemIds
+     */
+    #expandSelectedCollapsedItems(selectedItemIds) {
+        selectedItemIds.forEach((itemId) => {
+            if (!this.#collapsedItemIds.has(itemId)) return
+            this.#collapsedItemIds.delete(itemId)
+            this.#autoExpandedItemIds.add(itemId)
+        })
+    }
+
+    /**
+     * Restores collapsed state for cards that were auto-expanded by selection.
+     * @param {Set<string>} selectedItemIds
+     */
+    #restoreAutoCollapsedItems(selectedItemIds) {
+        Array.from(this.#autoExpandedItemIds).forEach((itemId) => {
+            if (selectedItemIds.has(itemId)) return
+            this.#collapsedItemIds.add(itemId)
+            this.#autoExpandedItemIds.delete(itemId)
+        })
     }
 
     /**
      * Renders the list of items and their controls.
      */
     render() {
+        this.#syncPanelItemOrder()
+        this.#pruneCollapsedItemIds()
         this.els.items.innerHTML = ''
         const sizeLabel =
             this.state.orientation === 'horizontal'
                 ? this.translate('itemsEditor.sizeLength')
                 : this.translate('itemsEditor.sizeHeight')
-        this.state.items.forEach((item, index) => {
-            const card = this.#createItemCard(item, index, sizeLabel)
+        const panelItems = this.#panelItemOrder
+            .map((itemId) => this.state.items.find((item) => item.id === itemId))
+            .filter(Boolean)
+        panelItems.forEach((item, panelIndex) => {
+            const card = this.#createItemCard(item, panelIndex, sizeLabel)
             this.els.items.appendChild(card)
         })
     }
@@ -163,33 +199,31 @@ export class ItemsEditor {
      * Binds drag handlers for reordering items.
      */
     bindDrag() {
-        let fromIndex = null
+        let fromPanelIndex = null
         this.els.items.addEventListener('dragstart', (e) => {
             const handle = e.target.closest('.handle')
             if (!handle) return
             const card = handle.closest('.item-card')
             if (!card) return
-            fromIndex = Number(card.dataset.index)
+            fromPanelIndex = Number(card.dataset.panelIndex)
             e.dataTransfer.effectAllowed = 'move'
         })
         this.els.items.addEventListener('dragover', (e) => {
-            if (fromIndex === null) return
+            if (fromPanelIndex === null) return
             e.preventDefault()
         })
         this.els.items.addEventListener('drop', (e) => {
             e.preventDefault()
             const card = e.target.closest('.item-card')
-            if (!card || fromIndex === null) return
-            const toIndex = Number(card.dataset.index)
-            if (toIndex === fromIndex) {
-                fromIndex = null
+            if (!card || fromPanelIndex === null) return
+            const toPanelIndex = Number(card.dataset.panelIndex)
+            if (toPanelIndex === fromPanelIndex) {
+                fromPanelIndex = null
                 return
             }
-            const [moved] = this.state.items.splice(fromIndex, 1)
-            this.state.items.splice(toIndex, 0, moved)
-            fromIndex = null
+            this.#movePanelItem(fromPanelIndex, toPanelIndex)
+            fromPanelIndex = null
             this.render()
-            this.#onChange()
         })
     }
 
@@ -197,8 +231,9 @@ export class ItemsEditor {
      * Adds a new text item.
      */
     addTextItem() {
+        const id = this.nextId()
         this.state.items.push({
-            id: this.nextId(),
+            id,
             type: 'text',
             text: this.translate('itemsEditor.newText'),
             fontFamily: this.#resolveDefaultFontFamily(),
@@ -206,6 +241,8 @@ export class ItemsEditor {
             height: 40,
             xOffset: 4
         })
+        this.#panelItemOrder.push(id)
+        this.#collapsedItemIds.delete(id)
         this.render()
         this.#onChange()
     }
@@ -224,8 +261,9 @@ export class ItemsEditor {
      */
     addQrItem() {
         const initialSize = QrSizeUtils.computeInitialQrSizeDots(this.state)
+        const id = this.nextId()
         this.state.items.push({
-            id: this.nextId(),
+            id,
             type: 'qr',
             data: this.translate('itemsEditor.newQrData'),
             size: initialSize,
@@ -235,6 +273,8 @@ export class ItemsEditor {
             qrEncodingMode: QrCodeUtils.getDefaultEncodingMode(),
             xOffset: 4
         })
+        this.#panelItemOrder.push(id)
+        this.#collapsedItemIds.delete(id)
         this.render()
         this.#onChange()
     }
@@ -252,8 +292,9 @@ export class ItemsEditor {
         } else if (shapeType === 'polygon') {
             dimensions.height = 52
         }
+        const id = this.nextId()
         this.state.items.push({
-            id: this.nextId(),
+            id,
             type: 'shape',
             shapeType,
             width: dimensions.width,
@@ -264,8 +305,70 @@ export class ItemsEditor {
             xOffset: 4,
             yOffset: 0
         })
+        this.#panelItemOrder.push(id)
+        this.#collapsedItemIds.delete(id)
         this.render()
         this.#onChange()
+    }
+
+    /**
+     * Synchronizes panel item order with the current state item ids.
+     * New items are appended to the end while deleted ids are removed.
+     */
+    #syncPanelItemOrder() {
+        const stateItemIds = this.state.items.map((item) => item.id)
+        const stateIdSet = new Set(stateItemIds)
+        this.#panelItemOrder = this.#panelItemOrder.filter((itemId) => stateIdSet.has(itemId))
+        stateItemIds.forEach((itemId) => {
+            if (!this.#panelItemOrder.includes(itemId)) {
+                this.#panelItemOrder.push(itemId)
+            }
+        })
+    }
+
+    /**
+     * Moves one panel item from a source index to a destination index.
+     * @param {number} fromPanelIndex
+     * @param {number} toPanelIndex
+     */
+    #movePanelItem(fromPanelIndex, toPanelIndex) {
+        if (!Number.isInteger(fromPanelIndex) || !Number.isInteger(toPanelIndex)) return
+        if (fromPanelIndex < 0 || toPanelIndex < 0) return
+        if (fromPanelIndex >= this.#panelItemOrder.length || toPanelIndex >= this.#panelItemOrder.length) return
+        const [movedItemId] = this.#panelItemOrder.splice(fromPanelIndex, 1)
+        this.#panelItemOrder.splice(toPanelIndex, 0, movedItemId)
+    }
+
+    /**
+     * Removes stale collapsed ids for deleted items.
+     */
+    #pruneCollapsedItemIds() {
+        const validItemIds = new Set(this.state.items.map((item) => item.id))
+        Array.from(this.#collapsedItemIds).forEach((itemId) => {
+            if (!validItemIds.has(itemId)) {
+                this.#collapsedItemIds.delete(itemId)
+            }
+        })
+        Array.from(this.#autoExpandedItemIds).forEach((itemId) => {
+            if (!validItemIds.has(itemId)) {
+                this.#autoExpandedItemIds.delete(itemId)
+            }
+        })
+    }
+
+    /**
+     * Toggles collapsed state for one item card.
+     * @param {string} itemId
+     */
+    #toggleItemCollapsed(itemId) {
+        if (!itemId) return
+        if (this.#collapsedItemIds.has(itemId)) {
+            this.#collapsedItemIds.delete(itemId)
+        } else {
+            this.#collapsedItemIds.add(itemId)
+        }
+        this.#autoExpandedItemIds.delete(itemId)
+        this.render()
     }
 
     /**
@@ -306,14 +409,18 @@ export class ItemsEditor {
      * @param {string} sizeLabel
      * @returns {HTMLDivElement}
      */
-    #createItemCard(item, index, sizeLabel) {
+    #createItemCard(item, panelIndex, sizeLabel) {
         const card = document.createElement('div')
         card.className = 'item-card'
         card.draggable = false
-        card.dataset.index = index.toString()
+        card.dataset.panelIndex = panelIndex.toString()
         card.dataset.itemId = item.id
+        const isCollapsed = this.#collapsedItemIds.has(item.id)
         if (this.selectedItemIds.has(item.id)) {
             card.classList.add('selected')
+        }
+        if (isCollapsed) {
+            card.classList.add('collapsed')
         }
 
         const meta = document.createElement('div')
@@ -331,8 +438,25 @@ export class ItemsEditor {
         handle.className = 'handle'
         handle.textContent = this.translate('itemsEditor.handleDrag')
         handle.draggable = true
-        handle.dataset.index = index.toString()
-        meta.append(tag, handle)
+        handle.dataset.panelIndex = panelIndex.toString()
+        const toggleSettings = document.createElement('button')
+        toggleSettings.type = 'button'
+        toggleSettings.className = 'ghost item-toggle'
+        toggleSettings.textContent = isCollapsed ? '▸' : '▾'
+        toggleSettings.title = this.translate(
+            isCollapsed ? 'itemsEditor.expandSettings' : 'itemsEditor.collapseSettings'
+        )
+        toggleSettings.setAttribute('aria-label', toggleSettings.title)
+        toggleSettings.setAttribute('aria-expanded', String(!isCollapsed))
+        toggleSettings.addEventListener('click', () => this.#toggleItemCollapsed(item.id))
+        const headerActions = document.createElement('div')
+        headerActions.className = 'item-header-actions'
+        headerActions.append(handle, toggleSettings)
+        meta.append(tag, headerActions)
+
+        const body = document.createElement('div')
+        body.className = 'item-body'
+        body.hidden = isCollapsed
 
         const contentWrap = document.createElement('div')
         contentWrap.className = 'field'
@@ -388,12 +512,19 @@ export class ItemsEditor {
         const remove = document.createElement('button')
         remove.textContent = this.translate('itemsEditor.remove')
         remove.addEventListener('click', () => {
-            this.state.items.splice(index, 1)
+            const stateIndex = this.state.items.findIndex((entry) => entry.id === item.id)
+            if (stateIndex >= 0) {
+                this.state.items.splice(stateIndex, 1)
+            }
+            this.#panelItemOrder = this.#panelItemOrder.filter((itemId) => itemId !== item.id)
+            this.#collapsedItemIds.delete(item.id)
+            this.#autoExpandedItemIds.delete(item.id)
             this.render()
             this.#onChange()
         })
 
-        card.append(meta, contentWrap, controls, remove)
+        body.append(contentWrap, controls, remove)
+        card.append(meta, body)
         card.querySelectorAll('input, textarea, select').forEach((el) =>
             el.addEventListener('dragstart', (ev) => {
                 ev.stopPropagation()

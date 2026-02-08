@@ -175,7 +175,10 @@ class AppController {
         this.els.mode.value = this.state.backend
         this.els.printer.value = this.state.printer
         this.#toggleBleFields()
-        await this.#loadProjectFromUrlParameter()
+        const loadedProjectFromUrl = await this.#loadProjectFromUrlParameter()
+        if (!loadedProjectFromUrl) {
+            this.#restoreZoomPreference()
+        }
         this.#syncZoomControls()
         this.parameterPanel.init()
         this.#syncPreviewTemplateValues()
@@ -306,6 +309,43 @@ class AppController {
         }
         if (this.els.zoomLabel) {
             this.els.zoomLabel.textContent = ZoomUtils.formatZoomLabel(zoom)
+        }
+        this.#persistZoomPreference()
+    }
+
+    /**
+     * Restores a persisted zoom value when the current display fingerprint matches.
+     */
+    #restoreZoomPreference() {
+        const persistedZoom = this.#readPersistedZoomPreference()
+        if (persistedZoom === null) return
+        this.state.zoom = ZoomUtils.clampZoom(persistedZoom)
+    }
+
+    /**
+     * Reads a persisted zoom value from localStorage with display matching.
+     * @returns {number | null}
+     */
+    #readPersistedZoomPreference() {
+        try {
+            if (!window.localStorage) return null
+            const rawPreference = window.localStorage.getItem(ZoomUtils.ZOOM_PREFERENCE_STORAGE_KEY)
+            return ZoomUtils.resolvePersistedZoom(rawPreference, window)
+        } catch (_error) {
+            return null
+        }
+    }
+
+    /**
+     * Persists the current zoom value together with a display fingerprint.
+     */
+    #persistZoomPreference() {
+        try {
+            if (!window.localStorage) return
+            const preferencePayload = ZoomUtils.createZoomPreferencePayload(this.state.zoom, window)
+            window.localStorage.setItem(ZoomUtils.ZOOM_PREFERENCE_STORAGE_KEY, JSON.stringify(preferencePayload))
+        } catch (_error) {
+            // Ignore storage write failures in private mode or restricted contexts.
         }
     }
 

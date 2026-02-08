@@ -122,6 +122,8 @@
         "typeText": "Text",
         "typeQr": "QR",
         "typeShape": "Form",
+        "collapseSettings": "Collapse settings",
+        "expandSettings": "Expand settings",
         "handleDrag": "⇅ drag",
         "fieldText": "Text",
         "fieldQrContent": "QR content",
