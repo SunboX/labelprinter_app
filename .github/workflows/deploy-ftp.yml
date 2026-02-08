@@ -54,6 +54,7 @@ jobs:
           server-dir: /
           exclude: |
             **/node_modules/**
+          state-name: .ftp-deploy-src-state.json
 
       # 2) Deploy node_modules -> /node_modules/
       - name: Deploy node_modules to /node_modules/
@@ -68,3 +69,4 @@ jobs:
           exclude: |
             **/.git*
             **/.github/**
+          state-name: .ftp-deploy-nm-state.json
