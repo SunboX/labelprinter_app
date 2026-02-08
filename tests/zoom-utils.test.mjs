@@ -18,4 +18,72 @@ describe('zoom-utils', () => {
         assert.equal(ZoomUtils.formatZoomLabel(1), '100%')
         assert.equal(ZoomUtils.formatZoomLabel(1.236), '124%')
     })
+
+    it('builds a display fingerprint from screen metrics', () => {
+        const fingerprint = ZoomUtils.buildDisplayFingerprint({
+            devicePixelRatio: 2,
+            screen: {
+                width: 2560,
+                height: 1440,
+                availWidth: 2560,
+                availHeight: 1380,
+                colorDepth: 24,
+                pixelDepth: 24
+            }
+        })
+        assert.deepEqual(fingerprint, {
+            screenWidth: 2560,
+            screenHeight: 1440,
+            availWidth: 2560,
+            availHeight: 1380,
+            colorDepth: 24,
+            pixelDepth: 24,
+            devicePixelRatio: 2
+        })
+    })
+
+    it('restores persisted zoom when the display fingerprint matches', () => {
+        const windowRef = {
+            devicePixelRatio: 2,
+            screen: {
+                width: 2560,
+                height: 1440,
+                availWidth: 2560,
+                availHeight: 1380,
+                colorDepth: 24,
+                pixelDepth: 24
+            }
+        }
+        const payload = ZoomUtils.createZoomPreferencePayload(1.7, windowRef)
+        const restoredZoom = ZoomUtils.resolvePersistedZoom(payload, windowRef)
+        assert.equal(restoredZoom, 1.7)
+    })
+
+    it('skips persisted zoom when the display fingerprint does not match', () => {
+        const savedDisplay = {
+            devicePixelRatio: 2,
+            screen: {
+                width: 2560,
+                height: 1440,
+                availWidth: 2560,
+                availHeight: 1380,
+                colorDepth: 24,
+                pixelDepth: 24
+            }
+        }
+        const currentDisplay = {
+            devicePixelRatio: 1,
+            screen: {
+                width: 1920,
+                height: 1080,
+                availWidth: 1920,
+                availHeight: 1040,
+                colorDepth: 24,
+                pixelDepth: 24
+            }
+        }
+        const payload = ZoomUtils.createZoomPreferencePayload(1.7, savedDisplay)
+        const restoredZoom = ZoomUtils.resolvePersistedZoom(payload, currentDisplay)
+        assert.equal(restoredZoom, null)
+    })
 })

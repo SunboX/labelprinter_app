@@ -753,6 +753,22 @@ button:disabled {
     gap: 8px;
 }
 
+.item-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.item-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.item-card.collapsed .item-body {
+    display: none;
+}
+
 .handle {
     cursor: grab;
     color: var(--muted);
@@ -805,6 +821,14 @@ input[type='range'] {
 .item-card button {
     width: 100%;
     margin-top: 4px;
+}
+
+.item-card .item-toggle {
+    width: 30px;
+    min-width: 30px;
+    margin-top: 0;
+    padding: 7px 0;
+    line-height: 1;
 }
 
 .item-card .google-font-row button {
