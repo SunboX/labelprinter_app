@@ -102,6 +102,7 @@ const defaultState = {
     parameterDataRows: [],
     parameterDataRaw: '',
     parameterDataSourceName: '',
+    customFontLinks: [],
     items: [
         { id: nextId(), type: 'text', text: 'New text', fontFamily: 'Barlow', fontSize: 24, height: 40, xOffset: 4, yOffset: 0 }
     ]
@@ -387,10 +388,11 @@ class AppController {
      * @param {string} sourceLabel
      * @param {boolean} [refreshView=true]
      */
-    #applyLoadedProject(rawState, sourceLabel, refreshView = true) {
+    async #applyLoadedProject(rawState, sourceLabel, refreshView = true) {
         const { state: normalizedState, nextIdCounter } = ProjectIoUtils.normalizeProjectState(rawState, defaultState)
         idCounter = nextIdCounter
         this.#applyState(normalizedState)
+        await this.itemsEditor.loadGoogleFontLinks(this.state.customFontLinks)
         this.#syncFormFromState()
         this.parameterPanel.syncFromState()
         this.#syncPreviewTemplateValues()
@@ -424,12 +426,12 @@ class AppController {
                     throw new Error(`HTTP ${response.status}`)
                 }
                 rawProject = await response.json()
-                this.#applyLoadedProject(rawProject, this.#t('messages.sourceUrlParameter'), false)
+                await this.#applyLoadedProject(rawProject, this.#t('messages.sourceUrlParameter'), false)
                 return true
             }
             const rawValue = String(source.value || '').trim()
             rawProject = rawValue.startsWith('{') ? JSON.parse(rawValue) : ProjectUrlUtils.decodeEmbeddedProjectParam(rawValue)
-            this.#applyLoadedProject(rawProject, this.#t('messages.sourceSharedLink'), false)
+            await this.#applyLoadedProject(rawProject, this.#t('messages.sourceSharedLink'), false)
             return true
         } catch (err) {
             const message = err?.message || this.#t('messages.unknownError')
@@ -545,7 +547,7 @@ class AppController {
             }
             const rawText = await file.text()
             const rawState = JSON.parse(rawText)
-            this.#applyLoadedProject(rawState, file.name)
+            await this.#applyLoadedProject(rawState, file.name)
         } catch (err) {
             if (err?.name === 'AbortError') {
                 this.setStatus(this.#t('messages.loadCanceled'), 'info')
@@ -589,6 +591,9 @@ class AppController {
                   name: String(parameter?.name || '').trim(),
                   defaultValue: String(parameter?.defaultValue ?? '')
               }))
+            : []
+        this.state.customFontLinks = Array.isArray(nextState.customFontLinks)
+            ? nextState.customFontLinks.map((link) => String(link || '').trim()).filter(Boolean)
             : []
         this.state.parameterDataRows = Array.isArray(nextState.parameterDataRows)
             ? nextState.parameterDataRows
@@ -895,11 +900,13 @@ async function startApp() {
 
     const translate = (key, params = {}) => i18n.t(key, params)
     const previewRenderer = new PreviewRenderer(els, state, setStatus, translate)
-    const itemsEditor = new ItemsEditor(els, state, shapeTypes, noop, nextId, translate)
+    const itemsEditor = new ItemsEditor(els, state, shapeTypes, noop, nextId, translate, setStatus)
     const parameterPanel = new ParameterPanel(els, state, setStatus, noop, translate)
     const printController = new PrintController(els, state, printerMap, previewRenderer, setStatus, translate)
     const app = new AppController(els, state, itemsEditor, parameterPanel, previewRenderer, printController, setStatus, i18n)
 
+    await itemsEditor.loadInstalledFontFamilies()
+    await itemsEditor.loadGoogleFontLinks(state.customFontLinks)
     await app.init()
 }
 

@@ -1,4 +1,6 @@
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
+import { FontFamilyUtils } from '../FontFamilyUtils.mjs'
+import { QrCodeUtils } from '../QrCodeUtils.mjs'
 
 /**
  * Manages the item list UI, including drag reordering and item controls.
@@ -6,6 +8,8 @@ import { QrSizeUtils } from '../QrSizeUtils.mjs'
 export class ItemsEditor {
     #onChange = () => {}
     #translate = (key) => key
+    #setStatus = () => {}
+    #fontFamilies = FontFamilyUtils.getFallbackFontFamilies()
 
     /**
      * @param {object} els
@@ -14,14 +18,16 @@ export class ItemsEditor {
      * @param {() => void} onChange
      * @param {() => string} nextId
      * @param {(key: string, params?: Record<string, string | number>) => string} translate
+     * @param {(text: string, type?: string) => void} setStatus
      */
-    constructor(els, state, shapeTypes, onChange, nextId, translate) {
+    constructor(els, state, shapeTypes, onChange, nextId, translate, setStatus) {
         this.els = els
         this.state = state
         this.shapeTypes = shapeTypes
         this.onChange = onChange
         this.nextId = nextId
         this.translate = translate
+        this.setStatus = setStatus
         this.selectedItemIds = new Set()
     }
 
@@ -55,6 +61,78 @@ export class ItemsEditor {
      */
     get translate() {
         return this.#translate
+    }
+
+    /**
+     * Sets the status callback.
+     * @param {(text: string, type?: string) => void} callback
+     */
+    set setStatus(callback) {
+        this.#setStatus = typeof callback === 'function' ? callback : () => {}
+    }
+
+    /**
+     * Returns the status callback.
+     * @returns {(text: string, type?: string) => void}
+     */
+    get setStatus() {
+        return this.#setStatus
+    }
+
+    /**
+     * Sets available font families for dropdown controls.
+     * @param {string[]} value
+     */
+    set fontFamilies(value) {
+        this.#fontFamilies = FontFamilyUtils.normalizeFontFamilies(value, 'Barlow')
+    }
+
+    /**
+     * Returns available font families for dropdown controls.
+     * @returns {string[]}
+     */
+    get fontFamilies() {
+        return [...this.#fontFamilies]
+    }
+
+    /**
+     * Loads available local font families once from the browser.
+     * @returns {Promise<void>}
+     */
+    async loadInstalledFontFamilies() {
+        this.fontFamilies = await FontFamilyUtils.listInstalledFontFamilies(window)
+    }
+
+    /**
+     * Loads and tracks previously saved Google Font links.
+     * @param {string[]} fontLinks
+     * @returns {Promise<void>}
+     */
+    async loadGoogleFontLinks(fontLinks) {
+        this.#ensureCustomFontLinksState()
+        const normalizedLinks = FontFamilyUtils.normalizeGoogleFontLinks(fontLinks)
+        if (!normalizedLinks.length) return
+
+        const loadedFamilies = []
+        const loadedLinks = []
+        for (const link of normalizedLinks) {
+            try {
+                const result = await FontFamilyUtils.loadGoogleFontLink(link, document, window.location)
+                loadedFamilies.push(...result.families)
+                loadedLinks.push(result.url)
+            } catch (_err) {
+                continue
+            }
+        }
+
+        if (loadedLinks.length) {
+            this.state.customFontLinks = FontFamilyUtils.normalizeGoogleFontLinks(
+                this.state.customFontLinks.concat(loadedLinks)
+            )
+        }
+        if (loadedFamilies.length) {
+            this.fontFamilies = FontFamilyUtils.normalizeFontFamilies(this.fontFamilies.concat(loadedFamilies), 'Barlow')
+        }
     }
 
     /**
@@ -123,13 +201,22 @@ export class ItemsEditor {
             id: this.nextId(),
             type: 'text',
             text: this.translate('itemsEditor.newText'),
-            fontFamily: 'Barlow',
+            fontFamily: this.#resolveDefaultFontFamily(),
             fontSize: 24,
             height: 40,
             xOffset: 4
         })
         this.render()
         this.#onChange()
+    }
+
+    /**
+     * Ensures custom Google font links state is present.
+     */
+    #ensureCustomFontLinksState() {
+        if (!Array.isArray(this.state.customFontLinks)) {
+            this.state.customFontLinks = []
+        }
     }
 
     /**
@@ -143,6 +230,9 @@ export class ItemsEditor {
             data: this.translate('itemsEditor.newQrData'),
             size: initialSize,
             height: initialSize,
+            qrErrorCorrectionLevel: QrCodeUtils.getDefaultErrorCorrectionLevel(),
+            qrVersion: QrCodeUtils.getDefaultVersion(),
+            qrEncodingMode: QrCodeUtils.getDefaultEncodingMode(),
             xOffset: 4
         })
         this.render()
@@ -332,20 +422,117 @@ export class ItemsEditor {
         fontCtrl.className = 'field'
         const fontLabel = document.createElement('label')
         fontLabel.textContent = this.translate('itemsEditor.fontFamily')
-        const fontInput = document.createElement('input')
-        fontInput.value = item.fontFamily
-        fontInput.addEventListener('input', (e) => {
+        const fontSelect = document.createElement('select')
+        const availableFamilies = this.#buildItemFontFamilyOptions(item.fontFamily)
+        if (!item.fontFamily && availableFamilies.length) {
+            item.fontFamily = availableFamilies[0]
+        }
+        availableFamilies.forEach((family) => {
+            const option = document.createElement('option')
+            option.value = family
+            option.textContent = family
+            option.style.fontFamily = `"${family}", sans-serif`
+            fontSelect.appendChild(option)
+        })
+        fontSelect.value = item.fontFamily
+        fontSelect.addEventListener('change', (e) => {
             item.fontFamily = e.target.value
             this.#onChange()
         })
-        fontCtrl.append(fontLabel, fontInput)
+        fontCtrl.append(fontLabel, fontSelect)
+
+        const googleFontCtrl = document.createElement('div')
+        googleFontCtrl.className = 'field google-font-field'
+        const googleFontLabel = document.createElement('label')
+        googleFontLabel.textContent = this.translate('itemsEditor.googleFontUrl')
+        const googleFontRow = document.createElement('div')
+        googleFontRow.className = 'google-font-row'
+        const googleFontInput = document.createElement('input')
+        googleFontInput.type = 'url'
+        googleFontInput.placeholder = this.translate('itemsEditor.googleFontUrlPlaceholder')
+        const googleFontButton = document.createElement('button')
+        googleFontButton.type = 'button'
+        googleFontButton.className = 'ghost'
+        googleFontButton.textContent = this.translate('itemsEditor.addGoogleFont')
+        googleFontButton.addEventListener('click', async () => {
+            if (googleFontButton.disabled) return
+            googleFontButton.disabled = true
+            await this.#importGoogleFontFromInput(googleFontInput, item)
+            googleFontButton.disabled = false
+        })
+        googleFontRow.append(googleFontInput, googleFontButton)
+        const googleFontHint = document.createElement('p')
+        googleFontHint.className = 'small muted'
+        googleFontHint.textContent = this.translate('itemsEditor.googleFontHint')
+        googleFontCtrl.append(googleFontLabel, googleFontRow, googleFontHint)
 
         const sizeCtrl = this.#createSlider(this.translate('itemsEditor.sliderFontSize'), item.fontSize, 10, 64, 1, (v) => {
             item.fontSize = v
             this.#onChange()
         })
 
-        controls.append(offsetCtrl, yOffsetCtrl, fontCtrl, sizeCtrl)
+        controls.append(offsetCtrl, yOffsetCtrl, fontCtrl, sizeCtrl, googleFontCtrl)
+    }
+
+    /**
+     * Returns font-family options for the current item.
+     * @param {string} activeFontFamily
+     * @returns {string[]}
+     */
+    #buildItemFontFamilyOptions(activeFontFamily) {
+        return FontFamilyUtils.normalizeFontFamilies(this.fontFamilies.concat([activeFontFamily]), 'Barlow')
+    }
+
+    /**
+     * Resolves a default font family for new text items.
+     * @returns {string}
+     */
+    #resolveDefaultFontFamily() {
+        return this.fontFamilies[0] || 'Barlow'
+    }
+
+    /**
+     * Imports a Google Font stylesheet URL and refreshes available font options.
+     * @param {HTMLInputElement} input
+     * @param {object} item
+     * @returns {Promise<void>}
+     */
+    async #importGoogleFontFromInput(input, item) {
+        const rawValue = String(input?.value || '').trim()
+        if (!rawValue) {
+            this.setStatus(this.translate('itemsEditor.googleFontUrlRequired'), 'info')
+            return
+        }
+
+        try {
+            const result = await FontFamilyUtils.loadGoogleFontLink(rawValue, document, window.location)
+            this.#ensureCustomFontLinksState()
+            this.state.customFontLinks = FontFamilyUtils.normalizeGoogleFontLinks(
+                this.state.customFontLinks.concat([result.url])
+            )
+            this.fontFamilies = FontFamilyUtils.normalizeFontFamilies(this.fontFamilies.concat(result.families), 'Barlow')
+            if (result.families.length) {
+                item.fontFamily = result.families[0]
+            }
+            if (input) {
+                input.value = ''
+            }
+            this.render()
+            this.#onChange()
+
+            if (result.alreadyLoaded) {
+                this.setStatus(this.translate('itemsEditor.googleFontAlreadyLoaded'), 'info')
+                return
+            }
+            if (result.families.length === 1) {
+                this.setStatus(this.translate('itemsEditor.googleFontAdded', { family: result.families[0] }), 'success')
+                return
+            }
+            this.setStatus(this.translate('itemsEditor.googleFontAddedMany', { count: result.families.length }), 'success')
+        } catch (err) {
+            const message = err?.message || this.translate('messages.unknownError')
+            this.setStatus(this.translate('itemsEditor.googleFontLoadFailed', { message }), 'error')
+        }
     }
 
     /**
@@ -355,6 +542,11 @@ export class ItemsEditor {
      * @param {string} sizeLabel
      */
     #appendQrControls(item, controls, sizeLabel) {
+        const normalizedOptions = QrCodeUtils.normalizeItemOptions(item)
+        item.qrErrorCorrectionLevel = normalizedOptions.qrErrorCorrectionLevel
+        item.qrVersion = normalizedOptions.qrVersion
+        item.qrEncodingMode = normalizedOptions.qrEncodingMode
+
         const maxQrSize = QrSizeUtils.computeMaxQrSizeDots(this.state)
         const minQrSize = Math.max(1, Math.min(QrSizeUtils.MIN_QR_SIZE_DOTS, maxQrSize))
         const heightCtrl = this.#createSlider(sizeLabel, item.height, 20, 280, 1, (v) => {
@@ -377,7 +569,69 @@ export class ItemsEditor {
             item._qrCache = null
             this.#onChange()
         })
-        controls.append(heightCtrl, offsetCtrl, yOffsetCtrl, sizeCtrl)
+
+        const errorCorrectionCtrl = document.createElement('div')
+        errorCorrectionCtrl.className = 'field'
+        const errorCorrectionLabel = document.createElement('label')
+        errorCorrectionLabel.textContent = this.translate('itemsEditor.qrErrorCorrection')
+        const errorCorrectionSelect = document.createElement('select')
+        QrCodeUtils.getErrorCorrectionLevels().forEach((level) => {
+            const option = document.createElement('option')
+            option.value = level
+            option.textContent = this.translate(`itemsEditor.qrErrorCorrection${level}`)
+            errorCorrectionSelect.appendChild(option)
+        })
+        errorCorrectionSelect.value = item.qrErrorCorrectionLevel
+        errorCorrectionSelect.addEventListener('change', (e) => {
+            item.qrErrorCorrectionLevel = QrCodeUtils.normalizeErrorCorrectionLevel(e.target.value)
+            item._qrCache = null
+            this.#onChange()
+        })
+        errorCorrectionCtrl.append(errorCorrectionLabel, errorCorrectionSelect)
+
+        const versionCtrl = document.createElement('div')
+        versionCtrl.className = 'field'
+        const versionLabel = document.createElement('label')
+        versionLabel.textContent = this.translate('itemsEditor.qrVersion')
+        const versionSelect = document.createElement('select')
+        const autoVersionOption = document.createElement('option')
+        autoVersionOption.value = '0'
+        autoVersionOption.textContent = this.translate('itemsEditor.qrVersionAuto')
+        versionSelect.appendChild(autoVersionOption)
+        for (let version = 1; version <= 40; version += 1) {
+            const option = document.createElement('option')
+            option.value = String(version)
+            option.textContent = String(version)
+            versionSelect.appendChild(option)
+        }
+        versionSelect.value = String(item.qrVersion)
+        versionSelect.addEventListener('change', (e) => {
+            item.qrVersion = QrCodeUtils.normalizeVersion(e.target.value)
+            item._qrCache = null
+            this.#onChange()
+        })
+        versionCtrl.append(versionLabel, versionSelect)
+
+        const encodingModeCtrl = document.createElement('div')
+        encodingModeCtrl.className = 'field'
+        const encodingModeLabel = document.createElement('label')
+        encodingModeLabel.textContent = this.translate('itemsEditor.qrEncodingMode')
+        const encodingModeSelect = document.createElement('select')
+        QrCodeUtils.getEncodingModes().forEach((mode) => {
+            const option = document.createElement('option')
+            option.value = mode
+            option.textContent = this.translate(`itemsEditor.qrEncoding${mode[0].toUpperCase()}${mode.slice(1)}`)
+            encodingModeSelect.appendChild(option)
+        })
+        encodingModeSelect.value = item.qrEncodingMode
+        encodingModeSelect.addEventListener('change', (e) => {
+            item.qrEncodingMode = QrCodeUtils.normalizeEncodingMode(e.target.value)
+            item._qrCache = null
+            this.#onChange()
+        })
+        encodingModeCtrl.append(encodingModeLabel, encodingModeSelect)
+
+        controls.append(heightCtrl, offsetCtrl, yOffsetCtrl, sizeCtrl, errorCorrectionCtrl, versionCtrl, encodingModeCtrl)
     }
 
     /**

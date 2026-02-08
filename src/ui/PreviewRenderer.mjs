@@ -4,6 +4,7 @@ import { ZoomUtils } from '../ZoomUtils.mjs'
 import { RulerUtils } from '../RulerUtils.mjs'
 import { InteractionUtils } from '../InteractionUtils.mjs'
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
+import { QrCodeUtils } from '../QrCodeUtils.mjs'
 import { ParameterTemplateUtils } from '../ParameterTemplateUtils.mjs'
 import { Media, Resolution } from 'labelprinterkit-web/src/index.mjs'
 
@@ -157,7 +158,7 @@ export class PreviewRenderer {
             }
 
             const resolvedQrData = ParameterTemplateUtils.resolveTemplateString(item.data || '', parameterValues)
-            const qrCanvas = await this._getCachedQrCanvas(resolvedQrData, item.size)
+            const qrCanvas = await this._getCachedQrCanvas(resolvedQrData, item.size, item)
             const span = Math.max(item.height, item.size)
             blocks.push({ ref: item, span, qrSize: item.size, qrCanvas })
         }
@@ -1484,18 +1485,20 @@ export class PreviewRenderer {
      * Returns a cached QR canvas or generates a new one.
      * @param {string} data
      * @param {number} size
+     * @param {object} item
      * @returns {Promise<HTMLCanvasElement>}
      */
-    async _getCachedQrCanvas(data, size) {
+    async _getCachedQrCanvas(data, size, item = {}) {
         const safeSize = Math.max(1, Math.round(Number(size) || 1))
-        const cacheKey = `${safeSize}::${String(data || '')}`
+        const normalizedOptions = QrCodeUtils.normalizeItemOptions(item)
+        const cacheKey = `${safeSize}::${normalizedOptions.qrErrorCorrectionLevel}::${normalizedOptions.qrVersion}::${normalizedOptions.qrEncodingMode}::${String(data || '')}`
         if (this._qrRenderCache.has(cacheKey)) {
             const cached = this._qrRenderCache.get(cacheKey)
             this._qrRenderCache.delete(cacheKey)
             this._qrRenderCache.set(cacheKey, cached)
             return cached
         }
-        const builtCanvas = await this._buildQrCanvas(data, safeSize)
+        const builtCanvas = await this._buildQrCanvas(data, safeSize, normalizedOptions)
         this._qrRenderCache.set(cacheKey, builtCanvas)
         const maxEntries = 96
         if (this._qrRenderCache.size > maxEntries) {
@@ -1511,12 +1514,23 @@ export class PreviewRenderer {
      * Builds a QR code canvas for preview rendering.
      * @param {string} data
      * @param {number} size
+     * @param {object} options
      * @returns {Promise<HTMLCanvasElement>}
      */
-    async _buildQrCanvas(data, size) {
+    async _buildQrCanvas(data, size, options = {}) {
         const canvas = document.createElement('canvas')
         const qrCode = this._requireQrCode()
-        await qrCode.toCanvas(canvas, data || '', { errorCorrectionLevel: 'M', margin: 0, width: size })
+        const normalizedOptions = QrCodeUtils.normalizeItemOptions(options)
+        const payload = QrCodeUtils.buildQrPayload(data || '', normalizedOptions.qrEncodingMode)
+        const qrOptions = {
+            errorCorrectionLevel: normalizedOptions.qrErrorCorrectionLevel,
+            margin: 0,
+            width: size
+        }
+        if (normalizedOptions.qrVersion > 0) {
+            qrOptions.version = normalizedOptions.qrVersion
+        }
+        await qrCode.toCanvas(canvas, payload, qrOptions)
         return canvas
     }
 
