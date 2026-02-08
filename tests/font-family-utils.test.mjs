@@ -69,4 +69,17 @@ describe('font-family-utils', () => {
         assert.equal(result.alreadyLoaded, true)
         assert.deepEqual(result.families, ['Roboto'])
     })
+
+    it('parses persisted Google font links from localStorage payloads', () => {
+        const parsedLinks = FontFamilyUtils.parsePersistedGoogleFontLinks(
+            '["https://fonts.googleapis.com/css2?family=Roboto"," https://fonts.googleapis.com/css2?family=Roboto "]'
+        )
+        assert.deepEqual(parsedLinks, ['https://fonts.googleapis.com/css2?family=Roboto'])
+        assert.match(FontFamilyUtils.GOOGLE_FONT_LINKS_STORAGE_KEY, /google-font-links/i)
+    })
+
+    it('returns an empty list for invalid persisted font payloads', () => {
+        assert.deepEqual(FontFamilyUtils.parsePersistedGoogleFontLinks('not-json'), [])
+        assert.deepEqual(FontFamilyUtils.parsePersistedGoogleFontLinks({}), [])
+    })
 })

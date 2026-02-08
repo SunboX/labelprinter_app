@@ -18,6 +18,7 @@ export class FontFamilyUtils {
         'sans-serif',
         'monospace'
     ]
+    static #googleFontLinksStorageKey = 'labelprinter-app.google-font-links.v1'
 
     /**
      * Returns default fallback font families.
@@ -25,6 +26,14 @@ export class FontFamilyUtils {
      */
     static getFallbackFontFamilies() {
         return [...FontFamilyUtils.#fallbackFontFamilies]
+    }
+
+    /**
+     * Returns the localStorage key used for persisted Google font links.
+     * @returns {string}
+     */
+    static get GOOGLE_FONT_LINKS_STORAGE_KEY() {
+        return FontFamilyUtils.#googleFontLinksStorageKey
     }
 
     /**
@@ -43,6 +52,25 @@ export class FontFamilyUtils {
             links.push(text)
         })
         return links
+    }
+
+    /**
+     * Parses a raw persisted Google font links payload.
+     * Accepts either a JSON string array or a direct array value.
+     * @param {string | unknown[] | null | undefined} rawValue
+     * @returns {string[]}
+     */
+    static parsePersistedGoogleFontLinks(rawValue) {
+        if (rawValue === null || rawValue === undefined) return []
+        let parsedValue = rawValue
+        if (typeof rawValue === 'string') {
+            try {
+                parsedValue = JSON.parse(rawValue)
+            } catch (_error) {
+                return []
+            }
+        }
+        return FontFamilyUtils.normalizeGoogleFontLinks(Array.isArray(parsedValue) ? parsedValue : [])
     }
 
     /**
