@@ -7,8 +7,10 @@
     "start": "node src/server.mjs",
     "test": "node --test"
   },
+  "devDependencies": {
+    "express": "^4.19.2"
+  },
   "dependencies": {
-    "express": "^4.19.2",
     "interactjs": "^1.10.27",
     "labelprinterkit-web": "git+ssh://git@github.com/SunboX/labelprinterkit.git",
     "qrcode": "^1.5.1"
