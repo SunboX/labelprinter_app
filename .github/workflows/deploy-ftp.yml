@@ -41,8 +41,8 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: ${{ secrets.FTP_PORT }} # optional, defaults to 21
           protocol: ftp              # or ftps if your host supports it
-          local-dir: ./              # or ./dist/ if you build
-          server-dir: /public_html/  # adjust to your target folder
+          local-dir: ./src/              # or ./dist/ if you build
+          server-dir: /  # adjust to your target folder
           exclude: |
             **/.git*
             **/.github/**
