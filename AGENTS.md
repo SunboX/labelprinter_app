@@ -13,6 +13,7 @@
 - `src/ui/PrintController.mjs`
 - `src/index.html`
 - `src/style.css`
+- `src/styles/`
 - `README.md`
 
 ## Build, Run, Test
@@ -24,6 +25,7 @@
 ## Coding Style & Naming Conventions
 - Prettier settings are in `.prettierrc.json`: 4-space indent, single quotes, no semicolons, no trailing commas.
 - Keep files under 1000 lines; split into smaller modules/classes when they grow.
+- Keep each CSS file under 1000 lines; split styles into multiple files in `src/styles/` and keep `src/style.css` as the stylesheet entrypoint.
 - Add JSDoc for every function/method, including private helpers.
 - Add inline comments where decisions or behavior need clarity.
 - Utility modules should use class-based organization with static methods where appropriate.

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
+import { readCssBundle } from './CssBundleUtils.mjs'
 
 describe('items editor collapsible cards', () => {
     it('defines collapsed card styles for item settings body', async () => {
-        const css = await readFile('src/style.css', 'utf8')
+        const css = await readCssBundle('src/style.css')
         assert.match(css, /\.item-card\.collapsed\s+\.item-body\s*{[^}]*display:\s*none/i)
     })
 
