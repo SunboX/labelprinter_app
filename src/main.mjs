@@ -14,6 +14,7 @@ const els = {
     items: document.querySelector('[data-items]'),
     addText: document.querySelector('[data-add-text]'),
     addQr: document.querySelector('[data-add-qr]'),
+    addImage: document.querySelector('[data-add-image]'),
     addShape: document.querySelector('[data-add-shape]'),
     shapeMenu: document.querySelector('[data-shape-menu]'),
     saveProject: document.querySelector('[data-save-project]'),
@@ -74,7 +75,6 @@ const shapeTypes = [
     { id: 'polygon', labelKey: 'shapes.polygon' },
     { id: 'line', labelKey: 'shapes.line' }
 ]
-
 let idCounter = 1
 
 /**
@@ -899,6 +899,7 @@ class AppController {
         }
         this.els.addText.addEventListener('click', () => this.itemsEditor.addTextItem())
         this.els.addQr.addEventListener('click', () => this.itemsEditor.addQrItem())
+        if (this.els.addImage) this.els.addImage.addEventListener('click', () => this.itemsEditor.addImageItem())
         if (this.els.shapeMenu && this.els.addShape) {
             if (!this.els.shapeMenu.id) {
                 this.els.shapeMenu.id = 'shape-menu'

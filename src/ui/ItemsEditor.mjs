@@ -1,6 +1,8 @@
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { FontFamilyUtils } from '../FontFamilyUtils.mjs'
 import { QrCodeUtils } from '../QrCodeUtils.mjs'
+import { ImageRasterUtils } from '../ImageRasterUtils.mjs'
+import { Media } from 'labelprinterkit-web/src/index.mjs'
 
 /**
  * Manages the item list UI, including drag reordering and item controls.
@@ -280,6 +282,31 @@ export class ItemsEditor {
     }
 
     /**
+     * Adds a new image item.
+     */
+    addImageItem() {
+        const id = this.nextId()
+        this.state.items.push({
+            id,
+            type: 'image',
+            imageData: '',
+            imageName: '',
+            imageDither: 'floyd-steinberg',
+            imageThreshold: 128,
+            imageSmoothing: 'medium',
+            imageInvert: false,
+            width: 96,
+            height: 96,
+            xOffset: 4,
+            yOffset: 0
+        })
+        this.#panelItemOrder.push(id)
+        this.#collapsedItemIds.delete(id)
+        this.render()
+        this.#onChange()
+    }
+
+    /**
      * Adds a new shape item.
      * @param {string} [shapeType='rect']
      */
@@ -432,6 +459,8 @@ export class ItemsEditor {
                 ? this.translate('itemsEditor.typeText')
                 : item.type === 'qr'
                   ? this.translate('itemsEditor.typeQr')
+                  : item.type === 'image'
+                    ? this.translate('itemsEditor.typeImage')
                   : this.translate('itemsEditor.typeShape')
         tag.textContent = typeLabel
         const handle = document.createElement('div')
@@ -496,6 +525,32 @@ export class ItemsEditor {
                 this.#onChange()
             })
             contentWrap.append(label, select)
+        } else if (item.type === 'image') {
+            const label = document.createElement('label')
+            label.textContent = this.translate('itemsEditor.fieldImage')
+            const uploadButton = document.createElement('button')
+            uploadButton.type = 'button'
+            uploadButton.className = 'ghost'
+            uploadButton.textContent = this.translate('itemsEditor.uploadImage')
+            const uploadInput = document.createElement('input')
+            uploadInput.type = 'file'
+            uploadInput.accept = 'image/*'
+            uploadInput.hidden = true
+            uploadButton.addEventListener('click', () => uploadInput.click())
+            uploadInput.addEventListener('change', async () => {
+                const file = uploadInput.files?.[0] || null
+                if (!file) return
+                uploadButton.disabled = true
+                await this.#loadImageFile(item, file)
+                uploadButton.disabled = false
+                uploadInput.value = ''
+            })
+            const fileLabel = document.createElement('p')
+            fileLabel.className = 'small muted image-file-label'
+            fileLabel.textContent = item.imageName
+                ? this.translate('itemsEditor.imageFileName', { name: item.imageName })
+                : this.translate('itemsEditor.imageNoFile')
+            contentWrap.append(label, uploadButton, fileLabel, uploadInput)
         }
 
         const controls = document.createElement('div')
@@ -505,6 +560,8 @@ export class ItemsEditor {
             this.#appendTextControls(item, controls)
         } else if (item.type === 'qr') {
             this.#appendQrControls(item, controls, sizeLabel)
+        } else if (item.type === 'image') {
+            this.#appendImageControls(item, controls, sizeLabel)
         } else if (item.type === 'shape') {
             this.#appendShapeControls(item, controls, sizeLabel)
         }
@@ -664,6 +721,187 @@ export class ItemsEditor {
             const message = err?.message || this.translate('messages.unknownError')
             this.setStatus(this.translate('itemsEditor.googleFontLoadFailed', { message }), 'error')
         }
+    }
+
+    /**
+     * Loads an uploaded image file into an image item.
+     * @param {object} item
+     * @param {File} file
+     * @returns {Promise<void>}
+     */
+    async #loadImageFile(item, file) {
+        if (!file || !String(file.type || '').startsWith('image/')) {
+            this.setStatus(this.translate('itemsEditor.imageLoadFailedType'), 'error')
+            return
+        }
+        try {
+            const dataUrl = await this.#readFileAsDataUrl(file)
+            const imageElement = await this.#loadImageFromDataUrl(dataUrl)
+            if (!imageElement) {
+                throw new Error(this.translate('itemsEditor.imageLoadFailedDecode'))
+            }
+            const dimensions = this.#resolveInitialImageDimensions(imageElement.naturalWidth, imageElement.naturalHeight)
+            item.imageData = dataUrl
+            item.imageName = file.name || ''
+            item.width = dimensions.width
+            item.height = dimensions.height
+            const normalizedOptions = ImageRasterUtils.normalizeItemOptions(item)
+            item.imageDither = normalizedOptions.imageDither
+            item.imageThreshold = normalizedOptions.imageThreshold
+            item.imageSmoothing = normalizedOptions.imageSmoothing
+            item.imageInvert = normalizedOptions.imageInvert
+            this.render()
+            this.#onChange()
+            this.setStatus(this.translate('itemsEditor.imageLoaded', { name: item.imageName || 'image' }), 'success')
+        } catch (err) {
+            const message = err?.message || this.translate('messages.unknownError')
+            this.setStatus(this.translate('itemsEditor.imageLoadFailed', { message }), 'error')
+        }
+    }
+
+    /**
+     * Reads a file as a data URL.
+     * @param {File} file
+     * @returns {Promise<string>}
+     */
+    async #readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(String(reader.result || ''))
+            reader.onerror = () => reject(new Error(this.translate('itemsEditor.imageLoadFailedRead')))
+            reader.readAsDataURL(file)
+        })
+    }
+
+    /**
+     * Loads an image element from a data URL.
+     * @param {string} dataUrl
+     * @returns {Promise<HTMLImageElement | null>}
+     */
+    async #loadImageFromDataUrl(dataUrl) {
+        return new Promise((resolve) => {
+            const imageElement = new Image()
+            imageElement.onload = () => resolve(imageElement)
+            imageElement.onerror = () => resolve(null)
+            imageElement.src = dataUrl
+        })
+    }
+
+    /**
+     * Resolves initial image dimensions so the first render fits the label width.
+     * @param {number} naturalWidth
+     * @param {number} naturalHeight
+     * @returns {{ width: number, height: number }}
+     */
+    #resolveInitialImageDimensions(naturalWidth, naturalHeight) {
+        const safeNaturalWidth = Math.max(1, Math.round(Number(naturalWidth) || 1))
+        const safeNaturalHeight = Math.max(1, Math.round(Number(naturalHeight) || 1))
+        const media = Media[this.state.media] || Media.W24
+        const maxLabelHeight = Math.max(24, (media?.printArea || 128) - 4)
+        const maxInitialWidth = 220
+        const widthScale = maxInitialWidth / safeNaturalWidth
+        const heightScale = maxLabelHeight / safeNaturalHeight
+        const scale = Math.min(widthScale, heightScale, 1)
+        return {
+            width: Math.max(8, Math.round(safeNaturalWidth * scale)),
+            height: Math.max(8, Math.round(safeNaturalHeight * scale))
+        }
+    }
+
+    /**
+     * Appends image controls to the controls container.
+     * @param {object} item
+     * @param {HTMLElement} controls
+     * @param {string} sizeLabel
+     */
+    #appendImageControls(item, controls, sizeLabel) {
+        const normalizedOptions = ImageRasterUtils.normalizeItemOptions(item)
+        item.imageDither = normalizedOptions.imageDither
+        item.imageThreshold = normalizedOptions.imageThreshold
+        item.imageSmoothing = normalizedOptions.imageSmoothing
+        item.imageInvert = normalizedOptions.imageInvert
+
+        const widthCtrl = this.#createSlider(sizeLabel, item.width || 96, 8, 600, 1, (v) => {
+            item.width = v
+            this.#onChange()
+        })
+        const heightCtrl = this.#createSlider(this.translate('itemsEditor.sizeHeight'), item.height || 96, 8, 320, 1, (v) => {
+            item.height = v
+            this.#onChange()
+        })
+        const offsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, -80, 80, 1, (v) => {
+            item.xOffset = v
+            this.#onChange()
+        })
+        const yOffsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -80, 80, 1, (v) => {
+            item.yOffset = v
+            this.#onChange()
+        })
+        const thresholdCtrl = this.#createSlider(
+            this.translate('itemsEditor.imageThreshold'),
+            item.imageThreshold,
+            0,
+            255,
+            1,
+            (v) => {
+                item.imageThreshold = v
+                this.#onChange()
+            }
+        )
+
+        const ditherCtrl = document.createElement('div')
+        ditherCtrl.className = 'field'
+        const ditherLabel = document.createElement('label')
+        ditherLabel.textContent = this.translate('itemsEditor.imageDither')
+        const ditherSelect = document.createElement('select')
+        ImageRasterUtils.DITHER_MODES.forEach((mode) => {
+            const option = document.createElement('option')
+            option.value = mode
+            option.textContent = this.translate(`itemsEditor.imageDither${mode.replaceAll('-', '')}`)
+            ditherSelect.appendChild(option)
+        })
+        ditherSelect.value = item.imageDither
+        ditherSelect.addEventListener('change', (e) => {
+            item.imageDither = e.target.value
+            this.#onChange()
+        })
+        ditherCtrl.append(ditherLabel, ditherSelect)
+
+        const smoothingCtrl = document.createElement('div')
+        smoothingCtrl.className = 'field'
+        const smoothingLabel = document.createElement('label')
+        smoothingLabel.textContent = this.translate('itemsEditor.imageSmoothing')
+        const smoothingSelect = document.createElement('select')
+        ImageRasterUtils.SMOOTHING_MODES.forEach((mode) => {
+            const option = document.createElement('option')
+            option.value = mode
+            option.textContent = this.translate(`itemsEditor.imageSmoothing${mode}`)
+            smoothingSelect.appendChild(option)
+        })
+        smoothingSelect.value = item.imageSmoothing
+        smoothingSelect.addEventListener('change', (e) => {
+            item.imageSmoothing = e.target.value
+            this.#onChange()
+        })
+        smoothingCtrl.append(smoothingLabel, smoothingSelect)
+
+        const invertCtrl = document.createElement('div')
+        invertCtrl.className = 'field'
+        const invertLabel = document.createElement('label')
+        invertLabel.className = 'checkbox-row'
+        const invertInput = document.createElement('input')
+        invertInput.type = 'checkbox'
+        invertInput.checked = Boolean(item.imageInvert)
+        invertInput.addEventListener('change', (e) => {
+            item.imageInvert = e.target.checked
+            this.#onChange()
+        })
+        const invertText = document.createElement('span')
+        invertText.textContent = this.translate('itemsEditor.imageInvert')
+        invertLabel.append(invertInput, invertText)
+        invertCtrl.append(invertLabel)
+
+        controls.append(widthCtrl, heightCtrl, offsetCtrl, yOffsetCtrl, thresholdCtrl, ditherCtrl, smoothingCtrl, invertCtrl)
     }
 
     /**

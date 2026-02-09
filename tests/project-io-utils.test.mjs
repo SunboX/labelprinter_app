@@ -88,6 +88,18 @@ describe('project-io-utils', () => {
                     version: 2,
                     encodingMode: 'alphanumeric'
                 },
+                {
+                    id: 'item-3',
+                    type: 'image',
+                    imageData: 'data:image/png;base64,AAAB',
+                    imageName: 'logo.png',
+                    imageDither: 'ordered',
+                    imageThreshold: 140,
+                    imageSmoothing: 'high',
+                    imageInvert: true,
+                    width: 64,
+                    height: 48
+                },
                 { type: 'shape' },
                 { type: 'unsupported', id: 'item-9' }
             ]
@@ -104,6 +116,14 @@ describe('project-io-utils', () => {
         assert.equal(qrItem?.qrErrorCorrectionLevel, 'Q')
         assert.equal(qrItem?.qrVersion, 2)
         assert.equal(qrItem?.qrEncodingMode, 'alphanumeric')
+        const imageItem = state.items.find((item) => item.type === 'image')
+        assert.equal(imageItem?.imageName, 'logo.png')
+        assert.equal(imageItem?.imageDither, 'ordered')
+        assert.equal(imageItem?.imageThreshold, 140)
+        assert.equal(imageItem?.imageSmoothing, 'high')
+        assert.equal(imageItem?.imageInvert, true)
+        assert.equal(imageItem?.width, 64)
+        assert.equal(imageItem?.height, 48)
         assert.ok(nextIdCounter > ProjectIoUtils.deriveNextIdCounter([{ id: 'item-2' }]))
     })
 })
