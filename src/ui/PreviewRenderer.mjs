@@ -6,6 +6,7 @@ import { InteractionUtils } from '../InteractionUtils.mjs'
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { QrCodeUtils } from '../QrCodeUtils.mjs'
 import { ParameterTemplateUtils } from '../ParameterTemplateUtils.mjs'
+import { ImageRasterUtils } from '../ImageRasterUtils.mjs'
 import { Media, Resolution } from 'labelprinterkit-web/src/index.mjs'
 
 /**
@@ -43,6 +44,8 @@ export class PreviewRenderer {
         this._dotsPerPxY = 1
         this._templateValues = {}
         this._qrRenderCache = new Map()
+        this._imageRenderCache = new Map()
+        this._sourceImageCache = new Map()
         // Resize handles are part of the editor interaction model (drag via body, scale via dots/edges).
         this._enablePreviewResize = true
         this._handleRadius = 3
@@ -157,10 +160,23 @@ export class PreviewRenderer {
                 continue
             }
 
-            const resolvedQrData = ParameterTemplateUtils.resolveTemplateString(item.data || '', parameterValues)
-            const qrCanvas = await this._getCachedQrCanvas(resolvedQrData, item.size, item)
-            const span = Math.max(item.height, item.size)
-            blocks.push({ ref: item, span, qrSize: item.size, qrCanvas })
+            if (item.type === 'image') {
+                const imageWidth = Math.max(8, Math.round(Number(item.width) || 80))
+                const imageHeight = Math.max(8, Math.round(Number(item.height) || 80))
+                const imageCanvas = item.imageData
+                    ? await this._getCachedImageCanvas(item, imageWidth, imageHeight)
+                    : null
+                const span = isHorizontal ? imageWidth : Math.max(imageHeight + 4, imageHeight)
+                blocks.push({ ref: item, span, imageWidth, imageHeight, imageCanvas })
+                continue
+            }
+
+            if (item.type === 'qr') {
+                const resolvedQrData = ParameterTemplateUtils.resolveTemplateString(item.data || '', parameterValues)
+                const qrCanvas = await this._getCachedQrCanvas(resolvedQrData, item.size, item)
+                const span = Math.max(item.height, item.size)
+                blocks.push({ ref: item, span, qrSize: item.size, qrCanvas })
+            }
         }
 
         const baseTotalLength = feedPadStart + blocks.reduce((sum, block) => sum + block.span, 0) + feedPadEnd
@@ -190,9 +206,12 @@ export class PreviewRenderer {
                 descent,
                 shapeWidth,
                 shapeHeight,
+                imageWidth,
+                imageHeight,
                 textAdvanceWidth,
                 resolvedText,
-                qrCanvas
+                qrCanvas,
+                imageCanvas
             } of blocks) {
                 const yAdjust = item.yOffset || 0
                 if (item.type === 'text') {
@@ -249,6 +268,25 @@ export class PreviewRenderer {
                             height: item.size
                         }
                     })
+                } else if (item.type === 'image') {
+                    const drawWidth = Math.max(1, imageWidth || item.width || 1)
+                    const drawHeight = Math.max(1, imageHeight || item.height || 1)
+                    const drawY = Math.max(0, (canvas.height - drawHeight) / 2 + yAdjust)
+                    const drawX = (item.xOffset || 0) + x
+                    if (imageCanvas) {
+                        ctx.drawImage(imageCanvas, drawX, drawY, drawWidth, drawHeight)
+                    }
+                    layoutItems.push({
+                        id: item.id,
+                        type: item.type,
+                        item,
+                        bounds: {
+                            x: drawX,
+                            y: drawY,
+                            width: drawWidth,
+                            height: drawHeight
+                        }
+                    })
                 } else if (item.type === 'shape') {
                     const drawX = (item.xOffset || 0) + x
                     const drawY = Math.max(0, (canvas.height - shapeHeight) / 2 + yAdjust)
@@ -278,9 +316,12 @@ export class PreviewRenderer {
                 descent,
                 shapeWidth,
                 shapeHeight,
+                imageWidth,
+                imageHeight,
                 textAdvanceWidth,
                 resolvedText,
-                qrCanvas
+                qrCanvas,
+                imageCanvas
             } of blocks) {
                 const yAdjust = item.yOffset || 0
                 if (item.type === 'text') {
@@ -337,6 +378,25 @@ export class PreviewRenderer {
                             height: item.size
                         }
                     })
+                } else if (item.type === 'image') {
+                    const drawWidth = Math.max(1, imageWidth || item.width || 1)
+                    const drawHeight = Math.max(1, imageHeight || item.height || 1)
+                    const drawY = y + Math.max(0, (span - drawHeight) / 2 + yAdjust)
+                    const drawX = item.xOffset || 0
+                    if (imageCanvas) {
+                        ctx.drawImage(imageCanvas, drawX, drawY, drawWidth, drawHeight)
+                    }
+                    layoutItems.push({
+                        id: item.id,
+                        type: item.type,
+                        item,
+                        bounds: {
+                            x: drawX,
+                            y: drawY,
+                            width: drawWidth,
+                            height: drawHeight
+                        }
+                    })
                 } else if (item.type === 'shape') {
                     const drawX = Math.max(0, (canvas.width - shapeWidth) / 2 + (item.xOffset || 0))
                     const drawY = y + Math.max(0, (span - shapeHeight) / 2 + yAdjust)
@@ -389,6 +449,8 @@ export class PreviewRenderer {
      *  fontSizeDots?: number,
      *  shapeWidth?: number,
      *  shapeHeight?: number,
+     *  imageWidth?: number,
+     *  imageHeight?: number,
      *  qrSize?: number
      * }>} blocks
      * @param {boolean} isHorizontal
@@ -411,6 +473,9 @@ export class PreviewRenderer {
                 } else if (item.type === 'shape') {
                     start = cursor + (item.xOffset || 0)
                     size = Math.max(1, block.shapeWidth || item.width || 1)
+                } else if (item.type === 'image') {
+                    start = cursor + (item.xOffset || 0)
+                    size = Math.max(1, block.imageWidth || item.width || 1)
                 } else if (item.type === 'qr') {
                     start = cursor + (item.xOffset || 0)
                     size = Math.max(1, block.qrSize || item.size || 1)
@@ -430,6 +495,10 @@ export class PreviewRenderer {
                     const shapeHeight = Math.max(1, block.shapeHeight || item.height || 1)
                     start = cursor + Math.max(0, ((block.span || shapeHeight) - shapeHeight) / 2 + yAdjust)
                     size = shapeHeight
+                } else if (item.type === 'image') {
+                    const imageHeight = Math.max(1, block.imageHeight || item.height || 1)
+                    start = cursor + Math.max(0, ((block.span || imageHeight) - imageHeight) / 2 + yAdjust)
+                    size = imageHeight
                 } else if (item.type === 'qr') {
                     const qrSize = Math.max(1, block.qrSize || item.size || 1)
                     start = cursor + Math.max(0, ((block.span || qrSize) - qrSize) / 2 + yAdjust)
@@ -1394,6 +1463,17 @@ export class PreviewRenderer {
             if (deltaTop) {
                 item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
             }
+        } else if (item.type === 'image') {
+            const widthDots = Math.max(8, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
+            const heightDots = Math.max(8, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
+            item.width = widthDots
+            item.height = heightDots
+            if (deltaLeft) {
+                item.xOffset = Math.round((item.xOffset || 0) + deltaLeft)
+            }
+            if (deltaTop) {
+                item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
+            }
         } else if (item.type === 'qr') {
             const widthDots = Math.max(1, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
             const heightDots = Math.max(1, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
@@ -1531,6 +1611,132 @@ export class PreviewRenderer {
             qrOptions.version = normalizedOptions.qrVersion
         }
         await qrCode.toCanvas(canvas, payload, qrOptions)
+        return canvas
+    }
+
+    /**
+     * Returns a cached monochrome image canvas or generates one.
+     * @param {object} item
+     * @param {number} width
+     * @param {number} height
+     * @returns {Promise<HTMLCanvasElement | null>}
+     */
+    async _getCachedImageCanvas(item, width, height) {
+        const imageData = String(item?.imageData || '')
+        if (!imageData) return null
+        const safeWidth = Math.max(1, Math.round(Number(width) || 1))
+        const safeHeight = Math.max(1, Math.round(Number(height) || 1))
+        const normalizedOptions = ImageRasterUtils.normalizeItemOptions(item)
+        const cacheKey = this._buildImageCacheKey(imageData, safeWidth, safeHeight, normalizedOptions)
+        if (this._imageRenderCache.has(cacheKey)) {
+            const cached = this._imageRenderCache.get(cacheKey)
+            this._imageRenderCache.delete(cacheKey)
+            this._imageRenderCache.set(cacheKey, cached)
+            return cached
+        }
+        const sourceImage = await this._getSourceImage(imageData)
+        if (!sourceImage) return null
+        const canvas = this._buildMonochromeImageCanvas(sourceImage, safeWidth, safeHeight, normalizedOptions)
+        this._imageRenderCache.set(cacheKey, canvas)
+        const maxEntries = 96
+        if (this._imageRenderCache.size > maxEntries) {
+            const oldestKey = this._imageRenderCache.keys().next().value
+            if (oldestKey) {
+                this._imageRenderCache.delete(oldestKey)
+            }
+        }
+        return canvas
+    }
+
+    /**
+     * Builds a stable cache key for rendered image variants.
+     * @param {string} imageData
+     * @param {number} width
+     * @param {number} height
+     * @param {{ imageDither: string, imageThreshold: number, imageSmoothing: string, imageInvert: boolean }} options
+     * @returns {string}
+     */
+    _buildImageCacheKey(imageData, width, height, options) {
+        const sourceHash = this._hashString(imageData)
+        return `${sourceHash}:${width}x${height}:${options.imageDither}:${options.imageThreshold}:${options.imageSmoothing}:${options.imageInvert ? 1 : 0}`
+    }
+
+    /**
+     * Computes a small non-cryptographic hash for cache keys.
+     * @param {string} value
+     * @returns {string}
+     */
+    _hashString(value) {
+        let hash = 2166136261
+        for (let i = 0; i < value.length; i += 1) {
+            hash ^= value.charCodeAt(i)
+            hash = Math.imul(hash, 16777619)
+        }
+        return (hash >>> 0).toString(16)
+    }
+
+    /**
+     * Loads and caches image elements by source data URL.
+     * @param {string} imageData
+     * @returns {Promise<HTMLImageElement | null>}
+     */
+    async _getSourceImage(imageData) {
+        if (!imageData) return null
+        if (this._sourceImageCache.has(imageData)) {
+            return this._sourceImageCache.get(imageData)
+        }
+        const imageElement = await this._loadImageElement(imageData)
+        if (!imageElement) return null
+        this._sourceImageCache.set(imageData, imageElement)
+        const maxEntries = 32
+        if (this._sourceImageCache.size > maxEntries) {
+            const oldestKey = this._sourceImageCache.keys().next().value
+            if (oldestKey) {
+                this._sourceImageCache.delete(oldestKey)
+            }
+        }
+        return imageElement
+    }
+
+    /**
+     * Creates and decodes an HTML image element.
+     * @param {string} imageData
+     * @returns {Promise<HTMLImageElement | null>}
+     */
+    async _loadImageElement(imageData) {
+        return new Promise((resolve) => {
+            const imageElement = new Image()
+            imageElement.onload = () => resolve(imageElement)
+            imageElement.onerror = () => resolve(null)
+            imageElement.src = imageData
+        })
+    }
+
+    /**
+     * Builds a monochrome image canvas from source pixels.
+     * @param {CanvasImageSource} sourceImage
+     * @param {number} width
+     * @param {number} height
+     * @param {{ imageDither: string, imageThreshold: number, imageSmoothing: string, imageInvert: boolean }} options
+     * @returns {HTMLCanvasElement}
+     */
+    _buildMonochromeImageCanvas(sourceImage, width, height, options) {
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, 0, width, height)
+        const smoothingMode = options.imageSmoothing
+        ctx.imageSmoothingEnabled = smoothingMode !== 'off'
+        if (ctx.imageSmoothingEnabled && 'imageSmoothingQuality' in ctx) {
+            ctx.imageSmoothingQuality = smoothingMode === 'high' ? 'high' : smoothingMode === 'low' ? 'low' : 'medium'
+        }
+        ctx.drawImage(sourceImage, 0, 0, width, height)
+        const imageData = ctx.getImageData(0, 0, width, height)
+        const monochromePixels = ImageRasterUtils.convertRgbaToMonochrome(imageData.data, width, height, options)
+        imageData.data.set(monochromePixels)
+        ctx.putImageData(imageData, 0, 0)
         return canvas
     }
 

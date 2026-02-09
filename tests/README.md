@@ -58,6 +58,12 @@
 - Manual: select a QR item and adjust `Error correction`, `QR version`, and `Encoding mode`.
 - Expected: preview updates immediately, options persist in project save/load, and print uses the selected QR options.
 
+## Image objects
+- Unit: `tests/image-raster-utils.test.mjs` verifies image raster option normalization and monochrome conversion output.
+- Unit: `tests/interaction-utils.test.mjs` and `tests/project-io-utils.test.mjs` verify image items are interactive and persist correctly through project save/load normalization.
+- Manual: run `npm start`, open `http://localhost:3000/`, click `Image` in the Objects panel, upload a PNG/JPEG, then adjust `Length`, `Height`, `Threshold`, `Dithering`, `Resampling`, and `Invert black/white`.
+- Expected: preview shows a black/white print-like image, resize sliders change output dimensions, and all image settings survive Save/Load and shared project links.
+
 ## Parameterized labels
 - Unit: `tests/parameter-template-utils.test.mjs` validates placeholder extraction and substitution, JSON parsing constraints, and parameter-row validation diagnostics.
 - Unit: `tests/project-io-utils.test.mjs` also covers serialization/normalization for `parameters` and `parameterDataRows`.

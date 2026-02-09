@@ -129,7 +129,7 @@ export class InteractionUtils {
      * @returns {boolean}
      */
     static isInteractiveItemType(type) {
-        return ['text', 'shape', 'qr'].includes(type)
+        return ['text', 'shape', 'qr', 'image'].includes(type)
     }
 
     /**

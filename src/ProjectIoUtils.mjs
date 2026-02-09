@@ -1,5 +1,6 @@
 import { ZoomUtils } from './ZoomUtils.mjs'
 import { QrCodeUtils } from './QrCodeUtils.mjs'
+import { ImageRasterUtils } from './ImageRasterUtils.mjs'
 
 /**
  * Project serialization and normalization helpers.
@@ -156,6 +157,19 @@ export class ProjectIoUtils {
                 sides: 6,
                 xOffset: 4,
                 yOffset: 0
+            },
+            image: {
+                type: 'image',
+                imageData: '',
+                imageName: '',
+                imageDither: 'floyd-steinberg',
+                imageThreshold: 128,
+                imageSmoothing: 'medium',
+                imageInvert: false,
+                width: 96,
+                height: 96,
+                xOffset: 4,
+                yOffset: 0
             }
         }
     }
@@ -169,7 +183,7 @@ export class ProjectIoUtils {
     static #normalizeItem(item, fallbackId) {
         const cleaned = ProjectIoUtils.stripRuntimeFields(item)
         const type = cleaned.type
-        if (!type || !['text', 'qr', 'shape'].includes(type)) return null
+        if (!type || !['text', 'qr', 'shape', 'image'].includes(type)) return null
 
         const defaults = ProjectIoUtils.#buildItemDefaults()[type]
         const normalized = { ...defaults, ...cleaned }
@@ -207,6 +221,19 @@ export class ProjectIoUtils {
             normalized.sides = ProjectIoUtils.#coerceNumber(normalized.sides, defaults.sides)
             normalized.xOffset = ProjectIoUtils.#coerceNumber(normalized.xOffset, defaults.xOffset)
             normalized.yOffset = ProjectIoUtils.#coerceNumber(normalized.yOffset, defaults.yOffset)
+        }
+        if (type === 'image') {
+            normalized.width = Math.max(8, ProjectIoUtils.#coerceNumber(normalized.width, defaults.width))
+            normalized.height = Math.max(8, ProjectIoUtils.#coerceNumber(normalized.height, defaults.height))
+            normalized.xOffset = ProjectIoUtils.#coerceNumber(normalized.xOffset, defaults.xOffset)
+            normalized.yOffset = ProjectIoUtils.#coerceNumber(normalized.yOffset, defaults.yOffset)
+            normalized.imageData = typeof normalized.imageData === 'string' ? normalized.imageData : defaults.imageData
+            normalized.imageName = typeof normalized.imageName === 'string' ? normalized.imageName : defaults.imageName
+            const normalizedImageOptions = ImageRasterUtils.normalizeItemOptions(normalized)
+            normalized.imageDither = normalizedImageOptions.imageDither
+            normalized.imageThreshold = normalizedImageOptions.imageThreshold
+            normalized.imageSmoothing = normalizedImageOptions.imageSmoothing
+            normalized.imageInvert = normalizedImageOptions.imageInvert
         }
 
         return normalized
