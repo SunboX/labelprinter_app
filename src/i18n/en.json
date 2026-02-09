@@ -95,6 +95,15 @@
         "title": "Status",
         "ready": "Ready. Choose a backend and click print."
     },
+    "footer": {
+        "title": "Imprint",
+        "responsible": "Responsible for this website",
+        "contact": "Contact",
+        "githubAria": "GitHub repository",
+        "githubTitle": "GitHub",
+        "mastodonAria": "Mastodon profile",
+        "mastodonTitle": "Mastodon"
+    },
     "shapes": {
         "rect": "Rectangle",
         "roundRect": "Rounded rectangle",
