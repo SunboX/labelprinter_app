@@ -64,7 +64,8 @@ const els = {
     parameterDataPanel: document.querySelector('[data-parameter-data-panel]'),
     parameterDataMeta: document.querySelector('[data-parameter-data-meta]'),
     parameterIssues: document.querySelector('[data-parameter-issues]'),
-    parameterPreview: document.querySelector('[data-parameter-preview]')
+    parameterPreview: document.querySelector('[data-parameter-preview]'),
+    objectsScrollIndicator: document.querySelector('[data-objects-scroll-indicator]')
 }
 
 const printerMap = { P700, P750W, E500, E550W, H500 }
