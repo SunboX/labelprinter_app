@@ -161,8 +161,14 @@ export class PreviewRenderer {
             }
 
             if (item.type === 'image') {
-                const imageWidth = Math.max(8, Math.round(Number(item.width) || 80))
-                const imageHeight = Math.max(8, Math.round(Number(item.height) || 80))
+                const rawImageWidth = Math.max(8, Math.round(Number(item.width) || 80))
+                const rawImageHeight = Math.max(8, Math.round(Number(item.height) || 80))
+                const { width: imageWidth, height: imageHeight } = this._constrainImageDimensionsToPrintWidth(
+                    rawImageWidth,
+                    rawImageHeight,
+                    printWidth,
+                    isHorizontal
+                )
                 const imageCanvas = item.imageData
                     ? await this._getCachedImageCanvas(item, imageWidth, imageHeight)
                     : null
@@ -434,6 +440,36 @@ export class PreviewRenderer {
             media: effectiveMedia,
             layoutItems
         }
+    }
+
+    /**
+     * Constrains image dimensions to the printable cross-axis width.
+     * Horizontal layout constrains image height, vertical layout constrains image width.
+     * @param {number} width
+     * @param {number} height
+     * @param {number} printWidth
+     * @param {boolean} isHorizontal
+     * @returns {{ width: number, height: number }}
+     */
+    _constrainImageDimensionsToPrintWidth(width, height, printWidth, isHorizontal) {
+        const safeWidth = Math.max(8, Math.round(Number(width) || 8))
+        const safeHeight = Math.max(8, Math.round(Number(height) || 8))
+        const crossAxisLimit = Math.max(8, Math.round(Number(printWidth) || 8))
+        if (isHorizontal && safeHeight > crossAxisLimit) {
+            const scale = crossAxisLimit / safeHeight
+            return {
+                width: Math.max(8, Math.round(safeWidth * scale)),
+                height: crossAxisLimit
+            }
+        }
+        if (!isHorizontal && safeWidth > crossAxisLimit) {
+            const scale = crossAxisLimit / safeWidth
+            return {
+                width: crossAxisLimit,
+                height: Math.max(8, Math.round(safeHeight * scale))
+            }
+        }
+        return { width: safeWidth, height: safeHeight }
     }
 
     /**
@@ -742,6 +778,7 @@ export class PreviewRenderer {
             })
             ctx.clearRect(0, 0, width, height)
             ctx.drawImage(preview, 0, 0)
+            this._drawMissingImagePlaceholders(ctx, layoutItems)
             ctx.save()
             const marginInsetPx = 2
             // The preview canvas already represents the printable tape width, so the marker spans the full label.
@@ -835,6 +872,59 @@ export class PreviewRenderer {
                 this.render()
             }
         }
+    }
+
+    /**
+     * Draws visual placeholders for image items without uploaded source data.
+     * This is preview-only and does not change the generated print canvas.
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {Array<{ id: string, type: string, item: object, bounds: { x: number, y: number, width: number, height: number } }>} layoutItems
+     */
+    _drawMissingImagePlaceholders(ctx, layoutItems) {
+        if (!Array.isArray(layoutItems)) return
+        layoutItems.forEach((entry) => {
+            if (entry?.type !== 'image') return
+            const sourceData = typeof entry.item?.imageData === 'string' ? entry.item.imageData.trim() : ''
+            if (sourceData) return
+            this._drawMissingImagePlaceholder(ctx, entry.bounds)
+        })
+    }
+
+    /**
+     * Draws a dashed placeholder block for a missing image source.
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {{ x: number, y: number, width: number, height: number }} bounds
+     */
+    _drawMissingImagePlaceholder(ctx, bounds) {
+        if (!bounds) return
+        const x = Number(bounds.x) || 0
+        const y = Number(bounds.y) || 0
+        const width = Math.max(1, Number(bounds.width) || 1)
+        const height = Math.max(1, Number(bounds.height) || 1)
+        ctx.save()
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.05)'
+        ctx.fillRect(x, y, width, height)
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)'
+        ctx.lineWidth = 1
+        ctx.setLineDash([4, 3])
+        ctx.strokeRect(x + 0.5, y + 0.5, Math.max(0, width - 1), Math.max(0, height - 1))
+        ctx.setLineDash([])
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)'
+        ctx.beginPath()
+        ctx.moveTo(x + 1, y + 1)
+        ctx.lineTo(x + width - 1, y + height - 1)
+        ctx.moveTo(x + width - 1, y + 1)
+        ctx.lineTo(x + 1, y + height - 1)
+        ctx.stroke()
+        if (width >= 30 && height >= 14) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
+            const fontSize = Math.max(9, Math.min(12, Math.floor(height * 0.22)))
+            ctx.font = `${fontSize}px Barlow, sans-serif`
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText(this.translate('itemsEditor.typeImage'), x + width / 2, y + height / 2)
+        }
+        ctx.restore()
     }
 
     /**
@@ -1466,8 +1556,16 @@ export class PreviewRenderer {
         } else if (item.type === 'image') {
             const widthDots = Math.max(8, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
             const heightDots = Math.max(8, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
-            item.width = widthDots
-            item.height = heightDots
+            const media = Media[this.state.media] || Media.W24
+            const printWidth = Math.max(8, media?.printArea || 128)
+            const constrained = this._constrainImageDimensionsToPrintWidth(
+                widthDots,
+                heightDots,
+                printWidth,
+                this.state.orientation === 'horizontal'
+            )
+            item.width = constrained.width
+            item.height = constrained.height
             if (deltaLeft) {
                 item.xOffset = Math.round((item.xOffset || 0) + deltaLeft)
             }

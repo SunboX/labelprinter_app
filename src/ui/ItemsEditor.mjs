@@ -285,6 +285,9 @@ export class ItemsEditor {
      * Adds a new image item.
      */
     addImageItem() {
+        const crossAxisLimit = this.#resolveImageCrossAxisLimit()
+        const defaultSide = Math.max(8, Math.min(96, crossAxisLimit))
+        const defaultDimensions = this.#constrainImageDimensionsForOrientation(defaultSide, defaultSide)
         const id = this.nextId()
         this.state.items.push({
             id,
@@ -295,8 +298,8 @@ export class ItemsEditor {
             imageThreshold: 128,
             imageSmoothing: 'medium',
             imageInvert: false,
-            width: 96,
-            height: 96,
+            width: defaultDimensions.width,
+            height: defaultDimensions.height,
             xOffset: 4,
             yOffset: 0
         })
@@ -526,6 +529,27 @@ export class ItemsEditor {
             })
             contentWrap.append(label, select)
         } else if (item.type === 'image') {
+            const previewBox = document.createElement('div')
+            previewBox.className = 'image-item-preview'
+            if (item.imageData) {
+                const previewImage = document.createElement('img')
+                previewImage.className = 'image-item-preview-image'
+                previewImage.src = item.imageData
+                previewImage.alt = item.imageName || this.translate('itemsEditor.typeImage')
+                previewImage.draggable = false
+                previewBox.append(previewImage)
+            } else {
+                const previewPlaceholder = document.createElement('div')
+                previewPlaceholder.className = 'image-item-preview-placeholder'
+                const previewPlaceholderIcon = document.createElement('span')
+                previewPlaceholderIcon.className = 'image-item-preview-placeholder-icon'
+                previewPlaceholderIcon.setAttribute('aria-hidden', 'true')
+                const previewPlaceholderText = document.createElement('span')
+                previewPlaceholderText.className = 'small muted image-item-preview-empty'
+                previewPlaceholderText.textContent = this.translate('itemsEditor.imageNoFile')
+                previewPlaceholder.append(previewPlaceholderIcon, previewPlaceholderText)
+                previewBox.append(previewPlaceholder)
+            }
             const label = document.createElement('label')
             label.textContent = this.translate('itemsEditor.fieldImage')
             const uploadButton = document.createElement('button')
@@ -550,7 +574,7 @@ export class ItemsEditor {
             fileLabel.textContent = item.imageName
                 ? this.translate('itemsEditor.imageFileName', { name: item.imageName })
                 : this.translate('itemsEditor.imageNoFile')
-            contentWrap.append(label, uploadButton, fileLabel, uploadInput)
+            contentWrap.append(previewBox, label, uploadButton, fileLabel, uploadInput)
         }
 
         const controls = document.createElement('div')
@@ -797,15 +821,53 @@ export class ItemsEditor {
         const safeNaturalWidth = Math.max(1, Math.round(Number(naturalWidth) || 1))
         const safeNaturalHeight = Math.max(1, Math.round(Number(naturalHeight) || 1))
         const media = Media[this.state.media] || Media.W24
-        const maxLabelHeight = Math.max(24, (media?.printArea || 128) - 4)
+        const maxLabelHeight = this.#resolveImageCrossAxisLimit(media)
         const maxInitialWidth = 220
         const widthScale = maxInitialWidth / safeNaturalWidth
         const heightScale = maxLabelHeight / safeNaturalHeight
         const scale = Math.min(widthScale, heightScale, 1)
-        return {
+        const scaledDimensions = {
             width: Math.max(8, Math.round(safeNaturalWidth * scale)),
             height: Math.max(8, Math.round(safeNaturalHeight * scale))
         }
+        return this.#constrainImageDimensionsForOrientation(scaledDimensions.width, scaledDimensions.height)
+    }
+
+    /**
+     * Resolves the maximum drawable size on the fixed label axis in dots.
+     * @param {object} [mediaOverride]
+     * @returns {number}
+     */
+    #resolveImageCrossAxisLimit(mediaOverride = null) {
+        const media = mediaOverride || Media[this.state.media] || Media.W24
+        return Math.max(8, Math.round((media?.printArea || 128) - 4))
+    }
+
+    /**
+     * Constrains image dimensions to the printable cross-axis for the current orientation.
+     * @param {number} width
+     * @param {number} height
+     * @returns {{ width: number, height: number }}
+     */
+    #constrainImageDimensionsForOrientation(width, height) {
+        const safeWidth = Math.max(8, Math.round(Number(width) || 8))
+        const safeHeight = Math.max(8, Math.round(Number(height) || 8))
+        const crossAxisLimit = this.#resolveImageCrossAxisLimit()
+        if (this.state.orientation === 'horizontal' && safeHeight > crossAxisLimit) {
+            const scale = crossAxisLimit / safeHeight
+            return {
+                width: Math.max(8, Math.round(safeWidth * scale)),
+                height: crossAxisLimit
+            }
+        }
+        if (this.state.orientation === 'vertical' && safeWidth > crossAxisLimit) {
+            const scale = crossAxisLimit / safeWidth
+            return {
+                width: crossAxisLimit,
+                height: Math.max(8, Math.round(safeHeight * scale))
+            }
+        }
+        return { width: safeWidth, height: safeHeight }
     }
 
     /**
@@ -820,13 +882,25 @@ export class ItemsEditor {
         item.imageThreshold = normalizedOptions.imageThreshold
         item.imageSmoothing = normalizedOptions.imageSmoothing
         item.imageInvert = normalizedOptions.imageInvert
+        const constrainedDimensions = this.#constrainImageDimensionsForOrientation(item.width || 96, item.height || 96)
+        item.width = constrainedDimensions.width
+        item.height = constrainedDimensions.height
+        const crossAxisLimit = this.#resolveImageCrossAxisLimit()
+        const widthMax = this.state.orientation === 'vertical' ? crossAxisLimit : 600
+        const heightMax = this.state.orientation === 'horizontal' ? crossAxisLimit : 320
 
-        const widthCtrl = this.#createSlider(sizeLabel, item.width || 96, 8, 600, 1, (v) => {
+        const widthCtrl = this.#createSlider(sizeLabel, item.width || 96, 8, widthMax, 1, (v) => {
             item.width = v
+            const constrained = this.#constrainImageDimensionsForOrientation(item.width, item.height || 96)
+            item.width = constrained.width
+            item.height = constrained.height
             this.#onChange()
         })
-        const heightCtrl = this.#createSlider(this.translate('itemsEditor.sizeHeight'), item.height || 96, 8, 320, 1, (v) => {
+        const heightCtrl = this.#createSlider(this.translate('itemsEditor.sizeHeight'), item.height || 96, 8, heightMax, 1, (v) => {
             item.height = v
+            const constrained = this.#constrainImageDimensionsForOrientation(item.width || 96, item.height)
+            item.width = constrained.width
+            item.height = constrained.height
             this.#onChange()
         })
         const offsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, -80, 80, 1, (v) => {
