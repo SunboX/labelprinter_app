@@ -72,7 +72,10 @@
         "addText": "Text",
         "addQr": "QR-Code",
         "addImage": "Image",
-        "addShape": "Form"
+        "addShape": "Form",
+        "scrollHintDown": "Scroll down in this panel for more objects",
+        "scrollHintUp": "Scroll up in this panel for previous objects",
+        "scrollHintBoth": "Scroll in this panel to see all objects"
     },
     "parameters": {
         "title": "Parameters",

@@ -12,6 +12,7 @@ export class ItemsEditor {
     #translate = (key) => key
     #setStatus = () => {}
     #fontFamilies = FontFamilyUtils.getFallbackFontFamilies()
+    #itemsScrollIndicatorsBound = false
     #collapsedItemIds = new Set()
     #autoExpandedItemIds = new Set()
     #panelItemOrder = []
@@ -195,6 +196,8 @@ export class ItemsEditor {
             const card = this.#createItemCard(item, panelIndex, sizeLabel)
             this.els.items.appendChild(card)
         })
+        this.#ensureItemsScrollIndicators()
+        this.#updateItemsScrollIndicators()
     }
 
     /**
@@ -227,6 +230,52 @@ export class ItemsEditor {
             fromPanelIndex = null
             this.render()
         })
+    }
+
+    /**
+     * Attaches one-time listeners that keep objects-panel scroll indicators in sync.
+     */
+    #ensureItemsScrollIndicators() {
+        if (this.#itemsScrollIndicatorsBound) return
+        if (!this.els.items) return
+        this.#itemsScrollIndicatorsBound = true
+        this.els.items.addEventListener(
+            'scroll',
+            () => {
+                this.#updateItemsScrollIndicators()
+            },
+            { passive: true }
+        )
+        window.addEventListener('resize', () => this.#updateItemsScrollIndicators())
+    }
+
+    /**
+     * Updates scroll indicator attributes for the objects-panel list.
+     */
+    #updateItemsScrollIndicators() {
+        if (!this.els.items) return
+        const overflowThreshold = 2
+        const hasOverflow = this.els.items.scrollHeight - this.els.items.clientHeight > overflowThreshold
+        const hasHiddenTop = hasOverflow && this.els.items.scrollTop > 1
+        const hasHiddenBottom =
+            hasOverflow &&
+            this.els.items.scrollTop + this.els.items.clientHeight < this.els.items.scrollHeight - 1
+        this.els.items.dataset.overflow = hasOverflow ? 'true' : 'false'
+        this.els.items.dataset.scrollTop = hasHiddenTop ? 'true' : 'false'
+        this.els.items.dataset.scrollBottom = hasHiddenBottom ? 'true' : 'false'
+        if (!this.els.objectsScrollIndicator) return
+        const indicatorDirection =
+            hasHiddenTop && hasHiddenBottom ? 'both' : hasHiddenTop ? 'up' : hasHiddenBottom ? 'down' : 'down'
+        this.els.objectsScrollIndicator.dataset.direction = indicatorDirection
+        this.els.objectsScrollIndicator.hidden = !hasOverflow
+        if (!hasOverflow) return
+        const hintKey =
+            hasHiddenTop && hasHiddenBottom
+                ? 'objects.scrollHintBoth'
+                : hasHiddenTop
+                  ? 'objects.scrollHintUp'
+                  : 'objects.scrollHintDown'
+        this.els.objectsScrollIndicator.textContent = this.translate(hintKey)
     }
 
     /**
