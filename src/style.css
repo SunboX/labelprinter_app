@@ -107,6 +107,7 @@ body {
 
 .main-grid {
     flex: 1;
+    min-height: 0;
     display: grid;
     grid-template-columns: 280px 1fr 340px;
     gap: 16px;
@@ -213,10 +214,17 @@ body {
 
 .rail {
     background: linear-gradient(180deg, #16181d 0%, #15171c 55%, #14161b 100%);
+    max-height: 100vh;
+    align-self: start;
+    overflow-y: auto;
 }
 
 .inspector {
     background: var(--panel-strong);
+    max-height: 100vh;
+    min-height: 0;
+    align-self: start;
+    overflow: hidden;
 }
 
 .section {
@@ -413,6 +421,9 @@ button:disabled {
     border: 1px solid var(--stroke);
     border-radius: 12px;
     padding: 14px;
+    max-height: 100vh;
+    align-self: start;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -682,6 +693,19 @@ button:disabled {
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+.objects-section {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.objects-section .items {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
 }
 
 .objects-actions {
@@ -993,6 +1017,16 @@ input[type='range'] {
 }
 
 @media (max-width: 1280px) {
+    .rail,
+    .workspace,
+    .inspector {
+        max-height: none;
+        align-self: stretch;
+    }
+    .rail,
+    .workspace {
+        overflow: visible;
+    }
     .main-grid {
         grid-template-columns: 1fr;
     }
