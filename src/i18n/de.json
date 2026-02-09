@@ -95,6 +95,15 @@
         "title": "Status",
         "ready": "Bereit. Backend auswählen und auf Drucken klicken."
     },
+    "footer": {
+        "title": "Impressum",
+        "responsible": "Verantwortlich für diese Website",
+        "contact": "Kontakt",
+        "githubAria": "GitHub-Repository",
+        "githubTitle": "GitHub",
+        "mastodonAria": "Mastodon-Profil",
+        "mastodonTitle": "Mastodon"
+    },
     "shapes": {
         "rect": "Rechteck",
         "roundRect": "Abgerundetes Rechteck",
