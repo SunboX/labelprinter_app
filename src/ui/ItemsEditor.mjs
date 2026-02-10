@@ -1,8 +1,7 @@
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { FontFamilyUtils } from '../FontFamilyUtils.mjs'
 import { QrCodeUtils } from '../QrCodeUtils.mjs'
-import { ImageRasterUtils } from '../ImageRasterUtils.mjs'
-import { Media } from 'labelprinterkit-web/src/index.mjs'
+import { ItemsEditorImageSupport } from './ItemsEditorImageSupport.mjs'
 
 /**
  * Manages the item list UI, including drag reordering and item controls.
@@ -334,9 +333,13 @@ export class ItemsEditor {
      * Adds a new image item.
      */
     addImageItem() {
-        const crossAxisLimit = this.#resolveImageCrossAxisLimit()
+        const crossAxisLimit = ItemsEditorImageSupport.resolveImageCrossAxisLimit(this.state)
         const defaultSide = Math.max(8, Math.min(96, crossAxisLimit))
-        const defaultDimensions = this.#constrainImageDimensionsForOrientation(defaultSide, defaultSide)
+        const defaultDimensions = ItemsEditorImageSupport.constrainImageDimensionsForOrientation(
+            defaultSide,
+            defaultSide,
+            this.state
+        )
         const id = this.nextId()
         this.state.items.push({
             id,
@@ -803,120 +806,15 @@ export class ItemsEditor {
      * @returns {Promise<void>}
      */
     async #loadImageFile(item, file) {
-        if (!file || !String(file.type || '').startsWith('image/')) {
-            this.setStatus(this.translate('itemsEditor.imageLoadFailedType'), 'error')
-            return
-        }
-        try {
-            const dataUrl = await this.#readFileAsDataUrl(file)
-            const imageElement = await this.#loadImageFromDataUrl(dataUrl)
-            if (!imageElement) {
-                throw new Error(this.translate('itemsEditor.imageLoadFailedDecode'))
-            }
-            const dimensions = this.#resolveInitialImageDimensions(imageElement.naturalWidth, imageElement.naturalHeight)
-            item.imageData = dataUrl
-            item.imageName = file.name || ''
-            item.width = dimensions.width
-            item.height = dimensions.height
-            const normalizedOptions = ImageRasterUtils.normalizeItemOptions(item)
-            item.imageDither = normalizedOptions.imageDither
-            item.imageThreshold = normalizedOptions.imageThreshold
-            item.imageSmoothing = normalizedOptions.imageSmoothing
-            item.imageInvert = normalizedOptions.imageInvert
-            this.render()
-            this.#onChange()
-            this.setStatus(this.translate('itemsEditor.imageLoaded', { name: item.imageName || 'image' }), 'success')
-        } catch (err) {
-            const message = err?.message || this.translate('messages.unknownError')
-            this.setStatus(this.translate('itemsEditor.imageLoadFailed', { message }), 'error')
-        }
-    }
-
-    /**
-     * Reads a file as a data URL.
-     * @param {File} file
-     * @returns {Promise<string>}
-     */
-    async #readFileAsDataUrl(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onload = () => resolve(String(reader.result || ''))
-            reader.onerror = () => reject(new Error(this.translate('itemsEditor.imageLoadFailedRead')))
-            reader.readAsDataURL(file)
+        await ItemsEditorImageSupport.loadImageFile({
+            item,
+            file,
+            state: this.state,
+            translate: this.translate,
+            setStatus: this.setStatus,
+            render: this.render.bind(this),
+            onChange: this.#onChange
         })
-    }
-
-    /**
-     * Loads an image element from a data URL.
-     * @param {string} dataUrl
-     * @returns {Promise<HTMLImageElement | null>}
-     */
-    async #loadImageFromDataUrl(dataUrl) {
-        return new Promise((resolve) => {
-            const imageElement = new Image()
-            imageElement.onload = () => resolve(imageElement)
-            imageElement.onerror = () => resolve(null)
-            imageElement.src = dataUrl
-        })
-    }
-
-    /**
-     * Resolves initial image dimensions so the first render fits the label width.
-     * @param {number} naturalWidth
-     * @param {number} naturalHeight
-     * @returns {{ width: number, height: number }}
-     */
-    #resolveInitialImageDimensions(naturalWidth, naturalHeight) {
-        const safeNaturalWidth = Math.max(1, Math.round(Number(naturalWidth) || 1))
-        const safeNaturalHeight = Math.max(1, Math.round(Number(naturalHeight) || 1))
-        const media = Media[this.state.media] || Media.W24
-        const maxLabelHeight = this.#resolveImageCrossAxisLimit(media)
-        const maxInitialWidth = 220
-        const widthScale = maxInitialWidth / safeNaturalWidth
-        const heightScale = maxLabelHeight / safeNaturalHeight
-        const scale = Math.min(widthScale, heightScale, 1)
-        const scaledDimensions = {
-            width: Math.max(8, Math.round(safeNaturalWidth * scale)),
-            height: Math.max(8, Math.round(safeNaturalHeight * scale))
-        }
-        return this.#constrainImageDimensionsForOrientation(scaledDimensions.width, scaledDimensions.height)
-    }
-
-    /**
-     * Resolves the maximum drawable size on the fixed label axis in dots.
-     * @param {object} [mediaOverride]
-     * @returns {number}
-     */
-    #resolveImageCrossAxisLimit(mediaOverride = null) {
-        const media = mediaOverride || Media[this.state.media] || Media.W24
-        return Math.max(8, Math.round((media?.printArea || 128) - 4))
-    }
-
-    /**
-     * Constrains image dimensions to the printable cross-axis for the current orientation.
-     * @param {number} width
-     * @param {number} height
-     * @returns {{ width: number, height: number }}
-     */
-    #constrainImageDimensionsForOrientation(width, height) {
-        const safeWidth = Math.max(8, Math.round(Number(width) || 8))
-        const safeHeight = Math.max(8, Math.round(Number(height) || 8))
-        const crossAxisLimit = this.#resolveImageCrossAxisLimit()
-        if (this.state.orientation === 'horizontal' && safeHeight > crossAxisLimit) {
-            const scale = crossAxisLimit / safeHeight
-            return {
-                width: Math.max(8, Math.round(safeWidth * scale)),
-                height: crossAxisLimit
-            }
-        }
-        if (this.state.orientation === 'vertical' && safeWidth > crossAxisLimit) {
-            const scale = crossAxisLimit / safeWidth
-            return {
-                width: crossAxisLimit,
-                height: Math.max(8, Math.round(safeHeight * scale))
-            }
-        }
-        return { width: safeWidth, height: safeHeight }
     }
 
     /**
@@ -926,105 +824,15 @@ export class ItemsEditor {
      * @param {string} sizeLabel
      */
     #appendImageControls(item, controls, sizeLabel) {
-        const normalizedOptions = ImageRasterUtils.normalizeItemOptions(item)
-        item.imageDither = normalizedOptions.imageDither
-        item.imageThreshold = normalizedOptions.imageThreshold
-        item.imageSmoothing = normalizedOptions.imageSmoothing
-        item.imageInvert = normalizedOptions.imageInvert
-        const constrainedDimensions = this.#constrainImageDimensionsForOrientation(item.width || 96, item.height || 96)
-        item.width = constrainedDimensions.width
-        item.height = constrainedDimensions.height
-        const crossAxisLimit = this.#resolveImageCrossAxisLimit()
-        const widthMax = this.state.orientation === 'vertical' ? crossAxisLimit : 600
-        const heightMax = this.state.orientation === 'horizontal' ? crossAxisLimit : 320
-
-        const widthCtrl = this.#createSlider(sizeLabel, item.width || 96, 8, widthMax, 1, (v) => {
-            item.width = v
-            const constrained = this.#constrainImageDimensionsForOrientation(item.width, item.height || 96)
-            item.width = constrained.width
-            item.height = constrained.height
-            this.#onChange()
+        ItemsEditorImageSupport.appendImageControls({
+            item,
+            controls,
+            sizeLabel,
+            state: this.state,
+            translate: this.translate,
+            onChange: this.#onChange,
+            createSlider: this.#createSlider.bind(this)
         })
-        const heightCtrl = this.#createSlider(this.translate('itemsEditor.sizeHeight'), item.height || 96, 8, heightMax, 1, (v) => {
-            item.height = v
-            const constrained = this.#constrainImageDimensionsForOrientation(item.width || 96, item.height)
-            item.width = constrained.width
-            item.height = constrained.height
-            this.#onChange()
-        })
-        const offsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, -80, 80, 1, (v) => {
-            item.xOffset = v
-            this.#onChange()
-        })
-        const yOffsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -80, 80, 1, (v) => {
-            item.yOffset = v
-            this.#onChange()
-        })
-        const thresholdCtrl = this.#createSlider(
-            this.translate('itemsEditor.imageThreshold'),
-            item.imageThreshold,
-            0,
-            255,
-            1,
-            (v) => {
-                item.imageThreshold = v
-                this.#onChange()
-            }
-        )
-
-        const ditherCtrl = document.createElement('div')
-        ditherCtrl.className = 'field'
-        const ditherLabel = document.createElement('label')
-        ditherLabel.textContent = this.translate('itemsEditor.imageDither')
-        const ditherSelect = document.createElement('select')
-        ImageRasterUtils.DITHER_MODES.forEach((mode) => {
-            const option = document.createElement('option')
-            option.value = mode
-            option.textContent = this.translate(`itemsEditor.imageDither${mode.replaceAll('-', '')}`)
-            ditherSelect.appendChild(option)
-        })
-        ditherSelect.value = item.imageDither
-        ditherSelect.addEventListener('change', (e) => {
-            item.imageDither = e.target.value
-            this.#onChange()
-        })
-        ditherCtrl.append(ditherLabel, ditherSelect)
-
-        const smoothingCtrl = document.createElement('div')
-        smoothingCtrl.className = 'field'
-        const smoothingLabel = document.createElement('label')
-        smoothingLabel.textContent = this.translate('itemsEditor.imageSmoothing')
-        const smoothingSelect = document.createElement('select')
-        ImageRasterUtils.SMOOTHING_MODES.forEach((mode) => {
-            const option = document.createElement('option')
-            option.value = mode
-            option.textContent = this.translate(`itemsEditor.imageSmoothing${mode}`)
-            smoothingSelect.appendChild(option)
-        })
-        smoothingSelect.value = item.imageSmoothing
-        smoothingSelect.addEventListener('change', (e) => {
-            item.imageSmoothing = e.target.value
-            this.#onChange()
-        })
-        smoothingCtrl.append(smoothingLabel, smoothingSelect)
-
-        const invertCtrl = document.createElement('div')
-        invertCtrl.className = 'field'
-        const invertLabel = document.createElement('label')
-        invertLabel.className = 'checkbox-row'
-        const invertInput = document.createElement('input')
-        invertInput.type = 'checkbox'
-        invertInput.checked = Boolean(item.imageInvert)
-        invertInput.addEventListener('change', (e) => {
-            item.imageInvert = e.target.checked
-            this.#onChange()
-        })
-        const invertText = document.createElement('span')
-        invertText.textContent = this.translate('itemsEditor.imageInvert')
-        invertLabel.append(invertInput, invertText)
-        invertCtrl.append(invertLabel)
-
-        controls.append(widthCtrl, heightCtrl, offsetCtrl, yOffsetCtrl, thresholdCtrl, ditherCtrl, smoothingCtrl, invertCtrl)
     }
 
     /**

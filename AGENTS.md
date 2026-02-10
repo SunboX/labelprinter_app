@@ -25,6 +25,7 @@
 ## Coding Style & Naming Conventions
 - Prettier settings are in `.prettierrc.json`: 4-space indent, single quotes, no semicolons, no trailing commas.
 - Keep files under 1000 lines; split into smaller modules/classes when they grow.
+- Keep every `.mjs` source file below 1000 lines; once a module approaches the limit, split it before merging.
 - Keep each CSS file under 1000 lines; split styles into multiple files in `src/styles/` and keep `src/style.css` as the stylesheet entrypoint.
 - Add JSDoc for every function/method, including private helpers.
 - Add inline comments where decisions or behavior need clarity.
