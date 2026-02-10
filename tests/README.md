@@ -26,6 +26,8 @@
 - Expected: multiple items stay selected, alignment controls become active, resize dots are hidden while more than one item is selected, plain click on one selected item keeps the multi-selection, and dragging one selected item moves the full selection together.
 - Manual: double-click a text item on the label preview.
 - Expected: an inline text input opens directly on the label, `Enter` commits, and `Escape` cancels.
+- Manual: add a `Form` item of type `Line`, select it on the label preview, then try resizing and dragging.
+- Expected: only left and right resize dots are shown for the line, and dragging inside the line body moves it without triggering top/bottom scaling.
 
 ## Collapsible item cards
 - Unit: `tests/items-editor-collapsible.test.mjs` verifies the items editor exposes collapse toggles and collapsed-body CSS.

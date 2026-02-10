@@ -10,15 +10,29 @@
  */
 export class InteractionUtils {
     /**
+     * Returns the allowed resize handle names for an item.
+     * Line shapes use horizontal endpoints only.
+     * @param {object | null | undefined} item
+     * @returns {string[]}
+     */
+    static getAllowedResizeHandleNames(item) {
+        if (item?.type === 'shape' && item?.shapeType === 'line') {
+            return ['w', 'e']
+        }
+        return ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+    }
+
+    /**
      * Computes handle positions around a rectangle.
      * @param {{ x: number, y: number, width: number, height: number }} bounds
+     * @param {string[] | null} [allowedHandles=null]
      * @returns {HandlePosition[]}
      */
-    static computeHandlePositions(bounds) {
+    static computeHandlePositions(bounds, allowedHandles = null) {
         const { x, y, width, height } = bounds
         const midX = x + width / 2
         const midY = y + height / 2
-        return [
+        const allHandles = [
             { name: 'nw', x, y },
             { name: 'n', x: midX, y },
             { name: 'ne', x: x + width, y },
@@ -28,6 +42,11 @@ export class InteractionUtils {
             { name: 'sw', x, y: y + height },
             { name: 'w', x, y: midY }
         ]
+        if (!Array.isArray(allowedHandles) || !allowedHandles.length) {
+            return allHandles
+        }
+        const allowed = new Set(allowedHandles)
+        return allHandles.filter((handle) => allowed.has(handle.name))
     }
 
     /**
@@ -35,12 +54,13 @@ export class InteractionUtils {
      * @param {{ x: number, y: number }} point
      * @param {{ x: number, y: number, width: number, height: number }} bounds
      * @param {number} handleRadius
+     * @param {string[] | null} [allowedHandles=null]
      * @returns {string | null}
      */
-    static getHandleAtPoint(point, bounds, handleRadius) {
+    static getHandleAtPoint(point, bounds, handleRadius, allowedHandles = null) {
         const radius = Math.max(1, handleRadius)
         const radiusSq = radius * radius
-        const handles = InteractionUtils.computeHandlePositions(bounds)
+        const handles = InteractionUtils.computeHandlePositions(bounds, allowedHandles)
         for (const handle of handles) {
             const dx = point.x - handle.x
             const dy = point.y - handle.y

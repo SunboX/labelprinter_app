@@ -164,6 +164,37 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
     }
 
     /**
+     * Gets the interactive entry for a hitbox target element.
+     * @param {HTMLElement | null | undefined} targetElement
+     * @returns {{ id: string, type: string, item: object, bounds: object, boundsCss: object } | null}
+     */
+    _getEntryFromTargetElement(targetElement) {
+        const itemId = targetElement?.dataset?.itemId
+        if (!itemId) return null
+        return this._interactiveItemsById.get(itemId) || null
+    }
+
+    /**
+     * Returns the allowed resize handles for a specific interactive entry.
+     * @param {{ item?: object } | null | undefined} entry
+     * @returns {string[]}
+     */
+    _getAllowedResizeHandlesForEntry(entry) {
+        return InteractionUtils.getAllowedResizeHandleNames(entry?.item)
+    }
+
+    /**
+     * Checks whether a handle is allowed for a specific interactive entry.
+     * @param {string | null | undefined} handle
+     * @param {{ item?: object } | null | undefined} entry
+     * @returns {boolean}
+     */
+    _isResizeHandleAllowed(handle, entry) {
+        if (!handle || handle === 'move') return false
+        return this._getAllowedResizeHandlesForEntry(entry).includes(handle)
+    }
+
+    /**
      * Handles hitbox hover entry to show resize handles.
      * @param {PointerEvent} event
      */
@@ -537,15 +568,23 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         if (InteractionUtils.isAdditiveSelectionModifier(event) || InteractionUtils.isAdditiveSelectionModifier(pointer)) {
             return null
         }
-        const handle = this._getPointerHandle(pointer, event, targetElement)
+        const entry = this._getEntryFromTargetElement(targetElement)
+        const handle = this._getPointerHandle(pointer, event, targetElement, entry)
         if (this._enablePreviewResize && handle && handle !== 'move') {
             const edges = InteractionUtils.getEdgesFromHandle(handle)
             if (edges) {
                 return { name: 'resize', edges }
             }
         }
+        if (handle === 'move') {
+            return { name: 'drag', edges: null }
+        }
         if (fallbackAction?.name === 'resize' && fallbackAction.edges) {
-            return { name: 'resize', edges: fallbackAction.edges }
+            const fallbackHandle = InteractionUtils.getHandleFromEdges(fallbackAction.edges)
+            if (this._isResizeHandleAllowed(fallbackHandle, entry)) {
+                return { name: 'resize', edges: fallbackAction.edges }
+            }
+            return { name: 'drag', edges: null }
         }
         if (fallbackAction?.name === 'drag') {
             return { name: 'drag', edges: null }
@@ -558,9 +597,10 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
      * @param {object} pointer
      * @param {object} event
      * @param {HTMLElement | null | undefined} targetElement
+     * @param {{ item?: object } | null | undefined} [entry]
      * @returns {string | null}
      */
-    _getPointerHandle(pointer, event, targetElement) {
+    _getPointerHandle(pointer, event, targetElement, entry = null) {
         if (!targetElement) return null
         const rect = targetElement.getBoundingClientRect()
         if (!rect.width || !rect.height) return null
@@ -571,7 +611,8 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         const bounds = { x: 0, y: 0, width: rect.width, height: rect.height }
         // Resize should trigger only on the visible dots, not broad edge zones.
         const hitRadius = Math.max(1, this._handleRadius || 3)
-        return InteractionUtils.getHandleAtPoint(point, bounds, hitRadius)
+        const allowedHandles = this._getAllowedResizeHandlesForEntry(entry)
+        return InteractionUtils.getHandleAtPoint(point, bounds, hitRadius, allowedHandles)
     }
 
     /**
