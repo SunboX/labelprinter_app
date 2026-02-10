@@ -1,6 +1,7 @@
 import { InteractionUtils } from '../InteractionUtils.mjs'
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { Media } from 'labelprinterkit-web/src/index.mjs'
+import { ItemsEditorImageSupport } from './ItemsEditorImageSupport.mjs'
 import { PreviewRendererRender } from './PreviewRendererRender.mjs'
 
 /**
@@ -205,6 +206,15 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
             event.preventDefault()
             event.stopImmediatePropagation()
         }
+        if (!isAdditive && entry.type === 'image' && Number(event.detail) >= 2) {
+            event.preventDefault()
+            event.stopImmediatePropagation()
+            this._activeItemId = entry.id
+            this._hoverItemId = entry.id
+            this._replaceImageFromPicker(entry.item)
+            this._drawOverlay()
+            return
+        }
         if (!isAdditive && entry.type === 'text' && Number(event.detail) >= 2) {
             // Fallback for environments where `dblclick` may be swallowed by drag handling.
             event.preventDefault()
@@ -262,8 +272,18 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
      */
     _handleHitboxDoubleClick(event) {
         const entry = this._getEntryFromEvent(event)
-        if (!entry || entry.type !== 'text') return
+        if (!entry) return
         if (InteractionUtils.isAdditiveSelectionModifier(event)) return
+        if (entry.type === 'image') {
+            event.preventDefault()
+            event.stopImmediatePropagation()
+            this._activeItemId = entry.id
+            this._hoverItemId = entry.id
+            this._replaceImageFromPicker(entry.item)
+            this._drawOverlay()
+            return
+        }
+        if (entry.type !== 'text') return
         event.preventDefault()
         event.stopImmediatePropagation()
         const nextSelection = new Set([entry.id])
@@ -409,6 +429,34 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
      */
     _handleInlineTextEditorBlur() {
         this._commitInlineTextEdit({ applyChanges: true })
+    }
+
+    /**
+     * Prompts the user to replace an image item source from disk.
+     * @param {object} item
+     */
+    _replaceImageFromPicker(item) {
+        if (!item || item.type !== 'image') return
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'image/*'
+        input.hidden = true
+        input.addEventListener('change', async () => {
+            const file = input.files?.[0] || null
+            if (!file) return
+            await ItemsEditorImageSupport.loadImageFile({
+                item,
+                file,
+                state: this.state,
+                translate: this.translate,
+                setStatus: this.setStatus,
+                render: this.render.bind(this),
+                onChange: () => this._emitItemChange()
+            })
+            input.remove()
+        })
+        document.body.appendChild(input)
+        input.click()
     }
 
     /**
