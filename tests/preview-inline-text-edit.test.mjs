@@ -10,6 +10,14 @@ describe('preview inline text editing', () => {
         assert.match(source, /entry\.type === 'text' && Number\(event\.detail\) >= 2/)
     })
 
+    it('supports image replacement from preview double-click', async () => {
+        const source = await readFile('src/ui/PreviewRendererInteractions.mjs', 'utf8')
+        assert.match(source, /entry\.type === 'image'/)
+        assert.match(source, /_replaceImageFromPicker\(item\)/)
+        assert.match(source, /ItemsEditorImageSupport\.loadImageFile\(/)
+        assert.match(source, /input\.type = 'file'/)
+    })
+
     it('creates a dedicated inline editor and commit/cancel handlers', async () => {
         const source = await readFile('src/ui/PreviewRendererInteractions.mjs', 'utf8')
         assert.match(source, /preview-inline-text-editor/)
