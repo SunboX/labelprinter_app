@@ -8,6 +8,7 @@
     "test": "node --test"
   },
   "devDependencies": {
+    "canvas": "^3.2.1",
     "express": "^4.19.2"
   },
   "dependencies": {
