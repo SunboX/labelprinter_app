@@ -100,6 +100,14 @@ describe('project-io-utils', () => {
                     width: 64,
                     height: 48
                 },
+                {
+                    type: 'icon',
+                    iconId: 'icon-printer',
+                    width: 60,
+                    height: 40,
+                    xOffset: -6,
+                    yOffset: 3
+                },
                 { type: 'shape' },
                 { type: 'unsupported', id: 'item-9' }
             ]
@@ -124,6 +132,12 @@ describe('project-io-utils', () => {
         assert.equal(imageItem?.imageInvert, true)
         assert.equal(imageItem?.width, 64)
         assert.equal(imageItem?.height, 48)
+        const iconItem = state.items.find((item) => item.type === 'icon')
+        assert.equal(iconItem?.iconId, 'icon-printer')
+        assert.equal(iconItem?.width, 60)
+        assert.equal(iconItem?.height, 40)
+        assert.equal(iconItem?.xOffset, -6)
+        assert.equal(iconItem?.yOffset, 3)
         assert.ok(nextIdCounter > ProjectIoUtils.deriveNextIdCounter([{ id: 'item-2' }]))
     })
 })

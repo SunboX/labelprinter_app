@@ -148,6 +148,63 @@ export class ItemsEditorImageSupport {
     }
 
     /**
+     * Appends image source controls including preview and upload UI.
+     * @param {{
+     *  item: object,
+     *  contentWrap: HTMLElement,
+     *  translate: (key: string, params?: Record<string, string | number>) => string,
+     *  onFileSelected: (file: File, controls: { uploadButton: HTMLButtonElement, uploadInput: HTMLInputElement }) => Promise<void> | void
+     * }} options
+     */
+    static appendImageSourceControls({ item, contentWrap, translate, onFileSelected }) {
+        const previewBox = document.createElement('div')
+        previewBox.className = 'image-item-preview'
+        if (item.imageData) {
+            const previewImage = document.createElement('img')
+            previewImage.className = 'image-item-preview-image'
+            previewImage.src = item.imageData
+            previewImage.alt = item.imageName || translate('itemsEditor.typeImage')
+            previewImage.draggable = false
+            previewBox.append(previewImage)
+        } else {
+            const previewPlaceholder = document.createElement('div')
+            previewPlaceholder.className = 'image-item-preview-placeholder'
+            const previewPlaceholderIcon = document.createElement('span')
+            previewPlaceholderIcon.className = 'image-item-preview-placeholder-icon'
+            previewPlaceholderIcon.setAttribute('aria-hidden', 'true')
+            const previewPlaceholderText = document.createElement('span')
+            previewPlaceholderText.className = 'small muted image-item-preview-empty'
+            previewPlaceholderText.textContent = translate('itemsEditor.imageNoFile')
+            previewPlaceholder.append(previewPlaceholderIcon, previewPlaceholderText)
+            previewBox.append(previewPlaceholder)
+        }
+
+        const label = document.createElement('label')
+        label.textContent = translate('itemsEditor.fieldImage')
+        const uploadButton = document.createElement('button')
+        uploadButton.type = 'button'
+        uploadButton.className = 'ghost'
+        uploadButton.textContent = translate('itemsEditor.uploadImage')
+        const uploadInput = document.createElement('input')
+        uploadInput.type = 'file'
+        uploadInput.accept = 'image/*'
+        uploadInput.hidden = true
+        uploadButton.addEventListener('click', () => uploadInput.click())
+        uploadInput.addEventListener('change', async () => {
+            const file = uploadInput.files?.[0] || null
+            if (!file) return
+            await onFileSelected(file, { uploadButton, uploadInput })
+        })
+
+        const fileLabel = document.createElement('p')
+        fileLabel.className = 'small muted image-file-label'
+        fileLabel.textContent = item.imageName
+            ? translate('itemsEditor.imageFileName', { name: item.imageName })
+            : translate('itemsEditor.imageNoFile')
+        contentWrap.append(previewBox, label, uploadButton, fileLabel, uploadInput)
+    }
+
+    /**
      * Appends image controls to the controls container.
      * @param {{
      *  item: object,

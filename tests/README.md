@@ -3,10 +3,13 @@
 ## Shape menu overlay
 - Unit: `tests/shape-menu-utils.test.mjs` validates the outside-click detection helper.
 - Unit: `tests/hidden-attribute.test.mjs` verifies the `[hidden]` CSS rule hides overlays like the shape menu.
-- Unit: `tests/shape-menu-icons.test.mjs` ensures SVG icons and labels are used in the shape menu.
+- Unit: `tests/shape-menu-icons.test.mjs` ensures SVG icons and labels are used for the expanded form catalog in the shape menu.
+- Unit: `tests/objects-action-icons.test.mjs` ensures the five Objects add buttons are icon-only, expose localized tooltip/ARIA bindings, and no longer rely on text replacement via `data-i18n`.
 - Unit: `tests/mjs-line-limit.test.mjs` enforces the project rule that each source `.mjs` module stays below 1000 lines.
 - Manual: run `npm start`, open `http://localhost:3000/`, click Form to open the menu, then click outside or press Escape to close.
-- Expected: clicking a menu item adds the shape and closes the menu.
+- Expected: clicking any form (including arrows, warning sign, dot, plus, triangle, and diamond) adds the selected form and closes the menu.
+- Manual: in the Objects panel hover each add button (`Text`, `QR-Code`, `Image`, `Icon`, `Form`) and switch language between `English` and `Deutsch`.
+- Expected: each button is icon-only, tooltip text is localized, screen-reader label follows locale, and click behavior (add item / open Form menu) remains unchanged.
 
 ## Layout preview sizing
 - Unit: `tests/preview-layout-utils.test.mjs` checks preview dimensions, scaling limits, label tag offsets, tape width mapping, margin marker geometry, and auto length expansion/shrink rules.
@@ -67,6 +70,13 @@
 - Unit: `tests/interaction-utils.test.mjs` and `tests/project-io-utils.test.mjs` verify image items are interactive and persist correctly through project save/load normalization.
 - Manual: run `npm start`, open `http://localhost:3000/`, click `Image` in the Objects panel, upload a PNG/JPEG, then adjust `Length`, `Height`, `Threshold`, `Dithering`, `Resampling`, and `Invert black/white`.
 - Expected: preview shows a black/white print-like image, resize sliders change output dimensions, and all image settings survive Save/Load and shared project links.
+
+## Icon objects
+- Unit: `tests/icon-library-utils.test.mjs` verifies icon catalog defaults, id normalization, and SVG data URL generation.
+- Unit: `tests/items-editor-icon-picker.test.mjs` verifies icon selection uses a popup grid (not a plain text dropdown).
+- Unit: `tests/interaction-utils.test.mjs` and `tests/project-io-utils.test.mjs` also verify icon items are interactive and persist correctly through project save/load normalization.
+- Manual: run `npm start`, open `http://localhost:3000/`, click `Icon` in the Objects panel, open the icon picker popup, select icons from different rows/categories, then resize or drag them in the label preview.
+- Expected: the popup shows icons in a multi-row/multi-column grid, icons render in monochrome (black/white print style), and selected icon settings survive Save/Load and shared project links.
 
 ## Parameterized labels
 - Unit: `tests/parameter-template-utils.test.mjs` validates placeholder extraction and substitution, JSON parsing constraints, and parameter-row validation diagnostics.

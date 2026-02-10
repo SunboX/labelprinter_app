@@ -260,10 +260,89 @@
                     <div class="section-title" data-i18n="objects.title">Objects</div>
                     <p class="muted small" data-i18n="objects.description">Drag to reorder. Adjust offsets, fonts, QR size, and forms.</p>
                     <div class="objects-actions">
-                        <button class="ghost" type="button" data-add-text data-i18n="objects.addText">Text</button>
-                        <button class="ghost" type="button" data-add-qr data-i18n="objects.addQr">QR-Code</button>
-                        <button class="ghost" type="button" data-add-image data-i18n="objects.addImage">Image</button>
-                        <button class="ghost" type="button" data-add-shape data-i18n="objects.addShape">Form</button>
+                        <button
+                            class="ghost object-add-btn"
+                            type="button"
+                            data-add-text
+                            title="Text"
+                            aria-label="Text"
+                            data-i18n-title="objects.addText"
+                            data-i18n-aria-label="objects.addText"
+                        >
+                            <svg class="icon-add-object" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <rect class="fill" x="3.5" y="5" width="11" height="2.4" rx="0.2"></rect>
+                                <rect class="fill" x="7.8" y="7.2" width="2.4" height="9.2" rx="0.2"></rect>
+                                <rect class="fill" x="5.8" y="16.4" width="6.4" height="2" rx="0.2"></rect>
+                                <path class="fill" d="M16 9h2v1.6h2.2V13H18v3.2c0 .5.4.8.9.8H20V19h-1.4a2.6 2.6 0 0 1-2.6-2.6V13h-1.4v-2.4H16Z"></path>
+                            </svg>
+                        </button>
+                        <button
+                            class="ghost object-add-btn"
+                            type="button"
+                            data-add-qr
+                            title="QR-Code"
+                            aria-label="QR-Code"
+                            data-i18n-title="objects.addQr"
+                            data-i18n-aria-label="objects.addQr"
+                        >
+                            <svg class="icon-add-object" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path d="M8 4H5a1 1 0 0 0-1 1v3"></path>
+                                <path d="M16 4h3a1 1 0 0 1 1 1v3"></path>
+                                <path d="M4 16v3a1 1 0 0 0 1 1h3"></path>
+                                <path d="M20 16v3a1 1 0 0 1-1 1h-3"></path>
+                                <rect class="fill" x="7" y="7" width="3.5" height="3.5" rx="0.8"></rect>
+                                <rect class="fill" x="13.5" y="7" width="3.5" height="3.5" rx="0.8"></rect>
+                                <rect class="fill" x="7" y="13.5" width="3.5" height="3.5" rx="0.8"></rect>
+                                <circle class="fill" cx="14.2" cy="14.2" r="0.9"></circle>
+                                <circle class="fill" cx="13.5" cy="16.7" r="0.9"></circle>
+                                <rect class="fill" x="15.6" y="14.9" width="1.8" height="3.5" rx="0.8"></rect>
+                            </svg>
+                        </button>
+                        <button
+                            class="ghost object-add-btn"
+                            type="button"
+                            data-add-image
+                            title="Image"
+                            aria-label="Image"
+                            data-i18n-title="objects.addImage"
+                            data-i18n-aria-label="objects.addImage"
+                        >
+                            <svg class="icon-add-object" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <rect x="3.5" y="5" width="17" height="14" rx="2"></rect>
+                                <circle cx="9" cy="10" r="1.25"></circle>
+                                <path d="m5.5 17 4.5-4.5 3.5 3.5 2.5-2.5 2.5 2.5"></path>
+                            </svg>
+                        </button>
+                        <button
+                            class="ghost object-add-btn"
+                            type="button"
+                            data-add-icon
+                            title="Icon"
+                            aria-label="Icon"
+                            data-i18n-title="objects.addIcon"
+                            data-i18n-aria-label="objects.addIcon"
+                        >
+                            <svg class="icon-add-object" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <circle cx="12" cy="12" r="8"></circle>
+                                <circle class="fill" cx="9.4" cy="10" r="1"></circle>
+                                <circle class="fill" cx="14.6" cy="10" r="1"></circle>
+                                <path d="M8.4 14c.9 1.4 2.1 2 3.6 2s2.7-.6 3.6-2"></path>
+                            </svg>
+                        </button>
+                        <button
+                            class="ghost object-add-btn"
+                            type="button"
+                            data-add-shape
+                            title="Form"
+                            aria-label="Form"
+                            data-i18n-title="objects.addShape"
+                            data-i18n-aria-label="objects.addShape"
+                        >
+                            <svg class="icon-add-object" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <rect x="5.5" y="4.5" width="10" height="10" rx="2.2"></rect>
+                                <rect x="8.5" y="7.5" width="10" height="10" rx="2.2"></rect>
+                            </svg>
+                        </button>
                         <div class="shape-menu" data-shape-menu hidden>
                             <button class="menu-item" data-shape-type="rect">
                                 <span class="menu-icon" aria-hidden="true">
@@ -304,6 +383,67 @@
                                     </svg>
                                 </span>
                                 <span class="menu-label" data-i18n="shapes.line">Linie</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="triangle">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <path d="M12 4 21 20H3Z"></path>
+                                    </svg>
+                                </span>
+                                <span class="menu-label" data-i18n="shapes.triangle">Dreieck</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="diamond">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <path d="M12 3 21 12 12 21 3 12Z"></path>
+                                    </svg>
+                                </span>
+                                <span class="menu-label" data-i18n="shapes.diamond">Raute</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="arrowRight">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <path d="M3 12h18"></path>
+                                        <path d="m14 6 7 6-7 6"></path>
+                                    </svg>
+                                </span>
+                                <span class="menu-label" data-i18n="shapes.arrowRight">Pfeil rechts</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="arrowLeft">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <path d="M3 12h18"></path>
+                                        <path d="m10 6-7 6 7 6"></path>
+                                    </svg>
+                                </span>
+                                <span class="menu-label" data-i18n="shapes.arrowLeft">Pfeil links</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="plus">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <path d="M12 4v16"></path>
+                                        <path d="M4 12h16"></path>
+                                    </svg>
+                                </span>
+                                <span class="menu-label" data-i18n="shapes.plus">Plus</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="dot">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <circle cx="12" cy="12" r="4"></circle>
+                                    </svg>
+                                </span>
+                                <span class="menu-label" data-i18n="shapes.dot">Punkt</span>
+                            </button>
+                            <button class="menu-item" data-shape-type="warningTriangle">
+                                <span class="menu-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" focusable="false">
+                                        <path d="M12 3 22 21H2Z"></path>
+                                        <path d="M12 8v6"></path>
+                                        <circle cx="12" cy="17" r="1"></circle>
+                                    </svg>
+                                </span>
+                                <span class="menu-label" data-i18n="shapes.warningTriangle">Warnschild</span>
                             </button>
                         </div>
                     </div>

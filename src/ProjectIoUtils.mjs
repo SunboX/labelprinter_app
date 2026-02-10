@@ -1,6 +1,7 @@
 import { ZoomUtils } from './ZoomUtils.mjs'
 import { QrCodeUtils } from './QrCodeUtils.mjs'
 import { ImageRasterUtils } from './ImageRasterUtils.mjs'
+import { IconLibraryUtils } from './IconLibraryUtils.mjs'
 
 /**
  * Project serialization and normalization helpers.
@@ -170,6 +171,14 @@ export class ProjectIoUtils {
                 height: 96,
                 xOffset: 4,
                 yOffset: 0
+            },
+            icon: {
+                type: 'icon',
+                iconId: IconLibraryUtils.getDefaultIconId(),
+                width: 72,
+                height: 72,
+                xOffset: 4,
+                yOffset: 0
             }
         }
     }
@@ -183,7 +192,7 @@ export class ProjectIoUtils {
     static #normalizeItem(item, fallbackId) {
         const cleaned = ProjectIoUtils.stripRuntimeFields(item)
         const type = cleaned.type
-        if (!type || !['text', 'qr', 'shape', 'image'].includes(type)) return null
+        if (!type || !['text', 'qr', 'shape', 'image', 'icon'].includes(type)) return null
 
         const defaults = ProjectIoUtils.#buildItemDefaults()[type]
         const normalized = { ...defaults, ...cleaned }
@@ -235,6 +244,13 @@ export class ProjectIoUtils {
             normalized.imageSmoothing = normalizedImageOptions.imageSmoothing
             normalized.imageInvert = normalizedImageOptions.imageInvert
         }
+        if (type === 'icon') {
+            normalized.width = Math.max(8, ProjectIoUtils.#coerceNumber(normalized.width, defaults.width))
+            normalized.height = Math.max(8, ProjectIoUtils.#coerceNumber(normalized.height, defaults.height))
+            normalized.xOffset = ProjectIoUtils.#coerceNumber(normalized.xOffset, defaults.xOffset)
+            normalized.yOffset = ProjectIoUtils.#coerceNumber(normalized.yOffset, defaults.yOffset)
+            normalized.iconId = IconLibraryUtils.normalizeIconId(normalized.iconId)
+        }
 
         return normalized
     }
@@ -283,7 +299,7 @@ export class ProjectIoUtils {
         rawItems.forEach((item) => {
             const normalized = ProjectIoUtils.#normalizeItem(item, `item-${nextIdCounter}`)
             if (!normalized) return
-            if (!normalized.id || usedIds.has(normalized.id)) {
+            while (!normalized.id || usedIds.has(normalized.id)) {
                 normalized.id = `item-${nextIdCounter++}`
             }
             usedIds.add(normalized.id)

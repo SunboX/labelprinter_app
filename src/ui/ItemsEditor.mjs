@@ -2,7 +2,7 @@ import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { FontFamilyUtils } from '../FontFamilyUtils.mjs'
 import { QrCodeUtils } from '../QrCodeUtils.mjs'
 import { ItemsEditorImageSupport } from './ItemsEditorImageSupport.mjs'
-
+import { ItemsEditorIconSupport } from './ItemsEditorIconSupport.mjs'
 /**
  * Manages the item list UI, including drag reordering and item controls.
  */
@@ -15,7 +15,6 @@ export class ItemsEditor {
     #collapsedItemIds = new Set()
     #autoExpandedItemIds = new Set()
     #panelItemOrder = []
-
     /**
      * @param {object} els
      * @param {object} state
@@ -35,7 +34,6 @@ export class ItemsEditor {
         this.setStatus = setStatus
         this.selectedItemIds = new Set()
     }
-
     /**
      * Sets the item change callback.
      * @param {() => void} callback
@@ -43,7 +41,6 @@ export class ItemsEditor {
     set onChange(callback) {
         this.#onChange = typeof callback === 'function' ? callback : () => {}
     }
-
     /**
      * Returns the current item change callback.
      * @returns {() => void}
@@ -51,7 +48,6 @@ export class ItemsEditor {
     get onChange() {
         return this.#onChange
     }
-
     /**
      * Sets the translation callback.
      * @param {(key: string, params?: Record<string, string | number>) => string} callback
@@ -59,7 +55,6 @@ export class ItemsEditor {
     set translate(callback) {
         this.#translate = typeof callback === 'function' ? callback : (key) => key
     }
-
     /**
      * Returns the translation callback.
      * @returns {(key: string, params?: Record<string, string | number>) => string}
@@ -67,7 +62,6 @@ export class ItemsEditor {
     get translate() {
         return this.#translate
     }
-
     /**
      * Sets the status callback.
      * @param {(text: string, type?: string) => void} callback
@@ -75,7 +69,6 @@ export class ItemsEditor {
     set setStatus(callback) {
         this.#setStatus = typeof callback === 'function' ? callback : () => {}
     }
-
     /**
      * Returns the status callback.
      * @returns {(text: string, type?: string) => void}
@@ -83,7 +76,6 @@ export class ItemsEditor {
     get setStatus() {
         return this.#setStatus
     }
-
     /**
      * Sets available font families for dropdown controls.
      * @param {string[]} value
@@ -91,7 +83,6 @@ export class ItemsEditor {
     set fontFamilies(value) {
         this.#fontFamilies = FontFamilyUtils.normalizeFontFamilies(value, 'Barlow')
     }
-
     /**
      * Returns available font families for dropdown controls.
      * @returns {string[]}
@@ -99,7 +90,6 @@ export class ItemsEditor {
     get fontFamilies() {
         return [...this.#fontFamilies]
     }
-
     /**
      * Loads available local font families once from the browser.
      * @returns {Promise<void>}
@@ -107,7 +97,6 @@ export class ItemsEditor {
     async loadInstalledFontFamilies() {
         this.fontFamilies = await FontFamilyUtils.listInstalledFontFamilies(window)
     }
-
     /**
      * Loads and tracks previously saved Google Font links.
      * @param {string[]} fontLinks
@@ -139,7 +128,6 @@ export class ItemsEditor {
             this.fontFamilies = FontFamilyUtils.normalizeFontFamilies(this.fontFamilies.concat(loadedFamilies), 'Barlow')
         }
     }
-
     /**
      * Syncs selected item ids from preview interactions.
      * @param {string[]} itemIds
@@ -153,6 +141,41 @@ export class ItemsEditor {
     }
 
     /**
+     * Selects an icon item and opens its icon chooser in the objects panel.
+     * @param {string} itemId
+     * @returns {boolean}
+     */
+    openIconPickerForItem(itemId) {
+        const normalizedItemId = String(itemId || '').trim()
+        if (!normalizedItemId) return false
+        const item = this.state.items.find((candidate) => candidate.id === normalizedItemId)
+        if (!item || item.type !== 'icon') return false
+        this.setSelectedItemIds([normalizedItemId])
+        const trigger = this.#findIconPickerTrigger(normalizedItemId)
+        if (!trigger) return false
+        const card = trigger.closest('.item-card')
+        if (card && typeof card.scrollIntoView === 'function') {
+            card.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        }
+        trigger.click()
+        return true
+    }
+
+    /**
+     * Returns the icon picker trigger element for a specific item card.
+     * @param {string} itemId
+     * @returns {HTMLButtonElement | null}
+     */
+    #findIconPickerTrigger(itemId) {
+        if (!this.els.items) return null
+        const card = Array.from(this.els.items.querySelectorAll('.item-card')).find((candidate) => {
+            return candidate.dataset.itemId === itemId
+        })
+        if (!card) return null
+        const trigger = card.querySelector('.icon-picker-trigger')
+        return trigger instanceof HTMLButtonElement ? trigger : null
+    }
+    /**
      * Expands selected cards that were previously collapsed.
      * Tracks ids so the original collapsed state can be restored on deselect.
      * @param {Set<string>} selectedItemIds
@@ -164,7 +187,6 @@ export class ItemsEditor {
             this.#autoExpandedItemIds.add(itemId)
         })
     }
-
     /**
      * Restores collapsed state for cards that were auto-expanded by selection.
      * @param {Set<string>} selectedItemIds
@@ -176,7 +198,6 @@ export class ItemsEditor {
             this.#autoExpandedItemIds.delete(itemId)
         })
     }
-
     /**
      * Renders the list of items and their controls.
      */
@@ -198,7 +219,6 @@ export class ItemsEditor {
         this.#ensureItemsScrollIndicators()
         this.#updateItemsScrollIndicators()
     }
-
     /**
      * Binds drag handlers for reordering items.
      */
@@ -230,7 +250,6 @@ export class ItemsEditor {
             this.render()
         })
     }
-
     /**
      * Attaches one-time listeners that keep objects-panel scroll indicators in sync.
      */
@@ -247,7 +266,6 @@ export class ItemsEditor {
         )
         window.addEventListener('resize', () => this.#updateItemsScrollIndicators())
     }
-
     /**
      * Updates scroll indicator attributes for the objects-panel list.
      */
@@ -276,7 +294,6 @@ export class ItemsEditor {
                   : 'objects.scrollHintDown'
         this.els.objectsScrollIndicator.textContent = this.translate(hintKey)
     }
-
     /**
      * Adds a new text item.
      */
@@ -296,7 +313,6 @@ export class ItemsEditor {
         this.render()
         this.#onChange()
     }
-
     /**
      * Ensures custom Google font links state is present.
      */
@@ -305,7 +321,6 @@ export class ItemsEditor {
             this.state.customFontLinks = []
         }
     }
-
     /**
      * Adds a new QR code item.
      */
@@ -328,7 +343,6 @@ export class ItemsEditor {
         this.render()
         this.#onChange()
     }
-
     /**
      * Adds a new image item.
      */
@@ -360,19 +374,51 @@ export class ItemsEditor {
         this.render()
         this.#onChange()
     }
-
+    /**
+     * Adds a new icon item.
+     */
+    addIconItem() {
+        const defaultDimensions = ItemsEditorIconSupport.resolveDefaultIconDimensions(this.state)
+        const id = this.nextId()
+        this.state.items.push({
+            id,
+            type: 'icon',
+            iconId: ItemsEditorIconSupport.getDefaultIconId(),
+            width: defaultDimensions.width,
+            height: defaultDimensions.height,
+            xOffset: 4,
+            yOffset: 0
+        })
+        this.#panelItemOrder.push(id)
+        this.#collapsedItemIds.delete(id)
+        this.render()
+        this.#onChange()
+    }
     /**
      * Adds a new shape item.
      * @param {string} [shapeType='rect']
      */
     addShapeItem(shapeType = 'rect') {
-        const dimensions = { width: 180, height: 36 }
-        if (shapeType === 'line') {
-            dimensions.height = 6
-        } else if (shapeType === 'oval') {
-            dimensions.height = 44
-        } else if (shapeType === 'polygon') {
-            dimensions.height = 52
+        const dimensions = {
+            ...(shapeType === 'line'
+                ? { width: 180, height: 6 }
+                : shapeType === 'oval'
+                  ? { width: 180, height: 44 }
+                  : shapeType === 'polygon'
+                    ? { width: 180, height: 52 }
+                    : shapeType === 'triangle'
+                      ? { width: 120, height: 72 }
+                      : shapeType === 'diamond'
+                        ? { width: 120, height: 72 }
+                        : shapeType === 'arrowRight' || shapeType === 'arrowLeft'
+                          ? { width: 180, height: 48 }
+                          : shapeType === 'plus'
+                            ? { width: 84, height: 84 }
+                            : shapeType === 'dot'
+                              ? { width: 42, height: 42 }
+                              : shapeType === 'warningTriangle'
+                                ? { width: 120, height: 84 }
+                                : { width: 180, height: 36 })
         }
         const id = this.nextId()
         this.state.items.push({
@@ -392,7 +438,6 @@ export class ItemsEditor {
         this.render()
         this.#onChange()
     }
-
     /**
      * Synchronizes panel item order with the current state item ids.
      * New items are appended to the end while deleted ids are removed.
@@ -407,7 +452,6 @@ export class ItemsEditor {
             }
         })
     }
-
     /**
      * Moves one panel item from a source index to a destination index.
      * @param {number} fromPanelIndex
@@ -420,7 +464,6 @@ export class ItemsEditor {
         const [movedItemId] = this.#panelItemOrder.splice(fromPanelIndex, 1)
         this.#panelItemOrder.splice(toPanelIndex, 0, movedItemId)
     }
-
     /**
      * Removes stale collapsed ids for deleted items.
      */
@@ -437,7 +480,6 @@ export class ItemsEditor {
             }
         })
     }
-
     /**
      * Toggles collapsed state for one item card.
      * @param {string} itemId
@@ -452,7 +494,6 @@ export class ItemsEditor {
         this.#autoExpandedItemIds.delete(itemId)
         this.render()
     }
-
     /**
      * Creates a slider control for item adjustments.
      * @param {string} label
@@ -483,7 +524,6 @@ export class ItemsEditor {
         wrap.append(top, input)
         return wrap
     }
-
     /**
      * Creates a single item card with controls.
      * @param {object} item
@@ -516,6 +556,8 @@ export class ItemsEditor {
                   ? this.translate('itemsEditor.typeQr')
                   : item.type === 'image'
                     ? this.translate('itemsEditor.typeImage')
+                    : item.type === 'icon'
+                      ? this.translate('itemsEditor.typeIcon')
                   : this.translate('itemsEditor.typeShape')
         tag.textContent = typeLabel
         const handle = document.createElement('div')
@@ -581,52 +623,24 @@ export class ItemsEditor {
             })
             contentWrap.append(label, select)
         } else if (item.type === 'image') {
-            const previewBox = document.createElement('div')
-            previewBox.className = 'image-item-preview'
-            if (item.imageData) {
-                const previewImage = document.createElement('img')
-                previewImage.className = 'image-item-preview-image'
-                previewImage.src = item.imageData
-                previewImage.alt = item.imageName || this.translate('itemsEditor.typeImage')
-                previewImage.draggable = false
-                previewBox.append(previewImage)
-            } else {
-                const previewPlaceholder = document.createElement('div')
-                previewPlaceholder.className = 'image-item-preview-placeholder'
-                const previewPlaceholderIcon = document.createElement('span')
-                previewPlaceholderIcon.className = 'image-item-preview-placeholder-icon'
-                previewPlaceholderIcon.setAttribute('aria-hidden', 'true')
-                const previewPlaceholderText = document.createElement('span')
-                previewPlaceholderText.className = 'small muted image-item-preview-empty'
-                previewPlaceholderText.textContent = this.translate('itemsEditor.imageNoFile')
-                previewPlaceholder.append(previewPlaceholderIcon, previewPlaceholderText)
-                previewBox.append(previewPlaceholder)
-            }
-            const label = document.createElement('label')
-            label.textContent = this.translate('itemsEditor.fieldImage')
-            const uploadButton = document.createElement('button')
-            uploadButton.type = 'button'
-            uploadButton.className = 'ghost'
-            uploadButton.textContent = this.translate('itemsEditor.uploadImage')
-            const uploadInput = document.createElement('input')
-            uploadInput.type = 'file'
-            uploadInput.accept = 'image/*'
-            uploadInput.hidden = true
-            uploadButton.addEventListener('click', () => uploadInput.click())
-            uploadInput.addEventListener('change', async () => {
-                const file = uploadInput.files?.[0] || null
-                if (!file) return
-                uploadButton.disabled = true
-                await this.#loadImageFile(item, file)
-                uploadButton.disabled = false
-                uploadInput.value = ''
+            ItemsEditorImageSupport.appendImageSourceControls({
+                item,
+                contentWrap,
+                translate: this.translate,
+                onFileSelected: async (file, controls) => {
+                    controls.uploadButton.disabled = true
+                    await this.#loadImageFile(item, file)
+                    controls.uploadButton.disabled = false
+                    controls.uploadInput.value = ''
+                }
             })
-            const fileLabel = document.createElement('p')
-            fileLabel.className = 'small muted image-file-label'
-            fileLabel.textContent = item.imageName
-                ? this.translate('itemsEditor.imageFileName', { name: item.imageName })
-                : this.translate('itemsEditor.imageNoFile')
-            contentWrap.append(previewBox, label, uploadButton, fileLabel, uploadInput)
+        } else if (item.type === 'icon') {
+            ItemsEditorIconSupport.appendIconSourceControls({
+                item,
+                contentWrap,
+                translate: this.translate,
+                onChange: this.#onChange
+            })
         }
 
         const controls = document.createElement('div')
@@ -638,6 +652,8 @@ export class ItemsEditor {
             this.#appendQrControls(item, controls, sizeLabel)
         } else if (item.type === 'image') {
             this.#appendImageControls(item, controls, sizeLabel)
+        } else if (item.type === 'icon') {
+            this.#appendIconControls(item, controls, sizeLabel)
         } else if (item.type === 'shape') {
             this.#appendShapeControls(item, controls, sizeLabel)
         }
@@ -666,7 +682,6 @@ export class ItemsEditor {
         )
         return card
     }
-
     /**
      * Appends text controls to the controls container.
      * @param {object} item
@@ -737,7 +752,6 @@ export class ItemsEditor {
 
         controls.append(offsetCtrl, yOffsetCtrl, fontCtrl, sizeCtrl, googleFontCtrl)
     }
-
     /**
      * Returns font-family options for the current item.
      * @param {string} activeFontFamily
@@ -746,7 +760,6 @@ export class ItemsEditor {
     #buildItemFontFamilyOptions(activeFontFamily) {
         return FontFamilyUtils.normalizeFontFamilies(this.fontFamilies.concat([activeFontFamily]), 'Barlow')
     }
-
     /**
      * Resolves a default font family for new text items.
      * @returns {string}
@@ -754,7 +767,6 @@ export class ItemsEditor {
     #resolveDefaultFontFamily() {
         return this.fontFamilies[0] || 'Barlow'
     }
-
     /**
      * Imports a Google Font stylesheet URL and refreshes available font options.
      * @param {HTMLInputElement} input
@@ -798,7 +810,6 @@ export class ItemsEditor {
             this.setStatus(this.translate('itemsEditor.googleFontLoadFailed', { message }), 'error')
         }
     }
-
     /**
      * Loads an uploaded image file into an image item.
      * @param {object} item
@@ -816,7 +827,6 @@ export class ItemsEditor {
             onChange: this.#onChange
         })
     }
-
     /**
      * Appends image controls to the controls container.
      * @param {object} item
@@ -834,7 +844,23 @@ export class ItemsEditor {
             createSlider: this.#createSlider.bind(this)
         })
     }
-
+    /**
+     * Appends icon controls to the controls container.
+     * @param {object} item
+     * @param {HTMLElement} controls
+     * @param {string} sizeLabel
+     */
+    #appendIconControls(item, controls, sizeLabel) {
+        ItemsEditorIconSupport.appendIconControls({
+            item,
+            controls,
+            sizeLabel,
+            state: this.state,
+            translate: this.translate,
+            onChange: this.#onChange,
+            createSlider: this.#createSlider.bind(this)
+        })
+    }
     /**
      * Appends QR controls to the controls container.
      * @param {object} item
@@ -933,7 +959,6 @@ export class ItemsEditor {
 
         controls.append(heightCtrl, offsetCtrl, yOffsetCtrl, sizeCtrl, errorCorrectionCtrl, versionCtrl, encodingModeCtrl)
     }
-
     /**
      * Appends shape controls to the controls container.
      * @param {object} item

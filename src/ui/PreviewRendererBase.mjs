@@ -6,6 +6,7 @@ import { AlignmentUtils } from '../AlignmentUtils.mjs'
 export class PreviewRendererBase {
     #onSelectionChange = null
     #onItemChange = null
+    #onItemEditorRequest = null
 
     /**
      * @param {object} els
@@ -31,6 +32,7 @@ export class PreviewRendererBase {
         this._selectedItemIds = new Set()
         this.onSelectionChange = null
         this.onItemChange = null
+        this.onItemEditorRequest = null
         this._interaction = null
         this._interactionFrame = null
         this._dotsPerPxX = 1
@@ -144,6 +146,22 @@ export class PreviewRendererBase {
     }
 
     /**
+     * Sets the item-editor request callback.
+     * @param {(request: { itemId: string, type: string }) => void} callback
+     */
+    set onItemEditorRequest(callback) {
+        this.#onItemEditorRequest = typeof callback === 'function' ? callback : null
+    }
+
+    /**
+     * Returns the current item-editor request callback.
+     * @returns {((request: { itemId: string, type: string }) => void) | null}
+     */
+    get onItemEditorRequest() {
+        return this.#onItemEditorRequest
+    }
+
+    /**
      * Replaces the current interactive selection.
      * @param {string[]} itemIds
      */
@@ -227,6 +245,15 @@ export class PreviewRendererBase {
             return
         }
         this.render()
+    }
+
+    /**
+     * Emits an item-editor request (for example, opening a picker in the objects panel).
+     * @param {{ itemId: string, type: string }} request
+     */
+    _emitItemEditorRequest(request) {
+        if (typeof this.onItemEditorRequest !== 'function') return
+        this.onItemEditorRequest(request)
     }
 
     /**
