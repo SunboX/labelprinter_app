@@ -15,7 +15,7 @@
 - Unit: `tests/preview-layout-utils.test.mjs` checks preview dimensions, scaling limits, label tag offsets, tape width mapping, margin marker geometry, and auto length expansion/shrink rules.
 - Unit: `tests/preview-text-media-scale.test.mjs` verifies text media-width compensation is applied only for horizontal layout so text does not shrink when switching tape width in vertical layout.
 - Manual: run `npm start`, open `http://localhost:3000/`, add one text item, then switch media width between `W9` and `W24` in horizontal and vertical orientation.
-- Expected: text size remains visually stable when changing media width.
+- Expected: text keeps the same visual glyph proportions (width and height) when changing media width.
 
 ## Ruler alignment
 - Unit: `tests/ruler-utils.test.mjs` verifies the pixel scale, offsets, and highlight ranges used for ruler alignment.
