@@ -158,10 +158,6 @@ export class PreviewRendererRender extends PreviewRendererCanvasBuild {
             })
             const wrapRect = this.els.canvasWrap?.getBoundingClientRect()
             const plateRect = this.els.labelPlate?.getBoundingClientRect()
-            const rulerOffsetX = wrapRect && plateRect ? Math.max(0, plateRect.left - wrapRect.left) : 0
-            const rulerWidthPx = wrapRect && plateRect ? Math.max(0, plateRect.width + rulerOffsetX) : 0
-            const rulerOffsetY = wrapRect && plateRect ? Math.max(0, plateRect.top - wrapRect.top) : 0
-            const rulerHeightPx = wrapRect ? Math.max(0, wrapRect.height + rulerOffsetY) : 0
             if (this.els.labelWidth && wrapRect && plateRect && labelTagRectWidth && labelTagRectHeight) {
                 const tapeStartX = plateRect.left - wrapRect.left
                 const centerTop = plateRect.top - wrapRect.top + plateRect.height / 2
@@ -176,32 +172,16 @@ export class PreviewRendererRender extends PreviewRendererCanvasBuild {
                 this.els.labelWidth.style.left = `${labelLeft}px`
                 this.els.labelWidth.style.top = `${labelTop}px`
             }
-            if (this.els.rulerX) {
-                const rulerSpanDots = displayWidthMm * dotsPerMmX
-                this._drawRulerAxis(
-                    this.els.rulerX,
-                    rulerSpanDots,
-                    res?.dots?.[0] || res?.dots?.[1] || 180,
-                    'x',
-                    false,
-                    rulerOffsetX,
-                    rulerWidthPx,
-                    labelMmWidth
-                )
+            this._rulerContext = {
+                res,
+                dotsPerMmX,
+                dotsPerMmY,
+                displayWidthMm,
+                displayHeightMm,
+                labelMmWidth,
+                labelMmHeight
             }
-            if (this.els.rulerY) {
-                const rulerSpanDotsY = displayHeightMm * dotsPerMmY
-                this._drawRulerAxis(
-                    this.els.rulerY,
-                    rulerSpanDotsY,
-                    res?.dots?.[1] || res?.dots?.[0] || 180,
-                    'y',
-                    false,
-                    rulerOffsetY,
-                    rulerHeightPx,
-                    labelMmHeight
-                )
-            }
+            this._syncRulersFromViewport(wrapRect, plateRect)
             this._updateInteractiveItems(layoutItems, previewRect)
             this._syncInteractionLayer(previewRect, wrapRect)
             this._syncHitboxes()
@@ -216,6 +196,70 @@ export class PreviewRendererRender extends PreviewRendererCanvasBuild {
             if (this._previewQueued) {
                 this.render()
             }
+        }
+    }
+
+    /**
+     * Schedules a lightweight viewport sync after canvas-wrap scroll.
+     */
+    scheduleViewportSync() {
+        if (this._viewportSyncFrame) return
+        this._viewportSyncFrame = window.requestAnimationFrame(() => {
+            this._viewportSyncFrame = null
+            const wrapRect = this.els.canvasWrap?.getBoundingClientRect()
+            const plateRect = this.els.labelPlate?.getBoundingClientRect()
+            if (!wrapRect || !plateRect) return
+            this._syncRulersFromViewport(wrapRect, plateRect)
+            const previewRect = this.els.preview?.getBoundingClientRect()
+            if (!previewRect || !previewRect.width || !previewRect.height) return
+            this._syncInteractionLayer(previewRect, wrapRect)
+            this._syncInlineTextEditor()
+            this._updateOverlayCanvas(previewRect, wrapRect)
+            this._drawOverlay()
+        })
+    }
+
+    /**
+     * Draws both rulers using current viewport and scroll offsets.
+     * @param {DOMRect | undefined} wrapRect
+     * @param {DOMRect | undefined} plateRect
+     */
+    _syncRulersFromViewport(wrapRect, plateRect) {
+        if (!wrapRect || !plateRect || !this._rulerContext) return
+        const { res, dotsPerMmX, dotsPerMmY, displayWidthMm, displayHeightMm, labelMmWidth, labelMmHeight } = this._rulerContext
+        const scrollLeft = Number(this.els.canvasWrap?.scrollLeft || 0)
+        const scrollTop = Number(this.els.canvasWrap?.scrollTop || 0)
+        const rulerOffsetX = Math.max(0, plateRect.left - wrapRect.left + scrollLeft)
+        const rulerWidthPx = Math.max(0, plateRect.width + rulerOffsetX)
+        const rulerOffsetY = Math.max(0, plateRect.top - wrapRect.top + scrollTop)
+        const rulerHeightPx = Math.max(0, wrapRect.height + rulerOffsetY)
+        if (this.els.rulerX) {
+            const rulerSpanDots = displayWidthMm * dotsPerMmX
+            this._drawRulerAxis(
+                this.els.rulerX,
+                rulerSpanDots,
+                res?.dots?.[0] || res?.dots?.[1] || 180,
+                'x',
+                false,
+                rulerOffsetX,
+                rulerWidthPx,
+                labelMmWidth,
+                scrollLeft
+            )
+        }
+        if (this.els.rulerY) {
+            const rulerSpanDotsY = displayHeightMm * dotsPerMmY
+            this._drawRulerAxis(
+                this.els.rulerY,
+                rulerSpanDotsY,
+                res?.dots?.[1] || res?.dots?.[0] || 180,
+                'y',
+                false,
+                rulerOffsetY,
+                rulerHeightPx,
+                labelMmHeight,
+                scrollTop
+            )
         }
     }
 
@@ -348,8 +392,10 @@ export class PreviewRendererRender extends PreviewRendererCanvasBuild {
         if (!previewRect.width || !previewRect.height || !wrapRect) return
         const overlayPadding = (this._handleRadius || 0) + 1
         this._overlayPadding = overlayPadding
-        const offsetLeft = previewRect.left - wrapRect.left - overlayPadding
-        const offsetTop = previewRect.top - wrapRect.top - overlayPadding
+        const scrollLeft = Number(this.els.canvasWrap?.scrollLeft || 0)
+        const scrollTop = Number(this.els.canvasWrap?.scrollTop || 0)
+        const offsetLeft = previewRect.left - wrapRect.left + scrollLeft - overlayPadding
+        const offsetTop = previewRect.top - wrapRect.top + scrollTop - overlayPadding
         const overlayWidth = previewRect.width + overlayPadding * 2
         const overlayHeight = previewRect.height + overlayPadding * 2
         overlay.style.left = `${offsetLeft}px`

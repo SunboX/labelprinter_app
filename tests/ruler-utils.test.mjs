@@ -58,3 +58,18 @@ describe('computeRulerLabelPosition', () => {
         assert.equal(RulerUtils.computeRulerLabelPosition(80, 12, 200, 6), 80)
     })
 })
+
+describe('isAxisPositionVisible', () => {
+    it('returns true for positions within the visible axis span', () => {
+        assert.equal(RulerUtils.isAxisPositionVisible(0, 200), true)
+        assert.equal(RulerUtils.isAxisPositionVisible(120, 200), true)
+        assert.equal(RulerUtils.isAxisPositionVisible(200, 200), true)
+    })
+
+    it('supports a bleed margin and hides far out-of-range positions', () => {
+        assert.equal(RulerUtils.isAxisPositionVisible(-1, 200, 1), true)
+        assert.equal(RulerUtils.isAxisPositionVisible(201, 200, 1), true)
+        assert.equal(RulerUtils.isAxisPositionVisible(-3, 200, 1), false)
+        assert.equal(RulerUtils.isAxisPositionVisible(204, 200, 1), false)
+    })
+})

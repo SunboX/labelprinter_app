@@ -7,17 +7,25 @@
 - Unit: `tests/objects-action-icons.test.mjs` ensures the five Objects add buttons are icon-only, expose localized tooltip/ARIA bindings, and no longer rely on text replacement via `data-i18n`.
 - Unit: `tests/mjs-line-limit.test.mjs` enforces the project rule that each source `.mjs` module stays below 1000 lines.
 - Manual: run `npm start`, open `http://localhost:3000/`, click Form to open the menu, then click outside or press Escape to close.
-- Expected: clicking any form (including arrows, warning sign, dot, plus, triangle, and diamond) adds the selected form and closes the menu.
+- Expected: clicking any listed form (including arrows, dot, plus, triangle, and diamond) adds the selected form and closes the menu.
 - Manual: in the Objects panel hover each add button (`Text`, `QR-Code`, `Image`, `Icon`, `Form`) and switch language between `English` and `Deutsch`.
 - Expected: each button is icon-only, tooltip text is localized, screen-reader label follows locale, and click behavior (add item / open Form menu) remains unchanged.
 
 ## Layout preview sizing
 - Unit: `tests/preview-layout-utils.test.mjs` checks preview dimensions, scaling limits, label tag offsets, tape width mapping, margin marker geometry, and auto length expansion/shrink rules.
+- Unit: `tests/preview-text-media-scale.test.mjs` verifies text media-width compensation is applied only for horizontal layout so text does not shrink when switching tape width in vertical layout.
+- Manual: run `npm start`, open `http://localhost:3000/`, add one text item, then switch media width between `W9` and `W24` in horizontal and vertical orientation.
+- Expected: text size remains visually stable when changing media width.
 
 ## Ruler alignment
 - Unit: `tests/ruler-utils.test.mjs` verifies the pixel scale, offsets, and highlight ranges used for ruler alignment.
 - Unit: `tests/ruler-utils.test.mjs` also validates clamped label positions so edge labels (like the vertical `0`) stay readable.
+- Unit: `tests/preview-ruler-scroll-sync.test.mjs` verifies ruler redraw is synchronized with canvas viewport scrolling.
 - Manual: run `npm start`, open `http://localhost:3000/`, set media `W9`, and verify the vertical ruler highlight spans exactly from the label top edge to the label bottom edge.
+- Manual: extend label length so the horizontal stage needs scrolling and inspect the right edge ruler labels.
+- Expected: right-edge ruler numbers stay readable and do not overlap.
+- Manual: scroll the label viewport horizontally and compare item positions to ruler marks.
+- Expected: horizontal ruler values track scrolling and remain aligned with content.
 
 ## Preview interactions
 - Unit: `tests/interaction-utils.test.mjs` checks handle positions, hit testing, cursor mapping, handle-edge mapping, interactive item type support, and drag clamping for the preview overlay.
@@ -28,6 +36,10 @@
 - Expected: an inline text input opens directly on the label, `Enter` commits, and `Escape` cancels.
 - Manual: add a `Form` item of type `Line`, select it on the label preview, then try resizing and dragging.
 - Expected: only left and right resize dots are shown for the line, and dragging inside the line body moves it without triggering top/bottom scaling.
+- Manual: add a `Form` item of type `Polygon`, then adjust the `Sides` controls (slider + number input) and select the polygon on the label preview.
+- Expected: polygon edges update immediately, and the selection box/hit area matches the drawn polygon footprint instead of a much wider rectangle.
+- Manual: widen the label so the stage requires horizontal scrolling, scroll right, then click/select or drag items near the right side.
+- Expected: hitboxes and selection handles remain aligned with items while scrolled.
 
 ## Collapsible item cards
 - Unit: `tests/items-editor-collapsible.test.mjs` verifies the items editor exposes collapse toggles and collapsed-body CSS.

@@ -5,6 +5,7 @@ import path from 'node:path'
 
 const filePath = path.join(process.cwd(), 'src/index.html')
 const html = fs.readFileSync(filePath, 'utf8')
+const mainSource = fs.readFileSync(path.join(process.cwd(), 'src/main.mjs'), 'utf8')
 
 const iconMatches = html.match(/class="menu-icon"/g) || []
 const svgMatches = html.match(/<svg\s+viewBox="0 0 24 24"/g) || []
@@ -20,5 +21,10 @@ describe('shape menu icons', () => {
         assert.equal(iconMatches.length, shapeMatches.length)
         assert.equal(svgMatches.length, shapeMatches.length)
         assert.equal(labelMatches.length, shapeMatches.length)
+    })
+
+    it('does not expose the warning sign in the Forms catalog', () => {
+        assert.equal(html.includes('data-shape-type="warningTriangle"'), false)
+        assert.equal(mainSource.includes("id: 'warningTriangle'"), false)
     })
 })

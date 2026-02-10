@@ -45,6 +45,21 @@ export class RulerUtils {
     }
 
     /**
+     * Determines whether an axis position is visible in the current ruler viewport.
+     * @param {number} positionPx
+     * @param {number} axisLengthPx
+     * @param {number} [bleedPx=0]
+     * @returns {boolean}
+     */
+    static isAxisPositionVisible(positionPx, axisLengthPx, bleedPx = 0) {
+        const safePositionPx = Number.isFinite(positionPx) ? positionPx : NaN
+        const safeAxisLengthPx = Math.max(0, Number.isFinite(axisLengthPx) ? axisLengthPx : 0)
+        const safeBleedPx = Math.max(0, Number.isFinite(bleedPx) ? bleedPx : 0)
+        if (!Number.isFinite(safePositionPx)) return false
+        return safePositionPx >= 0 - safeBleedPx && safePositionPx <= safeAxisLengthPx + safeBleedPx
+    }
+
+    /**
      * Computes a clamped label position for ruler text so edge labels remain visible.
      * @param {number} positionPx
      * @param {number} startPx

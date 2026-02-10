@@ -1000,11 +1000,49 @@ export class ItemsEditor {
             controls.append(radiusCtrl)
         }
         if (item.shapeType === 'polygon') {
-            const sidesCtrl = this.#createSlider(this.translate('itemsEditor.sliderSides'), item.sides || 6, 3, 12, 1, (v) => {
+            const minSides = 3
+            const maxSides = 24
+            item.sides = Math.max(minSides, Math.min(maxSides, Math.round(item.sides || 6)))
+            const sidesCtrl = this.#createSlider(this.translate('itemsEditor.sliderSides'), item.sides, minSides, maxSides, 1, (v) => {
                 item.sides = v
+                if (sidesInput.value !== String(v)) {
+                    sidesInput.value = String(v)
+                }
                 this.#onChange()
             })
+            const sidesLabelRow = sidesCtrl.querySelector('.small')
+            const sidesRangeInput = sidesCtrl.querySelector('input[type="range"]')
+            const sidesField = document.createElement('div')
+            sidesField.className = 'field'
+            const sidesFieldLabel = document.createElement('label')
+            sidesFieldLabel.textContent = this.translate('itemsEditor.sliderSides')
+            const sidesInput = document.createElement('input')
+            sidesInput.type = 'number'
+            sidesInput.min = String(minSides)
+            sidesInput.max = String(maxSides)
+            sidesInput.step = '1'
+            sidesInput.value = String(item.sides)
+            sidesInput.addEventListener('input', (e) => {
+                const rawValue = Number(e.target.value)
+                const fallback = item.sides || 6
+                const clampedValue = Number.isFinite(rawValue)
+                    ? Math.max(minSides, Math.min(maxSides, Math.round(rawValue)))
+                    : fallback
+                if (item.sides !== clampedValue) {
+                    item.sides = clampedValue
+                    this.#onChange()
+                }
+                e.target.value = String(clampedValue)
+                if (sidesRangeInput) {
+                    sidesRangeInput.value = String(clampedValue)
+                }
+                if (sidesLabelRow) {
+                    sidesLabelRow.textContent = `${this.translate('itemsEditor.sliderSides')}: ${clampedValue}`
+                }
+            })
+            sidesField.append(sidesFieldLabel, sidesInput)
             controls.append(sidesCtrl)
+            controls.append(sidesField)
         }
     }
 }

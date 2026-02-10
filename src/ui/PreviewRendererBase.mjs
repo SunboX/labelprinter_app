@@ -35,8 +35,10 @@ export class PreviewRendererBase {
         this.onItemEditorRequest = null
         this._interaction = null
         this._interactionFrame = null
+        this._viewportSyncFrame = null
         this._dotsPerPxX = 1
         this._dotsPerPxY = 1
+        this._rulerContext = null
         this._templateValues = {}
         this._qrRenderCache = new Map()
         this._imageRenderCache = new Map()

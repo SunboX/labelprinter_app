@@ -3,6 +3,45 @@
  */
 export class ShapeDrawUtils {
     /**
+     * Computes the interactive bounds for a rendered shape.
+     * Most shapes fill the provided rect; polygon uses its true drawn path bounds.
+     * @param {object} item
+     * @param {number} x
+     * @param {number} y
+     * @param {number} width
+     * @param {number} height
+     * @returns {{ x: number, y: number, width: number, height: number }}
+     */
+    static computeInteractionBounds(item, x, y, width, height) {
+        const type = item?.shapeType || 'rect'
+        const strokePadding = Math.max(0, (Math.max(1, item?.strokeWidth || 2) || 1) / 2)
+        if (type !== 'polygon') {
+            return { x, y, width, height }
+        }
+        const sides = Math.max(3, Math.min(24, Math.floor(item?.sides || 6)))
+        const points = ShapeDrawUtils.#computePolygonPoints(x, y, width, height, sides)
+        let minX = Infinity
+        let minY = Infinity
+        let maxX = -Infinity
+        let maxY = -Infinity
+        points.forEach((point) => {
+            minX = Math.min(minX, point.x)
+            minY = Math.min(minY, point.y)
+            maxX = Math.max(maxX, point.x)
+            maxY = Math.max(maxY, point.y)
+        })
+        if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+            return { x, y, width, height }
+        }
+        return {
+            x: minX - strokePadding,
+            y: minY - strokePadding,
+            width: Math.max(1, maxX - minX + strokePadding * 2),
+            height: Math.max(1, maxY - minY + strokePadding * 2)
+        }
+    }
+
+    /**
      * Draws a supported shape type onto a 2D canvas context.
      * @param {CanvasRenderingContext2D} ctx
      * @param {object} item
@@ -37,17 +76,12 @@ export class ShapeDrawUtils {
             ctx.ellipse(x + width / 2, y + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2)
             ctx.stroke()
         } else if (type === 'polygon') {
-            const sides = Math.max(3, Math.min(12, Math.floor(item.sides || 6)))
-            const cx = x + width / 2
-            const cy = y + height / 2
-            const radius = Math.min(width, height) / 2
-            for (let index = 0; index < sides; index += 1) {
-                const angle = -Math.PI / 2 + (index * 2 * Math.PI) / sides
-                const px = cx + radius * Math.cos(angle)
-                const py = cy + radius * Math.sin(angle)
-                if (index === 0) ctx.moveTo(px, py)
-                else ctx.lineTo(px, py)
-            }
+            const sides = Math.max(3, Math.min(24, Math.floor(item.sides || 6)))
+            const points = ShapeDrawUtils.#computePolygonPoints(x, y, width, height, sides)
+            points.forEach((point, index) => {
+                if (index === 0) ctx.moveTo(point.x, point.y)
+                else ctx.lineTo(point.x, point.y)
+            })
             ctx.closePath()
             ctx.stroke()
         } else if (type === 'triangle') {
@@ -133,5 +167,29 @@ export class ShapeDrawUtils {
             ctx.stroke()
         }
         ctx.restore()
+    }
+
+    /**
+     * Computes polygon points centered inside the provided rectangle.
+     * @param {number} x
+     * @param {number} y
+     * @param {number} width
+     * @param {number} height
+     * @param {number} sides
+     * @returns {Array<{ x: number, y: number }>}
+     */
+    static #computePolygonPoints(x, y, width, height, sides) {
+        const cx = x + width / 2
+        const cy = y + height / 2
+        const radius = Math.min(width, height) / 2
+        const points = []
+        for (let index = 0; index < sides; index += 1) {
+            const angle = -Math.PI / 2 + (index * 2 * Math.PI) / sides
+            points.push({
+                x: cx + radius * Math.cos(angle),
+                y: cy + radius * Math.sin(angle)
+            })
+        }
+        return points
     }
 }

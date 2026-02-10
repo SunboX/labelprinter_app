@@ -81,8 +81,7 @@ const shapeTypes = [
     { id: 'arrowRight', labelKey: 'shapes.arrowRight' },
     { id: 'arrowLeft', labelKey: 'shapes.arrowLeft' },
     { id: 'plus', labelKey: 'shapes.plus' },
-    { id: 'dot', labelKey: 'shapes.dot' },
-    { id: 'warningTriangle', labelKey: 'shapes.warningTriangle' }
+    { id: 'dot', labelKey: 'shapes.dot' }
 ]
 let idCounter = 1
 
@@ -838,6 +837,15 @@ class AppController {
                 const zoom = Number(e.target.value) / 100
                 this.#setZoom(zoom)
             })
+        }
+        if (this.els.canvasWrap) {
+            this.els.canvasWrap.addEventListener(
+                'scroll',
+                () => {
+                    this.previewRenderer.scheduleViewportSync()
+                },
+                { passive: true }
+            )
         }
         if (this.els.alignReference) {
             this.els.alignReference.addEventListener('change', () => this.#syncAlignControls())
