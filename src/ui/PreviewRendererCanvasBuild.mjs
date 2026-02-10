@@ -5,6 +5,7 @@ import { ImageRasterUtils } from '../ImageRasterUtils.mjs'
 import { QrCodeUtils } from '../QrCodeUtils.mjs'
 import { IconRasterUtils } from '../IconRasterUtils.mjs'
 import { ShapeDrawUtils } from '../ShapeDrawUtils.mjs'
+import { TextSizingUtils } from '../TextSizingUtils.mjs'
 import { Media, Resolution } from 'labelprinterkit-web/src/index.mjs'
 import { PreviewRendererBase } from './PreviewRendererBase.mjs'
 
@@ -31,11 +32,21 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
     async buildCanvasFromState(options = {}) {
         const media = Media[this.state.media] || Media.W24
         const res = Resolution[this.state.resolution] || Resolution.LOW
+        const isHorizontal = this.state.orientation === 'horizontal'
         const printWidth = media.printArea || 128
         const marginStart = media.lmargin || 0
         const marginEnd = media.rmargin || 0
-        const dotScale = (res?.dots?.[1] || 180) / 96 // interpret font sizes as CSS px and scale to printer dots
-        const isHorizontal = this.state.orientation === 'horizontal'
+        const baseDotScale = (res?.dots?.[1] || res?.dots?.[0] || 180) / 96
+        // Keep text sizing anchored to W9 so wider tapes (for example W24) do not inflate text height.
+        const mediaCompensatedDotScale = TextSizingUtils.computeMediaCompensatedDotScale({
+            resolutionDpi: res?.dots?.[1] || res?.dots?.[0] || 180,
+            printAreaDots: printWidth,
+            mediaWidthMm: media?.width || 9,
+            referencePrintAreaDots: Media.W9?.printArea || 64,
+            referenceWidthMm: Media.W9?.width || 9
+        })
+        // Vertical layout draws text along the feed axis, where media-width compensation would shrink text unexpectedly.
+        const dotScale = isHorizontal ? mediaCompensatedDotScale : baseDotScale
         const maxFontDots = Math.max(8, printWidth)
         const parameterValues = this._resolveParameterValues(options.parameterValues)
 
@@ -265,16 +276,18 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     const drawX = (item.xOffset || 0) + x
                     const drawY = Math.max(0, (canvas.height - shapeHeight) / 2 + yAdjust)
                     ShapeDrawUtils.drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
+                    const interactionBounds = ShapeDrawUtils.computeInteractionBounds(
+                        item,
+                        drawX,
+                        drawY,
+                        shapeWidth,
+                        shapeHeight
+                    )
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
                         item,
-                        bounds: {
-                            x: drawX,
-                            y: drawY,
-                            width: shapeWidth,
-                            height: shapeHeight
-                        }
+                        bounds: interactionBounds
                     })
                 }
                 x += span
@@ -397,16 +410,18 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     const drawX = Math.max(0, (canvas.width - shapeWidth) / 2 + (item.xOffset || 0))
                     const drawY = y + Math.max(0, (span - shapeHeight) / 2 + yAdjust)
                     ShapeDrawUtils.drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
+                    const interactionBounds = ShapeDrawUtils.computeInteractionBounds(
+                        item,
+                        drawX,
+                        drawY,
+                        shapeWidth,
+                        shapeHeight
+                    )
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
                         item,
-                        bounds: {
-                            x: drawX,
-                            y: drawY,
-                            width: shapeWidth,
-                            height: shapeHeight
-                        }
+                        bounds: interactionBounds
                     })
                 }
                 y += span
@@ -808,6 +823,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      * @param {number} [offsetPx=0]
      * @param {number} [axisLengthPxOverride=0]
      * @param {number} [highlightLengthMm=0]
+     * @param {number} [viewportShiftPx=0]
      */
     _drawRulerAxis(
         canvas,
@@ -817,7 +833,8 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         showUnitLabel = true,
         offsetPx = 0,
         axisLengthPxOverride = 0,
-        highlightLengthMm = 0
+        highlightLengthMm = 0,
+        viewportShiftPx = 0
     ) {
         if (!canvas || !dpi || !lengthDots) return
         const parent = canvas.parentElement
@@ -849,6 +866,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         const dotsPerMm = dpi / 25.4
         const lengthMm = lengthDots / dotsPerMm
         const axisLengthPx = orientation === 'x' ? cssWidth : cssHeight
+        const safeViewportShiftPx = Number.isFinite(viewportShiftPx) ? viewportShiftPx : 0
         // Keep ruler zoom in sync with the tape even when the tape is wider than the visible viewport.
         const scaleAxisPx = axisLengthPxOverride > 0 ? axisLengthPxOverride : axisLengthPx
         const { pixelsPerMm, startPx } = RulerUtils.computeRulerScale(lengthMm, scaleAxisPx, offsetPx)
@@ -862,17 +880,19 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             const highlightColor = rootStyles.getPropertyValue('--ruler').trim() || '#2a2f3a'
             ctx.fillStyle = highlightColor
             if (orientation === 'x') {
-                ctx.fillRect(highlightStartPx, 0, highlightLengthPx, cssHeight)
+                ctx.fillRect(highlightStartPx - safeViewportShiftPx, 0, highlightLengthPx, cssHeight)
             } else {
-                ctx.fillRect(0, highlightStartPx, cssWidth, highlightLengthPx)
+                ctx.fillRect(0, highlightStartPx - safeViewportShiftPx, cssWidth, highlightLengthPx)
             }
         }
 
         const horizontalLabelInset = 6
         const verticalLabelInset = 6
+        const tickBleedPx = 1
 
         for (let mm = 0; mm <= lengthMm; mm += 1) {
-            const pos = startPx + mm * pixelsPerMm
+            const pos = startPx + mm * pixelsPerMm - safeViewportShiftPx
+            if (!RulerUtils.isAxisPositionVisible(pos, axisLengthPx, tickBleedPx)) continue
             const isMajor = mm % 10 === 0
             const isMid = mm % 5 === 0
             const size = isMajor ? 14 : isMid ? 9 : 6
@@ -889,10 +909,13 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 ctx.fillStyle = '#d7dbe4'
                 ctx.font = '10px Barlow, sans-serif'
                 if (orientation === 'x') {
-                    const labelX = RulerUtils.computeRulerLabelPosition(pos, startPx, axisLengthPx, horizontalLabelInset)
+                    const labelText = `${mm}`
+                    const measuredLabelWidth = ctx.measureText(labelText).width
+                    const labelInset = Math.max(horizontalLabelInset, Math.ceil(measuredLabelWidth / 2 + 2))
+                    const labelX = RulerUtils.computeRulerLabelPosition(pos, startPx, axisLengthPx, labelInset)
                     ctx.textAlign = 'center'
                     ctx.textBaseline = 'alphabetic'
-                    ctx.fillText(`${mm}`, labelX, cssHeight - 6)
+                    ctx.fillText(labelText, labelX, cssHeight - 6)
                 } else {
                     const labelPos = RulerUtils.computeRulerLabelPosition(pos, startPx, axisLengthPx, verticalLabelInset)
                     ctx.save()

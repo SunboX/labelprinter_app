@@ -39,8 +39,10 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         const layer = this._interactionLayer
         if (!layer || !wrapRect) return
         if (!previewRect.width || !previewRect.height) return
-        const offsetLeft = previewRect.left - wrapRect.left
-        const offsetTop = previewRect.top - wrapRect.top
+        const scrollLeft = Number(this.els.canvasWrap?.scrollLeft || 0)
+        const scrollTop = Number(this.els.canvasWrap?.scrollTop || 0)
+        const offsetLeft = previewRect.left - wrapRect.left + scrollLeft
+        const offsetTop = previewRect.top - wrapRect.top + scrollTop
         layer.style.left = `${offsetLeft}px`
         layer.style.top = `${offsetTop}px`
         layer.style.width = `${previewRect.width}px`
