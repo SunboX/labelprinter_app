@@ -9,10 +9,12 @@ const canvasBuildSource = fs.readFileSync(
 )
 
 describe('preview text media scale', () => {
-    it('uses media compensation only in horizontal orientation', () => {
+    it('uses horizontal-only vertical compensation while keeping feed-axis text sizing stable', () => {
         assert.match(canvasBuildSource, /const isHorizontal = this\.state\.orientation === 'horizontal'/)
         assert.match(canvasBuildSource, /const baseDotScale =/)
         assert.match(canvasBuildSource, /const mediaCompensatedDotScale = TextSizingUtils\.computeMediaCompensatedDotScale\(/)
-        assert.match(canvasBuildSource, /const dotScale = isHorizontal \? mediaCompensatedDotScale : baseDotScale/)
+        assert.match(canvasBuildSource, /const textVerticalScale = isHorizontal \? mediaCompensatedDotScale \/ baseDotScale : 1/)
+        assert.match(canvasBuildSource, /const textDotScale = baseDotScale/)
+        assert.match(canvasBuildSource, /ctx\.scale\(1, verticalScale\)/)
     })
 })

@@ -37,7 +37,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         const marginStart = media.lmargin || 0
         const marginEnd = media.rmargin || 0
         const baseDotScale = (res?.dots?.[1] || res?.dots?.[0] || 180) / 96
-        // Keep text sizing anchored to W9 so wider tapes (for example W24) do not inflate text height.
+        // Keep text vertical sizing anchored to W9 so wider tapes (for example W24) do not inflate text height.
         const mediaCompensatedDotScale = TextSizingUtils.computeMediaCompensatedDotScale({
             resolutionDpi: res?.dots?.[1] || res?.dots?.[0] || 180,
             printAreaDots: printWidth,
@@ -45,8 +45,9 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             referencePrintAreaDots: Media.W9?.printArea || 64,
             referenceWidthMm: Media.W9?.width || 9
         })
-        // Vertical layout draws text along the feed axis, where media-width compensation would shrink text unexpectedly.
-        const dotScale = isHorizontal ? mediaCompensatedDotScale : baseDotScale
+        // Keep text width on the feed axis unchanged across media widths while only compensating cross-axis height.
+        const textVerticalScale = isHorizontal ? mediaCompensatedDotScale / baseDotScale : 1
+        const textDotScale = baseDotScale
         const maxFontDots = Math.max(8, printWidth)
         const parameterValues = this._resolveParameterValues(options.parameterValues)
 
@@ -59,7 +60,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             if (item.type === 'text') {
                 const resolvedText = ParameterTemplateUtils.resolveTemplateString(item.text || '', parameterValues)
                 const family = item.fontFamily || 'sans-serif'
-                const requestedSizeDots = Math.round((item.fontSize || 16) * dotScale)
+                const requestedSizeDots = Math.round((item.fontSize || 16) * textDotScale)
                 const {
                     size: fontSizeDots,
                     advanceWidth: textAdvanceWidth,
@@ -69,20 +70,26 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     inkLeft,
                     inkWidth
                 } = this._resolveTextMetrics(resolvedText, family, requestedSizeDots, maxFontDots, measureCtx)
+                const scaledAscent = ascent * textVerticalScale
+                const scaledDescent = descent * textVerticalScale
+                const scaledTextHeight = Math.max(1, scaledAscent + scaledDescent)
                 // Keep base flow dimensions stable while dragging; offsets are visual translation only.
-                const span = isHorizontal ? Math.max(textAdvanceWidth, textHeight) : Math.max(textHeight + 4, textHeight)
+                const span = isHorizontal
+                    ? Math.max(textAdvanceWidth, scaledTextHeight)
+                    : Math.max(scaledTextHeight + 4, scaledTextHeight)
                 blocks.push({
                     ref: item,
                     resolvedText,
                     span,
                     fontSizeDots,
-                    textHeight,
+                    textHeight: scaledTextHeight,
                     textAdvanceWidth,
                     textInkLeft: inkLeft,
                     textInkWidth: inkWidth,
                     family,
-                    ascent,
-                    descent
+                    ascent: scaledAscent,
+                    descent: scaledDescent,
+                    textVerticalScale
                 })
                 continue
             }
@@ -174,6 +181,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 iconWidth,
                 iconHeight,
                 textAdvanceWidth,
+                textVerticalScale,
                 resolvedText,
                 qrCanvas,
                 imageCanvas,
@@ -182,10 +190,11 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 const yAdjust = item.yOffset || 0
                 if (item.type === 'text') {
                     const resolvedSize =
-                        fontSizeDots || Math.min(Math.max(8, Math.round((item.fontSize || 16) * dotScale)), maxFontDots)
+                        fontSizeDots || Math.min(Math.max(8, Math.round((item.fontSize || 16) * textDotScale)), maxFontDots)
                     ctx.font = `${resolvedSize}px ${family || item.fontFamily || 'sans-serif'}`
                     ctx.textBaseline = 'alphabetic'
-                    const a = ascent || resolvedSize
+                    const verticalScale = Number.isFinite(textVerticalScale) ? textVerticalScale : 1
+                    const a = ascent || resolvedSize * verticalScale
                     const d = descent || 0
                     const blockH = a + d
                     const baselineY = (canvas.height - blockH) / 2 + a + yAdjust
@@ -206,7 +215,13 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     const clampedInkLeft = Math.max(0, inkLeft)
                     const clampedInkRight = Math.max(clampedInkLeft, inkRight)
                     const inkWidth = Math.max(1, clampedInkRight - clampedInkLeft)
-                    ctx.fillText(resolvedText || '', drawX, baselineY)
+                    ctx.save()
+                    ctx.translate(drawX, baselineY)
+                    ctx.scale(1, verticalScale)
+                    ctx.fillText(resolvedText || '', 0, 0)
+                    ctx.restore()
+                    const scaledAscent = actualAscent * verticalScale
+                    const scaledDescent = actualDescent * verticalScale
                     const inkOffsetX = drawX + clampedInkLeft
                     layoutItems.push({
                         id: item.id,
@@ -214,9 +229,9 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                         item,
                         bounds: {
                             x: inkOffsetX,
-                            y: baselineY - actualAscent,
+                            y: baselineY - scaledAscent,
                             width: inkWidth || textAdvanceWidth || 1,
-                            height: Math.max(1, actualAscent + actualDescent)
+                            height: Math.max(1, scaledAscent + scaledDescent)
                         }
                     })
                 } else if (item.type === 'qr') {
@@ -308,6 +323,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 iconWidth,
                 iconHeight,
                 textAdvanceWidth,
+                textVerticalScale,
                 resolvedText,
                 qrCanvas,
                 imageCanvas,
@@ -316,10 +332,11 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 const yAdjust = item.yOffset || 0
                 if (item.type === 'text') {
                     const resolvedSize =
-                        fontSizeDots || Math.min(Math.max(8, Math.round((item.fontSize || 16) * dotScale)), maxFontDots)
+                        fontSizeDots || Math.min(Math.max(8, Math.round((item.fontSize || 16) * textDotScale)), maxFontDots)
                     ctx.font = `${resolvedSize}px ${family || item.fontFamily || 'sans-serif'}`
                     ctx.textBaseline = 'alphabetic'
-                    const a = ascent || resolvedSize
+                    const verticalScale = Number.isFinite(textVerticalScale) ? textVerticalScale : 1
+                    const a = ascent || resolvedSize * verticalScale
                     const d = descent || 0
                     const blockH = a + d
                     const baselineY = y + (span - blockH) / 2 + a + yAdjust
@@ -340,7 +357,13 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     const clampedInkLeft = Math.max(0, inkLeft)
                     const clampedInkRight = Math.max(clampedInkLeft, inkRight)
                     const inkWidth = Math.max(1, clampedInkRight - clampedInkLeft)
-                    ctx.fillText(resolvedText || '', drawX, baselineY)
+                    ctx.save()
+                    ctx.translate(drawX, baselineY)
+                    ctx.scale(1, verticalScale)
+                    ctx.fillText(resolvedText || '', 0, 0)
+                    ctx.restore()
+                    const scaledAscent = actualAscent * verticalScale
+                    const scaledDescent = actualDescent * verticalScale
                     const inkOffsetX = drawX + clampedInkLeft
                     layoutItems.push({
                         id: item.id,
@@ -348,9 +371,9 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                         item,
                         bounds: {
                             x: inkOffsetX,
-                            y: baselineY - actualAscent,
+                            y: baselineY - scaledAscent,
                             width: inkWidth || textAdvanceWidth || 1,
-                            height: Math.max(1, actualAscent + actualDescent)
+                            height: Math.max(1, scaledAscent + scaledDescent)
                         }
                     })
                 } else if (item.type === 'qr') {
