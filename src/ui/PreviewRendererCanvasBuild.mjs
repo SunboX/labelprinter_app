@@ -3,6 +3,8 @@ import { RulerUtils } from '../RulerUtils.mjs'
 import { ParameterTemplateUtils } from '../ParameterTemplateUtils.mjs'
 import { ImageRasterUtils } from '../ImageRasterUtils.mjs'
 import { QrCodeUtils } from '../QrCodeUtils.mjs'
+import { IconRasterUtils } from '../IconRasterUtils.mjs'
+import { ShapeDrawUtils } from '../ShapeDrawUtils.mjs'
 import { Media, Resolution } from 'labelprinterkit-web/src/index.mjs'
 import { PreviewRendererBase } from './PreviewRendererBase.mjs'
 
@@ -100,6 +102,27 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 continue
             }
 
+            if (item.type === 'icon') {
+                const rawIconWidth = Math.max(8, Math.round(Number(item.width) || 72))
+                const rawIconHeight = Math.max(8, Math.round(Number(item.height) || 72))
+                const { width: iconWidth, height: iconHeight } = this._constrainImageDimensionsToPrintWidth(
+                    rawIconWidth,
+                    rawIconHeight,
+                    printWidth,
+                    isHorizontal
+                )
+                const iconCanvas = await IconRasterUtils.getCachedIconCanvas({
+                    item,
+                    width: iconWidth,
+                    height: iconHeight,
+                    cache: this._imageRenderCache,
+                    loadSourceImage: this._getSourceImage.bind(this)
+                })
+                const span = isHorizontal ? iconWidth : Math.max(iconHeight + 4, iconHeight)
+                blocks.push({ ref: item, span, iconWidth, iconHeight, iconCanvas })
+                continue
+            }
+
             if (item.type === 'qr') {
                 const resolvedQrData = ParameterTemplateUtils.resolveTemplateString(item.data || '', parameterValues)
                 const qrCanvas = await this._getCachedQrCanvas(resolvedQrData, item.size, item)
@@ -137,10 +160,13 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 shapeHeight,
                 imageWidth,
                 imageHeight,
+                iconWidth,
+                iconHeight,
                 textAdvanceWidth,
                 resolvedText,
                 qrCanvas,
-                imageCanvas
+                imageCanvas,
+                iconCanvas
             } of blocks) {
                 const yAdjust = item.yOffset || 0
                 if (item.type === 'text') {
@@ -216,10 +242,29 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                             height: drawHeight
                         }
                     })
+                } else if (item.type === 'icon') {
+                    const drawWidth = Math.max(1, iconWidth || item.width || 1)
+                    const drawHeight = Math.max(1, iconHeight || item.height || 1)
+                    const drawY = Math.max(0, (canvas.height - drawHeight) / 2 + yAdjust)
+                    const drawX = (item.xOffset || 0) + x
+                    if (iconCanvas) {
+                        ctx.drawImage(iconCanvas, drawX, drawY, drawWidth, drawHeight)
+                    }
+                    layoutItems.push({
+                        id: item.id,
+                        type: item.type,
+                        item,
+                        bounds: {
+                            x: drawX,
+                            y: drawY,
+                            width: drawWidth,
+                            height: drawHeight
+                        }
+                    })
                 } else if (item.type === 'shape') {
                     const drawX = (item.xOffset || 0) + x
                     const drawY = Math.max(0, (canvas.height - shapeHeight) / 2 + yAdjust)
-                    this._drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
+                    ShapeDrawUtils.drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
@@ -247,10 +292,13 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 shapeHeight,
                 imageWidth,
                 imageHeight,
+                iconWidth,
+                iconHeight,
                 textAdvanceWidth,
                 resolvedText,
                 qrCanvas,
-                imageCanvas
+                imageCanvas,
+                iconCanvas
             } of blocks) {
                 const yAdjust = item.yOffset || 0
                 if (item.type === 'text') {
@@ -326,10 +374,29 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                             height: drawHeight
                         }
                     })
+                } else if (item.type === 'icon') {
+                    const drawWidth = Math.max(1, iconWidth || item.width || 1)
+                    const drawHeight = Math.max(1, iconHeight || item.height || 1)
+                    const drawY = y + Math.max(0, (span - drawHeight) / 2 + yAdjust)
+                    const drawX = item.xOffset || 0
+                    if (iconCanvas) {
+                        ctx.drawImage(iconCanvas, drawX, drawY, drawWidth, drawHeight)
+                    }
+                    layoutItems.push({
+                        id: item.id,
+                        type: item.type,
+                        item,
+                        bounds: {
+                            x: drawX,
+                            y: drawY,
+                            width: drawWidth,
+                            height: drawHeight
+                        }
+                    })
                 } else if (item.type === 'shape') {
                     const drawX = Math.max(0, (canvas.width - shapeWidth) / 2 + (item.xOffset || 0))
                     const drawY = y + Math.max(0, (span - shapeHeight) / 2 + yAdjust)
-                    this._drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
+                    ShapeDrawUtils.drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
@@ -410,6 +477,8 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      *  shapeHeight?: number,
      *  imageWidth?: number,
      *  imageHeight?: number,
+     *  iconWidth?: number,
+     *  iconHeight?: number,
      *  qrSize?: number
      * }>} blocks
      * @param {boolean} isHorizontal
@@ -435,6 +504,9 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 } else if (item.type === 'image') {
                     start = cursor + (item.xOffset || 0)
                     size = Math.max(1, block.imageWidth || item.width || 1)
+                } else if (item.type === 'icon') {
+                    start = cursor + (item.xOffset || 0)
+                    size = Math.max(1, block.iconWidth || item.width || 1)
                 } else if (item.type === 'qr') {
                     start = cursor + (item.xOffset || 0)
                     size = Math.max(1, block.qrSize || item.size || 1)
@@ -458,6 +530,10 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     const imageHeight = Math.max(1, block.imageHeight || item.height || 1)
                     start = cursor + Math.max(0, ((block.span || imageHeight) - imageHeight) / 2 + yAdjust)
                     size = imageHeight
+                } else if (item.type === 'icon') {
+                    const iconHeight = Math.max(1, block.iconHeight || item.height || 1)
+                    start = cursor + Math.max(0, ((block.span || iconHeight) - iconHeight) / 2 + yAdjust)
+                    size = iconHeight
                 } else if (item.type === 'qr') {
                     const qrSize = Math.max(1, block.qrSize || item.size || 1)
                     start = cursor + Math.max(0, ((block.span || qrSize) - qrSize) / 2 + yAdjust)
@@ -720,62 +796,6 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             inkRight,
             inkWidth
         }
-    }
-
-    /**
-     * Draws basic shapes (rect, roundRect, oval, polygon, line) onto the canvas.
-     * @param {CanvasRenderingContext2D} ctx
-     * @param {object} item
-     * @param {number} x
-     * @param {number} y
-     * @param {number} width
-     * @param {number} height
-     */
-    _drawShape(ctx, item, x, y, width, height) {
-        const type = item.shapeType || 'rect'
-        const lw = Math.max(1, item.strokeWidth || 2)
-        ctx.save()
-        ctx.lineWidth = lw
-        ctx.strokeStyle = '#000'
-        ctx.beginPath()
-        if (type === 'rect') {
-            ctx.strokeRect(x, y, width, height)
-        } else if (type === 'roundRect') {
-            const r = Math.min(item.cornerRadius || 8, width / 2, height / 2)
-            ctx.beginPath()
-            ctx.moveTo(x + r, y)
-            ctx.lineTo(x + width - r, y)
-            ctx.quadraticCurveTo(x + width, y, x + width, y + r)
-            ctx.lineTo(x + width, y + height - r)
-            ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height)
-            ctx.lineTo(x + r, y + height)
-            ctx.quadraticCurveTo(x, y + height, x, y + height - r)
-            ctx.lineTo(x, y + r)
-            ctx.quadraticCurveTo(x, y, x + r, y)
-            ctx.stroke()
-        } else if (type === 'oval') {
-            ctx.ellipse(x + width / 2, y + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2)
-            ctx.stroke()
-        } else if (type === 'polygon') {
-            const sides = Math.max(3, Math.min(12, Math.floor(item.sides || 6)))
-            const cx = x + width / 2
-            const cy = y + height / 2
-            const radius = Math.min(width, height) / 2
-            for (let i = 0; i < sides; i++) {
-                const a = (-Math.PI / 2) + (i * 2 * Math.PI) / sides
-                const px = cx + radius * Math.cos(a)
-                const py = cy + radius * Math.sin(a)
-                if (i === 0) ctx.moveTo(px, py)
-                else ctx.lineTo(px, py)
-            }
-            ctx.closePath()
-            ctx.stroke()
-        } else if (type === 'line') {
-            ctx.moveTo(x, y + height / 2)
-            ctx.lineTo(x + width, y + height / 2)
-            ctx.stroke()
-        }
-        ctx.restore()
     }
 
     /**

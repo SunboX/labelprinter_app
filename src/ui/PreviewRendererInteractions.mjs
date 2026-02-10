@@ -215,6 +215,12 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
             this._drawOverlay()
             return
         }
+        if (!isAdditive && entry.type === 'icon' && Number(event.detail) >= 2) {
+            event.preventDefault()
+            event.stopImmediatePropagation()
+            this._openIconPickerFromPreview(entry)
+            return
+        }
         if (!isAdditive && entry.type === 'text' && Number(event.detail) >= 2) {
             // Fallback for environments where `dblclick` may be swallowed by drag handling.
             event.preventDefault()
@@ -283,6 +289,12 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
             this._drawOverlay()
             return
         }
+        if (entry.type === 'icon') {
+            event.preventDefault()
+            event.stopImmediatePropagation()
+            this._openIconPickerFromPreview(entry)
+            return
+        }
         if (entry.type !== 'text') return
         event.preventDefault()
         event.stopImmediatePropagation()
@@ -303,6 +315,32 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         this._activeItemId = entry.id
         this._hoverItemId = entry.id
         this._startInlineTextEdit(entry)
+        this._drawOverlay()
+    }
+
+    /**
+     * Selects an icon item and asks the app shell to open its icon picker in the objects panel.
+     * @param {{ id: string, type: string }} entry
+     */
+    _openIconPickerFromPreview(entry) {
+        if (!entry || entry.type !== 'icon') return
+        const nextSelection = new Set([entry.id])
+        let selectionChanged = nextSelection.size !== this._selectedItemIds.size
+        if (!selectionChanged) {
+            for (const id of nextSelection) {
+                if (!this._selectedItemIds.has(id)) {
+                    selectionChanged = true
+                    break
+                }
+            }
+        }
+        if (selectionChanged) {
+            this._selectedItemIds = nextSelection
+            this._emitSelectionChange()
+        }
+        this._activeItemId = entry.id
+        this._hoverItemId = entry.id
+        this._emitItemEditorRequest({ itemId: entry.id, type: entry.type })
         this._drawOverlay()
     }
 
@@ -680,6 +718,25 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
                 item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
             }
         } else if (item.type === 'image') {
+            const widthDots = Math.max(8, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
+            const heightDots = Math.max(8, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
+            const media = Media[this.state.media] || Media.W24
+            const printWidth = Math.max(8, media?.printArea || 128)
+            const constrained = this._constrainImageDimensionsToPrintWidth(
+                widthDots,
+                heightDots,
+                printWidth,
+                this.state.orientation === 'horizontal'
+            )
+            item.width = constrained.width
+            item.height = constrained.height
+            if (deltaLeft) {
+                item.xOffset = Math.round((item.xOffset || 0) + deltaLeft)
+            }
+            if (deltaTop) {
+                item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
+            }
+        } else if (item.type === 'icon') {
             const widthDots = Math.max(8, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
             const heightDots = Math.max(8, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
             const media = Media[this.state.media] || Media.W24

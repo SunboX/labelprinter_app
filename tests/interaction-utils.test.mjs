@@ -96,6 +96,7 @@ describe('isInteractiveItemType', () => {
         assert.equal(InteractionUtils.isInteractiveItemType('shape'), true)
         assert.equal(InteractionUtils.isInteractiveItemType('qr'), true)
         assert.equal(InteractionUtils.isInteractiveItemType('image'), true)
+        assert.equal(InteractionUtils.isInteractiveItemType('icon'), true)
     })
 
     it('returns false for unknown types', () => {

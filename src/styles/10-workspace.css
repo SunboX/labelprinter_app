@@ -337,6 +337,29 @@
 
 .objects-actions > button {
     flex: 1;
+    min-height: 58px;
+    padding: 8px;
+}
+
+.objects-actions > .object-add-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-add-object {
+    width: 24px;
+    height: 24px;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.icon-add-object .fill {
+    fill: currentColor;
+    stroke: none;
 }
 
 .objects-actions .shape-menu {

@@ -18,6 +18,13 @@ describe('preview inline text editing', () => {
         assert.match(source, /input\.type = 'file'/)
     })
 
+    it('supports icon picker opening from preview double-click', async () => {
+        const source = await readFile('src/ui/PreviewRendererInteractions.mjs', 'utf8')
+        assert.match(source, /entry\.type === 'icon'/)
+        assert.match(source, /_openIconPickerFromPreview\(entry\)/)
+        assert.match(source, /_emitItemEditorRequest\(\{ itemId: entry\.id, type: entry\.type \}\)/)
+    })
+
     it('creates a dedicated inline editor and commit/cancel handlers', async () => {
         const source = await readFile('src/ui/PreviewRendererInteractions.mjs', 'utf8')
         assert.match(source, /preview-inline-text-editor/)
@@ -31,11 +38,15 @@ describe('preview inline text editing', () => {
         const source = await readFile('src/ui/PreviewRendererBase.mjs', 'utf8')
         assert.match(source, /set onItemChange\(callback\)/)
         assert.match(source, /_emitItemChange\(\)/)
+        assert.match(source, /set onItemEditorRequest\(callback\)/)
+        assert.match(source, /_emitItemEditorRequest\(request\)/)
     })
 
     it('refreshes objects panel after preview inline edits', async () => {
         const source = await readFile('src/main.mjs', 'utf8')
         assert.match(source, /previewRenderer\.onItemChange = this\.\#handlePreviewItemChange\.bind\(this\)/)
         assert.match(source, /\#handlePreviewItemChange\(\)\s*{[\s\S]*this\.itemsEditor\.render\(\)/)
+        assert.match(source, /previewRenderer\.onItemEditorRequest = this\.\#handlePreviewItemEditorRequest\.bind\(this\)/)
+        assert.match(source, /\#handlePreviewItemEditorRequest\(request\)\s*{[\s\S]*openIconPickerForItem\(request\.itemId\)/)
     })
 })

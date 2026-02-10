@@ -15,6 +15,7 @@ const els = {
     addText: document.querySelector('[data-add-text]'),
     addQr: document.querySelector('[data-add-qr]'),
     addImage: document.querySelector('[data-add-image]'),
+    addIcon: document.querySelector('[data-add-icon]'),
     addShape: document.querySelector('[data-add-shape]'),
     shapeMenu: document.querySelector('[data-shape-menu]'),
     saveProject: document.querySelector('[data-save-project]'),
@@ -74,7 +75,14 @@ const shapeTypes = [
     { id: 'roundRect', labelKey: 'shapes.roundRect' },
     { id: 'oval', labelKey: 'shapes.oval' },
     { id: 'polygon', labelKey: 'shapes.polygon' },
-    { id: 'line', labelKey: 'shapes.line' }
+    { id: 'line', labelKey: 'shapes.line' },
+    { id: 'triangle', labelKey: 'shapes.triangle' },
+    { id: 'diamond', labelKey: 'shapes.diamond' },
+    { id: 'arrowRight', labelKey: 'shapes.arrowRight' },
+    { id: 'arrowLeft', labelKey: 'shapes.arrowLeft' },
+    { id: 'plus', labelKey: 'shapes.plus' },
+    { id: 'dot', labelKey: 'shapes.dot' },
+    { id: 'warningTriangle', labelKey: 'shapes.warningTriangle' }
 ]
 let idCounter = 1
 
@@ -152,8 +160,8 @@ class AppController {
         this.parameterPanel.onChange = this.#handleParameterChange.bind(this)
         this.previewRenderer.onSelectionChange = this.#handleSelectionChange.bind(this)
         this.previewRenderer.onItemChange = this.#handlePreviewItemChange.bind(this)
+        this.previewRenderer.onItemEditorRequest = this.#handlePreviewItemEditorRequest.bind(this)
     }
-
     /**
      * Resolves a translated string.
      * @param {string} key
@@ -163,7 +171,6 @@ class AppController {
     #t(key, params = {}) {
         return this.i18n.t(key, params)
     }
-
     /**
      * Initializes the editor state and binds UI events.
      * @returns {Promise<void>}
@@ -192,7 +199,6 @@ class AppController {
         this.#bindEvents()
         this.previewRenderer.render()
     }
-
     /**
      * Applies locale-dependent static translations to the document.
      */
@@ -202,7 +208,6 @@ class AppController {
             this.els.localeSelect.value = this.i18n.locale
         }
     }
-
     /**
      * Refreshes the preview after state changes.
      */
@@ -212,7 +217,6 @@ class AppController {
         this.#syncPreviewTemplateValues()
         this.previewRenderer.render()
     }
-
     /**
      * Refreshes editor UI after direct preview item edits.
      */
@@ -222,20 +226,26 @@ class AppController {
     }
 
     /**
+     * Opens requested item editor controls originating from preview interactions.
+     * @param {{ itemId: string, type: string }} request
+     */
+    #handlePreviewItemEditorRequest(request) {
+        if (!request || request.type !== 'icon') return
+        this.itemsEditor.openIconPickerForItem(request.itemId)
+    }
+    /**
      * Handles parameter definition/data changes.
      */
     #handleParameterChange() {
         this.#syncPreviewTemplateValues()
         this.previewRenderer.render()
     }
-
     /**
      * Syncs preview template values from parameter state.
      */
     #syncPreviewTemplateValues() {
         this.previewRenderer.setTemplateValues(this.parameterPanel.getPreviewParameterValues())
     }
-
     /**
      * Handles selection updates from the preview overlay.
      * @param {string[]} selectedIds
@@ -244,7 +254,6 @@ class AppController {
         this.itemsEditor.setSelectedItemIds(selectedIds)
         this.#syncAlignControls()
     }
-
     /**
      * Enables or disables alignment controls based on selection and reference mode.
      */
@@ -266,7 +275,6 @@ class AppController {
             button.disabled = !canAlign
         })
     }
-
     /**
      * Aligns selected items according to the requested mode.
      * @param {'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'} mode
@@ -296,7 +304,6 @@ class AppController {
             'success'
         )
     }
-
     /**
      * Updates the zoom state and refreshes preview controls.
      * @param {number} value
@@ -306,7 +313,6 @@ class AppController {
         this.#syncZoomControls()
         this.previewRenderer.render()
     }
-
     /**
      * Syncs zoom controls with the current zoom value.
      */
@@ -323,7 +329,6 @@ class AppController {
         }
         this.#persistZoomPreference()
     }
-
     /**
      * Restores a persisted zoom value when the current display fingerprint matches.
      */
@@ -332,7 +337,6 @@ class AppController {
         if (persistedZoom === null) return
         this.state.zoom = ZoomUtils.clampZoom(persistedZoom)
     }
-
     /**
      * Reads a persisted zoom value from localStorage with display matching.
      * @returns {number | null}
@@ -346,7 +350,6 @@ class AppController {
             return null
         }
     }
-
     /**
      * Persists the current zoom value together with a display fingerprint.
      */
@@ -359,7 +362,6 @@ class AppController {
             // Ignore storage write failures in private mode or restricted contexts.
         }
     }
-
     /**
      * Restores persisted Google font links from localStorage.
      */
@@ -370,7 +372,6 @@ class AppController {
             this.state.customFontLinks.concat(persistedLinks)
         )
     }
-
     /**
      * Reads persisted Google font links from localStorage.
      * @returns {string[]}
@@ -384,7 +385,6 @@ class AppController {
             return []
         }
     }
-
     /**
      * Persists the current Google font links to localStorage.
      */
@@ -398,7 +398,6 @@ class AppController {
             // Ignore storage write failures in private mode or restricted contexts.
         }
     }
-
     /**
      * Builds a suggested file name for project exports.
      * @returns {string}
@@ -407,7 +406,6 @@ class AppController {
         const stamp = new Date().toISOString().slice(0, 10)
         return `label-project-${stamp}.json`
     }
-
     /**
      * Triggers a download for browsers without a save file picker.
      * @param {string} contents
@@ -424,7 +422,6 @@ class AppController {
         link.remove()
         window.setTimeout(() => URL.revokeObjectURL(url), 0)
     }
-
     /**
      * Prompts the user for a local JSON file.
      * @returns {Promise<File | null>}
@@ -471,7 +468,6 @@ class AppController {
             input.click()
         })
     }
-
     /**
      * Applies a raw project object to the editor state.
      * @param {object} rawState
@@ -494,7 +490,6 @@ class AppController {
         }
         this.setStatus(this.#t('messages.loaded', { sourceLabel }), 'success')
     }
-
     /**
      * Loads a project from URL query parameters when present.
      * Supported parameters:
@@ -530,7 +525,6 @@ class AppController {
             return false
         }
     }
-
     /**
      * Builds a shareable URL containing the current project payload.
      * @returns {string}
@@ -543,7 +537,6 @@ class AppController {
         shareUrl.searchParams.delete(ProjectUrlUtils.PROJECT_URL_PARAM)
         return shareUrl.toString()
     }
-
     /**
      * Shares or copies the current project URL.
      * @returns {Promise<void>}
@@ -576,7 +569,6 @@ class AppController {
             this.setStatus(this.#t('messages.shareFailed', { message }), 'error')
         }
     }
-
     /**
      * Saves the current project state as a JSON file.
      * @returns {Promise<void>}
@@ -623,7 +615,6 @@ class AppController {
             this.setStatus(this.#t('messages.saveFailed', { message }), 'error')
         }
     }
-
     /**
      * Loads a project JSON file and updates the editor state.
      * @returns {Promise<void>}
@@ -648,7 +639,6 @@ class AppController {
             this.setStatus(this.#t('messages.loadFailed', { message }), 'error')
         }
     }
-
     /**
      * Ensures a select control points to a valid option value.
      * @param {HTMLSelectElement} select
@@ -663,7 +653,6 @@ class AppController {
         select.value = nextValue
         return nextValue
     }
-
     /**
      * Applies a normalized state to the live state object.
      * @param {object} nextState
@@ -697,7 +686,6 @@ class AppController {
             typeof nextState.parameterDataSourceName === 'string' ? nextState.parameterDataSourceName : ''
         this.state.items.splice(0, this.state.items.length, ...nextState.items)
     }
-
     /**
      * Syncs form controls with the current state values.
      */
@@ -717,7 +705,6 @@ class AppController {
         this.#syncZoomControls()
         this.#syncAlignControls()
     }
-
     /**
      * Populates select elements with media and resolution options.
      */
@@ -755,7 +742,6 @@ class AppController {
         }
         this.els.orientation.value = this.state.orientation
     }
-
     /**
      * Shows or hides BLE-specific fields based on backend selection.
      */
@@ -763,7 +749,6 @@ class AppController {
         const isBle = this.els.mode.value === 'ble'
         this.els.bleFields.hidden = !isBle
     }
-
     /**
      * Restores BLE inputs from stored state.
      */
@@ -773,7 +758,6 @@ class AppController {
         this.els.bleNotify.value = this.state.ble.notifyCharacteristicUuid
         this.els.bleFilter.value = this.state.ble.namePrefix
     }
-
     /**
      * Sets the shape menu visibility and syncs the trigger state for accessibility.
      * @param {boolean} isOpen
@@ -783,7 +767,6 @@ class AppController {
         this.els.shapeMenu.hidden = !isOpen
         this.els.addShape.setAttribute('aria-expanded', isOpen ? 'true' : 'false')
     }
-
     /**
      * Sets the alignment dropdown visibility.
      * @param {boolean} isOpen
@@ -793,7 +776,6 @@ class AppController {
         this.els.alignMenu.open = isOpen
         this.els.alignMenuTrigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false')
     }
-
     /**
      * Applies a new locale and refreshes localized UI/state renderers.
      * @param {string} nextLocale
@@ -807,7 +789,6 @@ class AppController {
         this.parameterPanel.syncFromState()
         this.previewRenderer.render()
     }
-
     /**
      * Handles print with parameter validation and batch confirmation.
      * @returns {Promise<void>}
@@ -827,7 +808,6 @@ class AppController {
         }
         await this.printController.print(parameterValueMaps)
     }
-
     /**
      * Binds UI event handlers for the editor.
      */
@@ -907,6 +887,7 @@ class AppController {
         this.els.addText.addEventListener('click', () => this.itemsEditor.addTextItem())
         this.els.addQr.addEventListener('click', () => this.itemsEditor.addQrItem())
         if (this.els.addImage) this.els.addImage.addEventListener('click', () => this.itemsEditor.addImageItem())
+        if (this.els.addIcon) this.els.addIcon.addEventListener('click', () => this.itemsEditor.addIconItem())
         if (this.els.shapeMenu && this.els.addShape) {
             if (!this.els.shapeMenu.id) {
                 this.els.shapeMenu.id = 'shape-menu'
