@@ -395,7 +395,7 @@ export class PreviewRendererRender extends PreviewRendererCanvasBuild {
             handlesItem = activeItem || hoverItem
         }
         if (handlesItem) {
-            this._drawSelectionHandles(ctx, handlesItem.boundsCss, overlayPadding)
+            this._drawSelectionHandles(ctx, handlesItem, overlayPadding)
         }
         ctx.restore()
     }
@@ -423,10 +423,12 @@ export class PreviewRendererRender extends PreviewRendererCanvasBuild {
     /**
      * Draws resize handles for a selected item.
      * @param {CanvasRenderingContext2D} ctx
-     * @param {{ x: number, y: number, width: number, height: number }} boundsCss
+     * @param {{ item: object, boundsCss: { x: number, y: number, width: number, height: number } }} entry
      * @param {number} overlayPadding
      */
-    _drawSelectionHandles(ctx, boundsCss, overlayPadding) {
+    _drawSelectionHandles(ctx, entry, overlayPadding) {
+        const boundsCss = entry?.boundsCss
+        if (!boundsCss) return
         const { x, y, width, height } = boundsCss
         if (width <= 0 || height <= 0) return
         const handleRadius = this._handleRadius || 3
@@ -434,7 +436,8 @@ export class PreviewRendererRender extends PreviewRendererCanvasBuild {
         const handleStroke = '#e7efff'
         const drawX = x + overlayPadding
         const drawY = y + overlayPadding
-        const handles = InteractionUtils.computeHandlePositions({ x: drawX, y: drawY, width, height })
+        const allowedHandles = InteractionUtils.getAllowedResizeHandleNames(entry.item)
+        const handles = InteractionUtils.computeHandlePositions({ x: drawX, y: drawY, width, height }, allowedHandles)
         handles.forEach((handle) => {
             ctx.beginPath()
             ctx.arc(handle.x, handle.y, handleRadius, 0, Math.PI * 2)

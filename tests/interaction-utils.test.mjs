@@ -18,6 +18,38 @@ describe('computeHandlePositions', () => {
         assert.deepEqual(map.sw, { name: 'sw', x: 10, y: 70 })
         assert.deepEqual(map.w, { name: 'w', x: 10, y: 45 })
     })
+
+    it('supports restricting handles for line-like resize controls', () => {
+        const bounds = { x: 10, y: 20, width: 100, height: 50 }
+        const handles = InteractionUtils.computeHandlePositions(bounds, ['w', 'e'])
+        const map = Object.fromEntries(handles.map((handle) => [handle.name, handle]))
+
+        assert.deepEqual(
+            handles.map((handle) => handle.name),
+            ['e', 'w']
+        )
+        assert.deepEqual(map.w, { name: 'w', x: 10, y: 45 })
+        assert.deepEqual(map.e, { name: 'e', x: 110, y: 45 })
+    })
+})
+
+describe('getAllowedResizeHandleNames', () => {
+    it('returns horizontal endpoint handles for line shapes', () => {
+        assert.deepEqual(InteractionUtils.getAllowedResizeHandleNames({ type: 'shape', shapeType: 'line' }), ['w', 'e'])
+    })
+
+    it('returns full handle set for non-line items', () => {
+        assert.deepEqual(InteractionUtils.getAllowedResizeHandleNames({ type: 'shape', shapeType: 'rect' }), [
+            'nw',
+            'n',
+            'ne',
+            'e',
+            'se',
+            's',
+            'sw',
+            'w'
+        ])
+    })
 })
 
 describe('getHandleAtPoint', () => {
@@ -37,6 +69,13 @@ describe('getHandleAtPoint', () => {
         const bounds = { x: 10, y: 20, width: 100, height: 50 }
         const handle = InteractionUtils.getHandleAtPoint({ x: 2, y: 8 }, bounds, 6)
         assert.equal(handle, null)
+    })
+
+    it('keeps center dragging active when handle set is restricted', () => {
+        const bounds = { x: 10, y: 20, width: 100, height: 50 }
+        assert.equal(InteractionUtils.getHandleAtPoint({ x: 60, y: 45 }, bounds, 6, ['w', 'e']), 'move')
+        assert.equal(InteractionUtils.getHandleAtPoint({ x: 10, y: 45 }, bounds, 6, ['w', 'e']), 'w')
+        assert.equal(InteractionUtils.getHandleAtPoint({ x: 110, y: 45 }, bounds, 6, ['w', 'e']), 'e')
     })
 })
 
