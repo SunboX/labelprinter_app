@@ -4,6 +4,7 @@
 - Unit: `tests/shape-menu-utils.test.mjs` validates the outside-click detection helper.
 - Unit: `tests/hidden-attribute.test.mjs` verifies the `[hidden]` CSS rule hides overlays like the shape menu.
 - Unit: `tests/shape-menu-icons.test.mjs` ensures SVG icons and labels are used in the shape menu.
+- Unit: `tests/mjs-line-limit.test.mjs` enforces the project rule that each source `.mjs` module stays below 1000 lines.
 - Manual: run `npm start`, open `http://localhost:3000/`, click Form to open the menu, then click outside or press Escape to close.
 - Expected: clicking a menu item adds the shape and closes the menu.
 
@@ -17,8 +18,11 @@
 
 ## Preview interactions
 - Unit: `tests/interaction-utils.test.mjs` checks handle positions, hit testing, cursor mapping, handle-edge mapping, interactive item type support, and drag clamping for the preview overlay.
+- Unit: `tests/preview-inline-text-edit.test.mjs` validates source wiring for double-click inline text editing in the preview layer.
 - Manual: click an item to select it, then hold `Ctrl` (Windows/Linux) or `Cmd` (macOS) and click additional items.
 - Expected: multiple items stay selected, alignment controls become active, resize dots are hidden while more than one item is selected, plain click on one selected item keeps the multi-selection, and dragging one selected item moves the full selection together.
+- Manual: double-click a text item on the label preview.
+- Expected: an inline text input opens directly on the label, `Enter` commits, and `Escape` cancels.
 
 ## Collapsible item cards
 - Unit: `tests/items-editor-collapsible.test.mjs` verifies the items editor exposes collapse toggles and collapsed-body CSS.

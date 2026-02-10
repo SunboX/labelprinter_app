@@ -85,7 +85,6 @@ let idCounter = 1
 function nextId() {
     return `item-${idCounter++}`
 }
-
 const defaultState = {
     media: 'W9',
     mediaLengthMm: null,
@@ -122,12 +121,10 @@ function setStatus(text, type = 'info') {
     els.status.textContent = text
     els.status.dataset.type = type
 }
-
 /**
  * No-op placeholder for optional callbacks.
  */
 function noop() {}
-
 /**
  * Coordinates UI bindings and the editor lifecycle.
  */
@@ -154,6 +151,7 @@ class AppController {
         this.itemsEditor.onChange = this.#handleStateChange.bind(this)
         this.parameterPanel.onChange = this.#handleParameterChange.bind(this)
         this.previewRenderer.onSelectionChange = this.#handleSelectionChange.bind(this)
+        this.previewRenderer.onItemChange = this.#handlePreviewItemChange.bind(this)
     }
 
     /**
@@ -213,6 +211,14 @@ class AppController {
         this.parameterPanel.handleItemTemplatesChanged()
         this.#syncPreviewTemplateValues()
         this.previewRenderer.render()
+    }
+
+    /**
+     * Refreshes editor UI after direct preview item edits.
+     */
+    #handlePreviewItemChange() {
+        this.#handleStateChange()
+        this.itemsEditor.render()
     }
 
     /**

@@ -143,6 +143,24 @@
     overflow: auto;
 }
 
+.preview-inline-text-editor {
+    position: absolute;
+    z-index: 4;
+    margin: 0;
+    padding: 1px 4px;
+    border: 1px solid rgba(74, 155, 255, 0.95);
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.96);
+    color: #0f1116;
+    outline: none;
+    box-shadow: 0 0 0 1px rgba(143, 184, 255, 0.35);
+}
+
+.preview-inline-text-editor:focus {
+    border-color: #8fb8ff;
+    box-shadow: 0 0 0 1px rgba(143, 184, 255, 0.55), 0 0 0 4px rgba(74, 155, 255, 0.2);
+}
+
 .label-plate {
     width: 100%;
     max-width: none;
