@@ -14,6 +14,7 @@
 ## Layout preview sizing
 - Unit: `tests/preview-layout-utils.test.mjs` checks preview dimensions, scaling limits, label tag offsets, tape width mapping, margin marker geometry, and auto length expansion/shrink rules.
 - Unit: `tests/preview-text-media-scale.test.mjs` verifies text media-width compensation is applied only for horizontal layout so text does not shrink when switching tape width in vertical layout.
+- Unit: `tests/preview-text-visual-regression.test.mjs` renders text for `W9` and `W24` using a canvas snapshot pipeline and compares normalized monochrome bitmaps to guard against media-width text regressions.
 - Manual: run `npm start`, open `http://localhost:3000/`, add one text item, then switch media width between `W9` and `W24` in horizontal and vertical orientation.
 - Expected: text keeps the same visual glyph proportions (width and height) when changing media width.
 
