@@ -1,4 +1,5 @@
 import { ParameterTemplateUtils } from '../ParameterTemplateUtils.mjs'
+import { ParameterDataFileUtils } from '../ParameterDataFileUtils.mjs'
 
 /**
  * Manages parameter definitions, uploaded parameter data, validation, and preview rendering.
@@ -66,8 +67,17 @@ export class ParameterPanel {
      */
     init() {
         this.#ensureStateShape()
+        this.#syncFileInputAccept()
         this.#bindEvents()
         this.syncFromState()
+    }
+
+    /**
+     * Syncs the hidden file input accept attribute with supported formats.
+     */
+    #syncFileInputAccept() {
+        if (!this.els.parameterDataInput) return
+        this.els.parameterDataInput.setAttribute('accept', ParameterDataFileUtils.FILE_INPUT_ACCEPT_VALUE)
     }
 
     /**
@@ -200,18 +210,18 @@ export class ParameterPanel {
     }
 
     /**
-     * Loads parameter row data from a local JSON file.
+     * Loads parameter row data from a local parameter data file.
      * @returns {Promise<void>}
      */
     async #loadParameterDataFromFile() {
         try {
-            const file = await this.#promptForJsonFile()
+            const file = await this.#promptForParameterDataFile()
             if (!file) {
                 this.setStatus(this.translate('parameterStatus.loadCanceled'), 'info')
                 return
             }
-            const rawText = await file.text()
-            this.applyParameterDataRawText(rawText, file.name)
+            const { jsonText } = await ParameterDataFileUtils.convertFileToParameterJsonText(file)
+            this.applyParameterDataRawText(jsonText, file.name)
         } catch (err) {
             if (err?.name === 'AbortError') {
                 this.setStatus(this.translate('parameterStatus.loadCanceled'), 'info')
@@ -270,19 +280,14 @@ export class ParameterPanel {
     }
 
     /**
-     * Prompts for a single JSON file.
+     * Prompts for a single parameter data file.
      * @returns {Promise<File | null>}
      */
-    async #promptForJsonFile() {
+    async #promptForParameterDataFile() {
         if (window.showOpenFilePicker) {
             const [handle] = await window.showOpenFilePicker({
                 multiple: false,
-                types: [
-                    {
-                        description: this.translate('parameterStatus.pickerDescription'),
-                        accept: { 'application/json': ['.json'] }
-                    }
-                ]
+                types: ParameterDataFileUtils.buildPickerTypes(this.translate('parameterStatus.pickerDescription'))
             })
             return handle ? handle.getFile() : null
         }

@@ -2,12 +2,12 @@ import { PreviewLayoutUtils } from '../PreviewLayoutUtils.mjs'
 import { RulerUtils } from '../RulerUtils.mjs'
 import { ParameterTemplateUtils } from '../ParameterTemplateUtils.mjs'
 import { ImageRasterUtils } from '../ImageRasterUtils.mjs'
-import { QrCodeUtils } from '../QrCodeUtils.mjs'
 import { IconRasterUtils } from '../IconRasterUtils.mjs'
 import { ShapeDrawUtils } from '../ShapeDrawUtils.mjs'
 import { TextSizingUtils } from '../TextSizingUtils.mjs'
 import { RotationUtils } from '../RotationUtils.mjs'
 import { Media, Resolution } from 'labelprinterkit-web/src/index.mjs'
+import { PreviewRendererCanvasSupport } from './PreviewRendererCanvasSupport.mjs'
 import { PreviewRendererBase } from './PreviewRendererBase.mjs'
 
 /**
@@ -70,7 +70,13 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     descent,
                     inkLeft,
                     inkWidth
-                } = this._resolveTextMetrics(resolvedText, family, requestedSizeDots, maxFontDots, measureCtx)
+                } = PreviewRendererCanvasSupport.resolveTextMetrics({
+                    ctx: measureCtx,
+                    text: resolvedText,
+                    family,
+                    requestedSize: requestedSizeDots,
+                    maxHeight: maxFontDots
+                })
                 const scaledAscent = ascent * textVerticalScale
                 const scaledDescent = descent * textVerticalScale
                 const scaledTextHeight = Math.max(1, scaledAscent + scaledDescent)
@@ -142,9 +148,31 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 continue
             }
 
+            if (item.type === 'barcode') {
+                const resolvedBarcodeData = ParameterTemplateUtils.resolveTemplateString(item.data || '', parameterValues)
+                const rawBarcodeWidth = Math.max(16, Math.round(Number(item.width) || 220))
+                const rawBarcodeHeight = Math.max(16, Math.round(Number(item.height) || 64))
+                const { width: barcodeWidth, height: barcodeHeight } = this._constrainImageDimensionsToPrintWidth(
+                    rawBarcodeWidth,
+                    rawBarcodeHeight,
+                    printWidth,
+                    isHorizontal
+                )
+                const barcodeCanvas = PreviewRendererCanvasSupport.getCachedBarcodeCanvas(
+                    this,
+                    resolvedBarcodeData,
+                    barcodeWidth,
+                    barcodeHeight,
+                    item
+                )
+                const span = isHorizontal ? barcodeWidth : Math.max(barcodeHeight + 4, barcodeHeight)
+                blocks.push({ ref: item, span, barcodeWidth, barcodeHeight, barcodeCanvas })
+                continue
+            }
+
             if (item.type === 'qr') {
                 const resolvedQrData = ParameterTemplateUtils.resolveTemplateString(item.data || '', parameterValues)
-                const qrCanvas = await this._getCachedQrCanvas(resolvedQrData, item.size, item)
+                const qrCanvas = await PreviewRendererCanvasSupport.getCachedQrCanvas(this, resolvedQrData, item.size, item)
                 const span = Math.max(item.height, item.size)
                 blocks.push({ ref: item, span, qrSize: item.size, qrCanvas })
             }
@@ -181,12 +209,15 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 imageHeight,
                 iconWidth,
                 iconHeight,
+                barcodeWidth,
+                barcodeHeight,
                 textAdvanceWidth,
                 textVerticalScale,
                 resolvedText,
                 qrCanvas,
                 imageCanvas,
-                iconCanvas
+                iconCanvas,
+                barcodeCanvas
             } of blocks) {
                 const yAdjust = item.yOffset || 0
                 if (item.type === 'text') {
@@ -250,6 +281,23 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                         type: item.type,
                         item,
                         bounds: RotationUtils.computeRotatedBounds(qrBounds, item.rotation)
+                    })
+                } else if (item.type === 'barcode') {
+                    const drawWidth = Math.max(16, barcodeWidth || item.width || 16)
+                    const drawHeight = Math.max(16, barcodeHeight || item.height || 16)
+                    const drawY = Math.max(0, (canvas.height - drawHeight) / 2 + yAdjust)
+                    const drawX = (item.xOffset || 0) + x
+                    const barcodeBounds = { x: drawX, y: drawY, width: drawWidth, height: drawHeight }
+                    if (barcodeCanvas) {
+                        RotationUtils.drawWithRotation(ctx, barcodeBounds, item.rotation, () => {
+                            ctx.drawImage(barcodeCanvas, drawX, drawY, drawWidth, drawHeight)
+                        })
+                    }
+                    layoutItems.push({
+                        id: item.id,
+                        type: item.type,
+                        item,
+                        bounds: RotationUtils.computeRotatedBounds(barcodeBounds, item.rotation)
                     })
                 } else if (item.type === 'image') {
                     const drawWidth = Math.max(1, imageWidth || item.width || 1)
@@ -323,12 +371,15 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 imageHeight,
                 iconWidth,
                 iconHeight,
+                barcodeWidth,
+                barcodeHeight,
                 textAdvanceWidth,
                 textVerticalScale,
                 resolvedText,
                 qrCanvas,
                 imageCanvas,
-                iconCanvas
+                iconCanvas,
+                barcodeCanvas
             } of blocks) {
                 const yAdjust = item.yOffset || 0
                 if (item.type === 'text') {
@@ -392,6 +443,23 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                         type: item.type,
                         item,
                         bounds: RotationUtils.computeRotatedBounds(qrBounds, item.rotation)
+                    })
+                } else if (item.type === 'barcode') {
+                    const drawWidth = Math.max(16, barcodeWidth || item.width || 16)
+                    const drawHeight = Math.max(16, barcodeHeight || item.height || 16)
+                    const drawY = y + Math.max(0, (span - drawHeight) / 2 + yAdjust)
+                    const drawX = item.xOffset || 0
+                    const barcodeBounds = { x: drawX, y: drawY, width: drawWidth, height: drawHeight }
+                    if (barcodeCanvas) {
+                        RotationUtils.drawWithRotation(ctx, barcodeBounds, item.rotation, () => {
+                            ctx.drawImage(barcodeCanvas, drawX, drawY, drawWidth, drawHeight)
+                        })
+                    }
+                    layoutItems.push({
+                        id: item.id,
+                        type: item.type,
+                        item,
+                        bounds: RotationUtils.computeRotatedBounds(barcodeBounds, item.rotation)
                     })
                 } else if (item.type === 'image') {
                     const drawWidth = Math.max(1, imageWidth || item.width || 1)
@@ -518,6 +586,8 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      *  imageHeight?: number,
      *  iconWidth?: number,
      *  iconHeight?: number,
+     *  barcodeWidth?: number,
+     *  barcodeHeight?: number,
      *  qrSize?: number
      * }>} blocks
      * @param {boolean} isHorizontal
@@ -532,7 +602,10 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             if (isHorizontal) {
                 let start = cursor
                 let size = Math.max(1, block.span || 1)
-                let crossSize = Math.max(1, block.shapeHeight || block.imageHeight || block.iconHeight || block.qrSize || 1)
+                let crossSize = Math.max(
+                    1,
+                    block.shapeHeight || block.imageHeight || block.iconHeight || block.barcodeHeight || block.qrSize || 1
+                )
                 if (item.type === 'text') {
                     const inkLeft = Math.max(0, block.textInkLeft || 0)
                     const inkWidth = Math.max(1, block.textInkWidth || block.textAdvanceWidth || 1)
@@ -552,6 +625,10 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     start = cursor + (item.xOffset || 0)
                     size = Math.max(1, block.iconWidth || item.width || 1)
                     crossSize = Math.max(1, block.iconHeight || item.height || 1)
+                } else if (item.type === 'barcode') {
+                    start = cursor + (item.xOffset || 0)
+                    size = Math.max(1, block.barcodeWidth || item.width || 1)
+                    crossSize = Math.max(1, block.barcodeHeight || item.height || 1)
                 } else if (item.type === 'qr') {
                     start = cursor + (item.xOffset || 0)
                     size = Math.max(1, block.qrSize || item.size || 1)
@@ -565,7 +642,10 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             } else {
                 let start = cursor
                 let size = Math.max(1, block.span || 1)
-                let crossSize = Math.max(1, block.shapeWidth || block.imageWidth || block.iconWidth || block.qrSize || 1)
+                let crossSize = Math.max(
+                    1,
+                    block.shapeWidth || block.imageWidth || block.iconWidth || block.barcodeWidth || block.qrSize || 1
+                )
                 const yAdjust = item.yOffset || 0
                 if (item.type === 'text') {
                     const ascent = block.ascent || block.fontSizeDots || 0
@@ -590,6 +670,11 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     start = cursor + Math.max(0, ((block.span || iconHeight) - iconHeight) / 2 + yAdjust)
                     size = iconHeight
                     crossSize = Math.max(1, block.iconWidth || item.width || 1)
+                } else if (item.type === 'barcode') {
+                    const barcodeHeight = Math.max(1, block.barcodeHeight || item.height || 1)
+                    start = cursor + Math.max(0, ((block.span || barcodeHeight) - barcodeHeight) / 2 + yAdjust)
+                    size = barcodeHeight
+                    crossSize = Math.max(1, block.barcodeWidth || item.width || 1)
                 } else if (item.type === 'qr') {
                     const qrSize = Math.max(1, block.qrSize || item.size || 1)
                     start = cursor + Math.max(0, ((block.span || qrSize) - qrSize) / 2 + yAdjust)
@@ -605,59 +690,6 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             cursor += Math.max(0, block.span || 0)
         })
         return maxEnd
-    }
-
-    /**
-     * Returns a cached QR canvas or generates a new one.
-     * @param {string} data
-     * @param {number} size
-     * @param {object} item
-     * @returns {Promise<HTMLCanvasElement>}
-     */
-    async _getCachedQrCanvas(data, size, item = {}) {
-        const safeSize = Math.max(1, Math.round(Number(size) || 1))
-        const normalizedOptions = QrCodeUtils.normalizeItemOptions(item)
-        const cacheKey = `${safeSize}::${normalizedOptions.qrErrorCorrectionLevel}::${normalizedOptions.qrVersion}::${normalizedOptions.qrEncodingMode}::${String(data || '')}`
-        if (this._qrRenderCache.has(cacheKey)) {
-            const cached = this._qrRenderCache.get(cacheKey)
-            this._qrRenderCache.delete(cacheKey)
-            this._qrRenderCache.set(cacheKey, cached)
-            return cached
-        }
-        const builtCanvas = await this._buildQrCanvas(data, safeSize, normalizedOptions)
-        this._qrRenderCache.set(cacheKey, builtCanvas)
-        const maxEntries = 96
-        if (this._qrRenderCache.size > maxEntries) {
-            const oldestKey = this._qrRenderCache.keys().next().value
-            if (oldestKey) {
-                this._qrRenderCache.delete(oldestKey)
-            }
-        }
-        return builtCanvas
-    }
-
-    /**
-     * Builds a QR code canvas for preview rendering.
-     * @param {string} data
-     * @param {number} size
-     * @param {object} options
-     * @returns {Promise<HTMLCanvasElement>}
-     */
-    async _buildQrCanvas(data, size, options = {}) {
-        const canvas = document.createElement('canvas')
-        const qrCode = this._requireQrCode()
-        const normalizedOptions = QrCodeUtils.normalizeItemOptions(options)
-        const payload = QrCodeUtils.buildQrPayload(data || '', normalizedOptions.qrEncodingMode)
-        const qrOptions = {
-            errorCorrectionLevel: normalizedOptions.qrErrorCorrectionLevel,
-            margin: 0,
-            width: size
-        }
-        if (normalizedOptions.qrVersion > 0) {
-            qrOptions.version = normalizedOptions.qrVersion
-        }
-        await qrCode.toCanvas(canvas, payload, qrOptions)
-        return canvas
     }
 
     /**
@@ -784,79 +816,6 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         imageData.data.set(monochromePixels)
         ctx.putImageData(imageData, 0, 0)
         return canvas
-    }
-
-    /**
-     * Measures text metrics using the provided canvas context.
-     * @param {CanvasRenderingContext2D} ctx
-     * @param {string} text
-     * @param {number} size
-     * @param {string} family
-     * @returns {{
-     *  advanceWidth: number,
-     *  height: number,
-     *  ascent: number,
-     *  descent: number,
-     *  inkLeft: number,
-     *  inkRight: number,
-     *  inkWidth: number
-     * }}
-     */
-    _measureText(ctx, text, size, family) {
-        ctx.font = `${size}px ${family}`
-        const metrics = ctx.measureText(text || '')
-        const ascent = metrics.actualBoundingBoxAscent || size
-        const descent = metrics.actualBoundingBoxDescent || 0
-        const inkLeft = Number.isFinite(metrics.actualBoundingBoxLeft) ? metrics.actualBoundingBoxLeft : 0
-        const inkRight = Number.isFinite(metrics.actualBoundingBoxRight) ? metrics.actualBoundingBoxRight : metrics.width
-        const inkWidth = Math.max(0, inkRight - inkLeft)
-        const advanceWidth = Math.ceil(metrics.width)
-        const height = Math.ceil(ascent + descent)
-        return { advanceWidth, height, ascent, descent, inkLeft, inkRight, inkWidth }
-    }
-
-    /**
-     * Resolves text metrics while ensuring it fits within the available height.
-     * @param {string} text
-     * @param {string} family
-     * @param {number} requestedSize
-     * @param {number} maxHeight
-     * @param {CanvasRenderingContext2D} ctx
-     * @returns {{
-     *  size: number,
-     *  advanceWidth: number,
-     *  height: number,
-     *  ascent: number,
-     *  descent: number,
-     *  inkLeft: number,
-     *  inkRight: number,
-     *  inkWidth: number
-     * }}
-     */
-    _resolveTextMetrics(text, family, requestedSize, maxHeight, ctx) {
-        const limit = Math.max(4, maxHeight)
-        let size = Math.min(Math.max(4, requestedSize), limit * 3) // allow overshoot; shrink only if needed
-        let { advanceWidth, height, inkLeft, inkRight, inkWidth } = this._measureText(ctx, text, size, family)
-        while (height > limit && size > 4) {
-            size -= 1
-            const nextMetrics = this._measureText(ctx, text, size, family)
-            advanceWidth = nextMetrics.advanceWidth
-            height = nextMetrics.height
-            inkLeft = nextMetrics.inkLeft
-            inkRight = nextMetrics.inkRight
-            inkWidth = nextMetrics.inkWidth
-        }
-        const { ascent, descent } = this._measureText(ctx, text, size, family)
-        return {
-            size,
-            advanceWidth,
-            height: Math.min(height, limit),
-            ascent,
-            descent,
-            inkLeft,
-            inkRight,
-            inkWidth
-        }
     }
 
     /**

@@ -58,7 +58,7 @@
                     <div class="field">
                         <label data-i18n="sidebar.printer.backend">Backend</label>
                         <select data-mode>
-                            <option value="usb" data-i18n="sidebar.printer.backendUsb">WebUSB (USB printer class)</option>
+                            <option value="usb" data-i18n="sidebar.printer.backendUsb">WebUSB (USB)</option>
                             <option value="ble" data-i18n="sidebar.printer.backendBle">WebBluetooth (BLE)</option>
                         </select>
                     </div>
@@ -258,7 +258,7 @@
             <aside class="sidebar inspector">
                 <div class="section objects-section">
                     <div class="section-title" data-i18n="objects.title">Objects</div>
-                    <p class="muted small" data-i18n="objects.description">Drag to reorder. Adjust offsets, fonts, QR size, and forms.</p>
+                    <p class="muted small" data-i18n="objects.description">Drag to reorder. Adjust offsets, fonts, QR/barcode/image/icon settings, and forms.</p>
                     <div class="objects-actions">
                         <button
                             class="ghost object-add-btn"
@@ -296,6 +296,25 @@
                                 <circle class="fill" cx="14.2" cy="14.2" r="0.9"></circle>
                                 <circle class="fill" cx="13.5" cy="16.7" r="0.9"></circle>
                                 <rect class="fill" x="15.6" y="14.9" width="1.8" height="3.5" rx="0.8"></rect>
+                            </svg>
+                        </button>
+                        <button
+                            class="ghost object-add-btn"
+                            type="button"
+                            data-add-barcode
+                            title="Barcode"
+                            aria-label="Barcode"
+                            data-i18n-title="objects.addBarcode"
+                            data-i18n-aria-label="objects.addBarcode"
+                        >
+                            <svg class="icon-add-object" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <rect x="3.5" y="4.5" width="17" height="15" rx="2"></rect>
+                                <path class="fill" d="M6.5 7h1.6v10H6.5z"></path>
+                                <path class="fill" d="M9.1 7h.9v10h-.9z"></path>
+                                <path class="fill" d="M10.8 7h2.2v10h-2.2z"></path>
+                                <path class="fill" d="M13.8 7h.9v10h-.9z"></path>
+                                <path class="fill" d="M15.3 7h1.5v10h-1.5z"></path>
+                                <path class="fill" d="M17.4 7h.8v10h-.8z"></path>
                             </svg>
                         </button>
                         <button
@@ -442,13 +461,18 @@
                 </div>
                 <div class="section">
                     <div class="section-title" data-i18n="parameters.title">Parameters</div>
-                    <p class="muted small" data-i18n="parameters.description">Use {{parameter_name}} in text and QR content.</p>
+                    <p class="muted small" data-i18n="parameters.description">Use {{parameter_name}} in text, QR, and barcode content.</p>
                     <div class="parameter-toolbar">
                         <button class="ghost" type="button" data-add-parameter data-i18n="parameters.add">Add parameter</button>
-                        <button class="ghost" type="button" data-load-parameter-data data-i18n="parameters.loadJson">Load JSON</button>
+                        <button class="ghost" type="button" data-load-parameter-data data-i18n="parameters.loadData">Load data</button>
                         <button class="ghost" type="button" data-download-parameter-example data-i18n="parameters.exampleJson">Example JSON</button>
                     </div>
-                    <input type="file" accept="application/json" data-parameter-data-input hidden />
+                    <input
+                        type="file"
+                        accept=".json,.csv,.xls,.xlsx,.ods,application/json,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.oasis.opendocument.spreadsheet"
+                        data-parameter-data-input
+                        hidden
+                    />
                     <div class="parameters" data-parameter-definitions></div>
                     <div data-parameter-data-panel>
                         <div class="parameter-meta small muted" data-parameter-data-meta>0 rows loaded (No file selected)</div>
@@ -521,12 +545,14 @@
     <script type="importmap">
         {
             "imports": {
-                "labelprinterkit-web/": "/node_modules/labelprinterkit-web/"
+                "labelprinterkit-web/": "/node_modules/labelprinterkit-web/",
+                "xlsx": "/node_modules/xlsx/xlsx.mjs"
             }
         }
     </script>
     <script src="/node_modules/interactjs/dist/interact.min.js"></script>
     <script src="/node_modules/qrcode/build/qrcode.js"></script>
+    <script src="/node_modules/jsbarcode/dist/JsBarcode.all.min.js"></script>
     <script type="module" src="./main.mjs"></script>
 </body>
 </html>

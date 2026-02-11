@@ -113,6 +113,17 @@ describe('project-io-utils', () => {
                     yOffset: 3,
                     rotation: -721
                 },
+                {
+                    type: 'barcode',
+                    data: 'ABC-123',
+                    width: 180,
+                    height: 52,
+                    format: 'code39',
+                    displayValue: 'true',
+                    moduleWidth: 3,
+                    margin: 7,
+                    rotation: 721
+                },
                 { type: 'shape' },
                 { type: 'unsupported', id: 'item-9' }
             ]
@@ -146,6 +157,15 @@ describe('project-io-utils', () => {
         assert.equal(iconItem?.xOffset, -6)
         assert.equal(iconItem?.yOffset, 3)
         assert.equal(iconItem?.rotation, -1)
+        const barcodeItem = state.items.find((item) => item.type === 'barcode')
+        assert.equal(barcodeItem?.data, 'ABC-123')
+        assert.equal(barcodeItem?.width, 180)
+        assert.equal(barcodeItem?.height, 52)
+        assert.equal(barcodeItem?.barcodeFormat, 'CODE39')
+        assert.equal(barcodeItem?.barcodeShowText, true)
+        assert.equal(barcodeItem?.barcodeModuleWidth, 3)
+        assert.equal(barcodeItem?.barcodeMargin, 7)
+        assert.equal(barcodeItem?.rotation, 1)
         const textItem = state.items.find((item) => item.type === 'text')
         assert.equal(textItem?.rotation, 0)
         const shapeItem = state.items.find((item) => item.type === 'shape')

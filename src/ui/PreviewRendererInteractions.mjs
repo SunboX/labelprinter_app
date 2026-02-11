@@ -798,6 +798,25 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
             if (deltaTop) {
                 item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
             }
+        } else if (item.type === 'barcode') {
+            const widthDots = Math.max(16, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
+            const heightDots = Math.max(16, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
+            const media = Media[this.state.media] || Media.W24
+            const printWidth = Math.max(8, media?.printArea || 128)
+            const constrained = this._constrainImageDimensionsToPrintWidth(
+                widthDots,
+                heightDots,
+                printWidth,
+                this.state.orientation === 'horizontal'
+            )
+            item.width = Math.max(16, constrained.width)
+            item.height = Math.max(16, constrained.height)
+            if (deltaLeft) {
+                item.xOffset = Math.round((item.xOffset || 0) + deltaLeft)
+            }
+            if (deltaTop) {
+                item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
+            }
         } else if (item.type === 'qr') {
             const widthDots = Math.max(1, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
             const heightDots = Math.max(1, Math.round((event.rect?.height || 0) * this._dotsPerPxY))

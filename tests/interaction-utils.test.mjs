@@ -134,6 +134,7 @@ describe('isInteractiveItemType', () => {
         assert.equal(InteractionUtils.isInteractiveItemType('text'), true)
         assert.equal(InteractionUtils.isInteractiveItemType('shape'), true)
         assert.equal(InteractionUtils.isInteractiveItemType('qr'), true)
+        assert.equal(InteractionUtils.isInteractiveItemType('barcode'), true)
         assert.equal(InteractionUtils.isInteractiveItemType('image'), true)
         assert.equal(InteractionUtils.isInteractiveItemType('icon'), true)
     })

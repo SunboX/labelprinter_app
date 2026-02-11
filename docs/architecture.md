@@ -19,11 +19,12 @@ This repository is the label printer application (editor/UI) and references `lab
   - project loading (`project`, `projectUrl`)
   - parameter-row loading (`parameterDataUrl`)
   - print behavior (`autoPrint`, `skipBatchConfirm`)
+- `src/ParameterDataFileUtils.mjs` converts parameter data sources (`JSON`, `CSV`, `XLS`, `XLSX`, `ODS`) into JSON array text for shared validation/rendering.
 - `src/main.mjs` applies URL sources in this order during init:
   1. Load project from URL (if provided)
   2. Load parameter rows from URL (if provided)
   3. Trigger auto-print (if enabled and project came from URL)
-- `src/ui/ParameterPanel.mjs` provides `applyParameterDataRawText(...)` so both file uploads and URL-fetched JSON use the same validation/rendering pipeline.
+- `src/ui/ParameterPanel.mjs` provides `applyParameterDataRawText(...)` so both file uploads and URL-fetched parameter files use the same validation/rendering pipeline after conversion to JSON.
 
 ## External Library
 

@@ -41,6 +41,7 @@ export class PreviewRendererBase {
         this._rulerContext = null
         this._templateValues = {}
         this._qrRenderCache = new Map()
+        this._barcodeRenderCache = new Map()
         this._imageRenderCache = new Map()
         this._sourceImageCache = new Map()
         // Resize handles are part of the editor interaction model (drag via body, scale via dots/edges).
@@ -87,6 +88,19 @@ export class PreviewRendererBase {
             throw new Error('qrcode is not loaded. Ensure /node_modules/qrcode/build/qrcode.js is available.')
         }
         return globalThis.QRCode
+    }
+
+    /**
+     * Returns the locally loaded JsBarcode runtime.
+     * @returns {(canvas: HTMLCanvasElement, value: string, options?: object) => void}
+     */
+    _requireBarcode() {
+        if (typeof globalThis.JsBarcode !== 'function') {
+            throw new Error(
+                'jsbarcode is not loaded. Ensure /node_modules/jsbarcode/dist/JsBarcode.all.min.js is available.'
+            )
+        }
+        return globalThis.JsBarcode
     }
 
     /**

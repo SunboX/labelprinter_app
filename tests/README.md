@@ -69,11 +69,11 @@
 - Expected: save creates a `.json` file, load restores the same items and settings, and status reflects success.
 - Manual: append `?projectUrl=<url-to-json>` or open a shared `?project=<encoded>` link.
 - Expected: project loads automatically on startup and the Share button creates a link that restores the same layout.
-- Manual: append `?parameterDataUrl=<url-to-parameter-json-array>` to the app URL (optionally together with `project`/`projectUrl`).
-- Expected: parameter rows are fetched on startup, validated, shown in the JSON preview, and auto-create parameter definitions when none exist yet.
-- Manual: append `?projectUrl=<url-to-project-json>&parameterDataUrl=<url-to-parameter-json-array>&autoPrint=true`.
+- Manual: append `?parameterDataUrl=<url-to-parameter-file>` to the app URL (optionally together with `project`/`projectUrl`), where the file is JSON/CSV/XLS/XLSX/ODS.
+- Expected: parameter rows are fetched on startup, converted to JSON preview, validated, shown with issue markers, and auto-create parameter definitions when none exist yet.
+- Manual: append `?projectUrl=<url-to-project-json>&parameterDataUrl=<url-to-parameter-file>&autoPrint=true`.
 - Expected: after loading URL content, print starts automatically (subject to browser device permission rules).
-- Manual: append `?projectUrl=<url-to-project-json>&parameterDataUrl=<url-to-many-rows-json>&autoPrint=true&skipBatchConfirm=true`.
+- Manual: append `?projectUrl=<url-to-project-json>&parameterDataUrl=<url-to-many-rows-file>&autoPrint=true&skipBatchConfirm=true`.
 - Expected: the “more than 10 labels” confirmation is skipped and the print job starts immediately.
 
 ## Workspace zoom
@@ -105,9 +105,10 @@
 
 ## Parameterized labels
 - Unit: `tests/parameter-template-utils.test.mjs` validates placeholder extraction and substitution, JSON parsing constraints, and parameter-row validation diagnostics.
+- Unit: `tests/parameter-data-file-utils.test.mjs` validates conversion from JSON/CSV/XLS/XLSX/ODS to normalized JSON preview text.
 - Unit: `tests/project-io-utils.test.mjs` also covers serialization/normalization for `parameters` and `parameterDataRows`.
-- Manual: run `npm start`, open `http://localhost:3000/`, add parameters in the inspector, use them in text/QR as `{{name}}`, then upload a JSON array file.
-- Expected: JSON is validated, issues are shown with row-aware highlighting, preview uses the first row, and Print produces one label per row (with confirmation when row count exceeds 10).
+- Manual: run `npm start`, open `http://localhost:3000/`, add parameters in the inspector, use them in text/QR as `{{name}}`, then upload a JSON/CSV/XLS/XLSX/ODS file.
+- Expected: input is converted to JSON preview, issues are shown with row-aware highlighting, preview uses the first row, and Print produces one label per row (with confirmation when row count exceeds 10).
 
 ## Localization
 - Unit: `tests/i18n.test.mjs` validates locale detection, interpolation, and `data-i18n` attribute application.

@@ -1,8 +1,9 @@
-import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { FontFamilyUtils } from '../FontFamilyUtils.mjs'
-import { QrCodeUtils } from '../QrCodeUtils.mjs'
+import { BarcodeUtils } from '../BarcodeUtils.mjs'
 import { ItemsEditorImageSupport } from './ItemsEditorImageSupport.mjs'
 import { ItemsEditorIconSupport } from './ItemsEditorIconSupport.mjs'
+import { ItemsEditorBarcodeSupport } from './ItemsEditorBarcodeSupport.mjs'
+import { ItemsEditorGeometrySupport } from './ItemsEditorGeometrySupport.mjs'
 /**
  * Manages the item list UI, including drag reordering and item controls.
  */
@@ -346,6 +347,31 @@ export class ItemsEditor {
         this.#onChange()
     }
     /**
+     * Adds a new barcode item.
+     */
+    addBarcodeItem() {
+        const dimensions = ItemsEditorBarcodeSupport.resolveDefaultBarcodeDimensions(this.state)
+        const id = this.nextId()
+        this.state.items.push({
+            id,
+            type: 'barcode',
+            data: '1234567890',
+            width: dimensions.width,
+            height: dimensions.height,
+            barcodeFormat: BarcodeUtils.getDefaultFormat(),
+            barcodeShowText: false,
+            barcodeModuleWidth: 2,
+            barcodeMargin: 0,
+            xOffset: 4,
+            yOffset: 0,
+            rotation: 0
+        })
+        this.#panelItemOrder.push(id)
+        this.#collapsedItemIds.delete(id)
+        this.render()
+        this.#onChange()
+    }
+    /**
      * Adds a new image item.
      */
     addImageItem() {
@@ -559,11 +585,13 @@ export class ItemsEditor {
                 ? this.translate('itemsEditor.typeText')
                 : item.type === 'qr'
                   ? this.translate('itemsEditor.typeQr')
+                  : item.type === 'barcode'
+                    ? this.translate('itemsEditor.typeBarcode')
                   : item.type === 'image'
                     ? this.translate('itemsEditor.typeImage')
                     : item.type === 'icon'
                       ? this.translate('itemsEditor.typeIcon')
-                  : this.translate('itemsEditor.typeShape')
+                      : this.translate('itemsEditor.typeShape')
         tag.textContent = typeLabel
         const handle = document.createElement('div')
         handle.className = 'handle'
@@ -591,12 +619,14 @@ export class ItemsEditor {
 
         const contentWrap = document.createElement('div')
         contentWrap.className = 'field'
-        if (item.type === 'text' || item.type === 'qr') {
+        if (item.type === 'text' || item.type === 'qr' || item.type === 'barcode') {
             const label = document.createElement('label')
             label.textContent =
                 item.type === 'text'
                     ? this.translate('itemsEditor.fieldText')
-                    : this.translate('itemsEditor.fieldQrContent')
+                    : item.type === 'qr'
+                      ? this.translate('itemsEditor.fieldQrContent')
+                      : this.translate('itemsEditor.fieldBarcodeContent')
             const input = item.type === 'text' ? document.createElement('textarea') : document.createElement('input')
             input.value = item.type === 'text' ? item.text : item.data
             input.rows = 2
@@ -655,6 +685,8 @@ export class ItemsEditor {
             this.#appendTextControls(item, controls)
         } else if (item.type === 'qr') {
             this.#appendQrControls(item, controls, sizeLabel)
+        } else if (item.type === 'barcode') {
+            this.#appendBarcodeControls(item, controls, sizeLabel)
         } else if (item.type === 'image') {
             this.#appendImageControls(item, controls, sizeLabel)
         } else if (item.type === 'icon') {
@@ -878,122 +910,38 @@ export class ItemsEditor {
         })
     }
     /**
+     * Appends barcode controls to the controls container.
+     * @param {object} item
+     * @param {HTMLElement} controls
+     * @param {string} sizeLabel
+     */
+    #appendBarcodeControls(item, controls, sizeLabel) {
+        ItemsEditorBarcodeSupport.appendBarcodeControls({
+            item,
+            controls,
+            sizeLabel,
+            state: this.state,
+            translate: this.translate,
+            onChange: this.#onChange,
+            createSlider: this.#createSlider.bind(this)
+        })
+    }
+    /**
      * Appends QR controls to the controls container.
      * @param {object} item
      * @param {HTMLElement} controls
      * @param {string} sizeLabel
      */
     #appendQrControls(item, controls, sizeLabel) {
-        const normalizedOptions = QrCodeUtils.normalizeItemOptions(item)
-        item.qrErrorCorrectionLevel = normalizedOptions.qrErrorCorrectionLevel
-        item.qrVersion = normalizedOptions.qrVersion
-        item.qrEncodingMode = normalizedOptions.qrEncodingMode
-
-        const maxQrSize = QrSizeUtils.computeMaxQrSizeDots(this.state)
-        const minQrSize = Math.max(1, Math.min(QrSizeUtils.MIN_QR_SIZE_DOTS, maxQrSize))
-        const heightCtrl = this.#createSlider(sizeLabel, item.height, 20, 280, 1, (v) => {
-            item.height = v
-            this.#onChange()
+        ItemsEditorGeometrySupport.appendQrControls({
+            item,
+            controls,
+            sizeLabel,
+            state: this.state,
+            translate: this.translate,
+            onChange: this.#onChange,
+            createSlider: this.#createSlider.bind(this)
         })
-        const offsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, 0, 50, 1, (v) => {
-            item.xOffset = v
-            this.#onChange()
-        })
-        const yOffsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -50, 50, 1, (v) => {
-            item.yOffset = v
-            this.#onChange()
-        })
-        const rotationCtrl = this.#createSlider(
-            this.translate('itemsEditor.sliderRotation'),
-            item.rotation ?? 0,
-            -180,
-            180,
-            1,
-            (v) => {
-                item.rotation = v
-                this.#onChange()
-            }
-        )
-        const sizeCtrl = this.#createSlider(this.translate('itemsEditor.sliderQrSize'), item.size, minQrSize, maxQrSize, 1, (v) => {
-            item.size = QrSizeUtils.clampQrSizeToLabel(this.state, v)
-            if ((item.height || 0) < item.size) {
-                item.height = item.size
-            }
-            item._qrCache = null
-            this.#onChange()
-        })
-
-        const errorCorrectionCtrl = document.createElement('div')
-        errorCorrectionCtrl.className = 'field'
-        const errorCorrectionLabel = document.createElement('label')
-        errorCorrectionLabel.textContent = this.translate('itemsEditor.qrErrorCorrection')
-        const errorCorrectionSelect = document.createElement('select')
-        QrCodeUtils.getErrorCorrectionLevels().forEach((level) => {
-            const option = document.createElement('option')
-            option.value = level
-            option.textContent = this.translate(`itemsEditor.qrErrorCorrection${level}`)
-            errorCorrectionSelect.appendChild(option)
-        })
-        errorCorrectionSelect.value = item.qrErrorCorrectionLevel
-        errorCorrectionSelect.addEventListener('change', (e) => {
-            item.qrErrorCorrectionLevel = QrCodeUtils.normalizeErrorCorrectionLevel(e.target.value)
-            item._qrCache = null
-            this.#onChange()
-        })
-        errorCorrectionCtrl.append(errorCorrectionLabel, errorCorrectionSelect)
-
-        const versionCtrl = document.createElement('div')
-        versionCtrl.className = 'field'
-        const versionLabel = document.createElement('label')
-        versionLabel.textContent = this.translate('itemsEditor.qrVersion')
-        const versionSelect = document.createElement('select')
-        const autoVersionOption = document.createElement('option')
-        autoVersionOption.value = '0'
-        autoVersionOption.textContent = this.translate('itemsEditor.qrVersionAuto')
-        versionSelect.appendChild(autoVersionOption)
-        for (let version = 1; version <= 40; version += 1) {
-            const option = document.createElement('option')
-            option.value = String(version)
-            option.textContent = String(version)
-            versionSelect.appendChild(option)
-        }
-        versionSelect.value = String(item.qrVersion)
-        versionSelect.addEventListener('change', (e) => {
-            item.qrVersion = QrCodeUtils.normalizeVersion(e.target.value)
-            item._qrCache = null
-            this.#onChange()
-        })
-        versionCtrl.append(versionLabel, versionSelect)
-
-        const encodingModeCtrl = document.createElement('div')
-        encodingModeCtrl.className = 'field'
-        const encodingModeLabel = document.createElement('label')
-        encodingModeLabel.textContent = this.translate('itemsEditor.qrEncodingMode')
-        const encodingModeSelect = document.createElement('select')
-        QrCodeUtils.getEncodingModes().forEach((mode) => {
-            const option = document.createElement('option')
-            option.value = mode
-            option.textContent = this.translate(`itemsEditor.qrEncoding${mode[0].toUpperCase()}${mode.slice(1)}`)
-            encodingModeSelect.appendChild(option)
-        })
-        encodingModeSelect.value = item.qrEncodingMode
-        encodingModeSelect.addEventListener('change', (e) => {
-            item.qrEncodingMode = QrCodeUtils.normalizeEncodingMode(e.target.value)
-            item._qrCache = null
-            this.#onChange()
-        })
-        encodingModeCtrl.append(encodingModeLabel, encodingModeSelect)
-
-        controls.append(
-            heightCtrl,
-            offsetCtrl,
-            yOffsetCtrl,
-            rotationCtrl,
-            sizeCtrl,
-            errorCorrectionCtrl,
-            versionCtrl,
-            encodingModeCtrl
-        )
     }
     /**
      * Appends shape controls to the controls container.
@@ -1002,94 +950,13 @@ export class ItemsEditor {
      * @param {string} sizeLabel
      */
     #appendShapeControls(item, controls, sizeLabel) {
-        const widthCtrl = this.#createSlider(sizeLabel, item.width || 120, 20, 420, 2, (v) => {
-            item.width = v
-            this.#onChange()
+        ItemsEditorGeometrySupport.appendShapeControls({
+            item,
+            controls,
+            sizeLabel,
+            translate: this.translate,
+            onChange: this.#onChange,
+            createSlider: this.#createSlider.bind(this)
         })
-        const heightLabel =
-            item.shapeType === 'line'
-                ? this.translate('itemsEditor.sliderThickness')
-                : this.translate('itemsEditor.sizeHeight')
-        const heightCtrl = this.#createSlider(heightLabel, item.height || 20, 4, 240, 1, (v) => {
-            item.height = v
-            this.#onChange()
-        })
-        const strokeCtrl = this.#createSlider(this.translate('itemsEditor.sliderStroke'), item.strokeWidth || 2, 1, 12, 1, (v) => {
-            item.strokeWidth = v
-            this.#onChange()
-        })
-        const offsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, -50, 50, 1, (v) => {
-            item.xOffset = v
-            this.#onChange()
-        })
-        const yOffsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -80, 80, 1, (v) => {
-            item.yOffset = v
-            this.#onChange()
-        })
-        const rotationCtrl = this.#createSlider(
-            this.translate('itemsEditor.sliderRotation'),
-            item.rotation ?? 0,
-            -180,
-            180,
-            1,
-            (v) => {
-                item.rotation = v
-                this.#onChange()
-            }
-        )
-        controls.append(widthCtrl, heightCtrl, strokeCtrl, offsetCtrl, yOffsetCtrl, rotationCtrl)
-
-        if (item.shapeType === 'roundRect') {
-            const radiusCtrl = this.#createSlider(this.translate('itemsEditor.sliderRadius'), item.cornerRadius || 8, 0, 60, 1, (v) => {
-                item.cornerRadius = v
-                this.#onChange()
-            })
-            controls.append(radiusCtrl)
-        }
-        if (item.shapeType === 'polygon') {
-            const minSides = 3
-            const maxSides = 24
-            item.sides = Math.max(minSides, Math.min(maxSides, Math.round(item.sides || 6)))
-            const sidesCtrl = this.#createSlider(this.translate('itemsEditor.sliderSides'), item.sides, minSides, maxSides, 1, (v) => {
-                item.sides = v
-                if (sidesInput.value !== String(v)) {
-                    sidesInput.value = String(v)
-                }
-                this.#onChange()
-            })
-            const sidesLabelRow = sidesCtrl.querySelector('.small')
-            const sidesRangeInput = sidesCtrl.querySelector('input[type="range"]')
-            const sidesField = document.createElement('div')
-            sidesField.className = 'field'
-            const sidesFieldLabel = document.createElement('label')
-            sidesFieldLabel.textContent = this.translate('itemsEditor.sliderSides')
-            const sidesInput = document.createElement('input')
-            sidesInput.type = 'number'
-            sidesInput.min = String(minSides)
-            sidesInput.max = String(maxSides)
-            sidesInput.step = '1'
-            sidesInput.value = String(item.sides)
-            sidesInput.addEventListener('input', (e) => {
-                const rawValue = Number(e.target.value)
-                const fallback = item.sides || 6
-                const clampedValue = Number.isFinite(rawValue)
-                    ? Math.max(minSides, Math.min(maxSides, Math.round(rawValue)))
-                    : fallback
-                if (item.sides !== clampedValue) {
-                    item.sides = clampedValue
-                    this.#onChange()
-                }
-                e.target.value = String(clampedValue)
-                if (sidesRangeInput) {
-                    sidesRangeInput.value = String(clampedValue)
-                }
-                if (sidesLabelRow) {
-                    sidesLabelRow.textContent = `${this.translate('itemsEditor.sliderSides')}: ${clampedValue}`
-                }
-            })
-            sidesField.append(sidesFieldLabel, sidesInput)
-            controls.append(sidesCtrl)
-            controls.append(sidesField)
-        }
     }
 }

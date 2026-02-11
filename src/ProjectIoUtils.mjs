@@ -2,6 +2,7 @@ import { ZoomUtils } from './ZoomUtils.mjs'
 import { QrCodeUtils } from './QrCodeUtils.mjs'
 import { ImageRasterUtils } from './ImageRasterUtils.mjs'
 import { IconLibraryUtils } from './IconLibraryUtils.mjs'
+import { BarcodeUtils } from './BarcodeUtils.mjs'
 import { RotationUtils } from './RotationUtils.mjs'
 
 /**
@@ -185,6 +186,19 @@ export class ProjectIoUtils {
                 xOffset: 4,
                 yOffset: 0,
                 rotation: 0
+            },
+            barcode: {
+                type: 'barcode',
+                data: '1234567890',
+                width: 220,
+                height: 64,
+                barcodeFormat: BarcodeUtils.getDefaultFormat(),
+                barcodeShowText: false,
+                barcodeModuleWidth: 2,
+                barcodeMargin: 0,
+                xOffset: 4,
+                yOffset: 0,
+                rotation: 0
             }
         }
     }
@@ -198,7 +212,7 @@ export class ProjectIoUtils {
     static #normalizeItem(item, fallbackId) {
         const cleaned = ProjectIoUtils.stripRuntimeFields(item)
         const type = cleaned.type
-        if (!type || !['text', 'qr', 'shape', 'image', 'icon'].includes(type)) return null
+        if (!type || !['text', 'qr', 'shape', 'image', 'icon', 'barcode'].includes(type)) return null
 
         const defaults = ProjectIoUtils.#buildItemDefaults()[type]
         const normalized = { ...defaults, ...cleaned }
@@ -261,6 +275,28 @@ export class ProjectIoUtils {
             normalized.yOffset = ProjectIoUtils.#coerceNumber(normalized.yOffset, defaults.yOffset)
             normalized.rotation = RotationUtils.normalizeDegrees(normalized.rotation, defaults.rotation)
             normalized.iconId = IconLibraryUtils.normalizeIconId(normalized.iconId)
+        }
+        if (type === 'barcode') {
+            normalized.data = typeof normalized.data === 'string' ? normalized.data : defaults.data
+            normalized.width = Math.max(16, ProjectIoUtils.#coerceNumber(normalized.width, defaults.width))
+            normalized.height = Math.max(16, ProjectIoUtils.#coerceNumber(normalized.height, defaults.height))
+            normalized.xOffset = ProjectIoUtils.#coerceNumber(normalized.xOffset, defaults.xOffset)
+            normalized.yOffset = ProjectIoUtils.#coerceNumber(normalized.yOffset, defaults.yOffset)
+            normalized.rotation = RotationUtils.normalizeDegrees(normalized.rotation, defaults.rotation)
+            const normalizedBarcodeOptions = BarcodeUtils.normalizeItemOptions({
+                barcodeFormat: cleaned.barcodeFormat ?? cleaned.format ?? normalized.barcodeFormat,
+                barcodeShowText: cleaned.barcodeShowText ?? cleaned.displayValue ?? normalized.barcodeShowText,
+                barcodeModuleWidth: cleaned.barcodeModuleWidth ?? cleaned.moduleWidth ?? normalized.barcodeModuleWidth,
+                barcodeMargin: cleaned.barcodeMargin ?? cleaned.margin ?? normalized.barcodeMargin
+            })
+            normalized.barcodeFormat = normalizedBarcodeOptions.barcodeFormat
+            normalized.barcodeShowText = normalizedBarcodeOptions.barcodeShowText
+            normalized.barcodeModuleWidth = normalizedBarcodeOptions.barcodeModuleWidth
+            normalized.barcodeMargin = normalizedBarcodeOptions.barcodeMargin
+            delete normalized.format
+            delete normalized.displayValue
+            delete normalized.moduleWidth
+            delete normalized.margin
         }
 
         return normalized
