@@ -47,6 +47,7 @@ describe('project-io-utils', () => {
                     qrErrorCorrectionLevel: 'H',
                     qrVersion: 7,
                     qrEncodingMode: 'numeric',
+                    rotation: 22,
                     _qrCache: { pixels: [] }
                 }
             ]
@@ -57,6 +58,7 @@ describe('project-io-utils', () => {
         assert.equal(payload.items[0].qrErrorCorrectionLevel, 'H')
         assert.equal(payload.items[0].qrVersion, 7)
         assert.equal(payload.items[0].qrEncodingMode, 'numeric')
+        assert.equal(payload.items[0].rotation, 22)
         assert.equal(payload.zoom, 1.23)
         assert.deepEqual(payload.parameters, [{ name: 'host', defaultValue: 'localhost' }])
         assert.deepEqual(payload.parameterDataRows, [{ host: 'printer-1' }])
@@ -86,7 +88,8 @@ describe('project-io-utils', () => {
                     data: 'https://example.com',
                     errorCorrectionLevel: 'q',
                     version: 2,
-                    encodingMode: 'alphanumeric'
+                    encodingMode: 'alphanumeric',
+                    rotation: 450
                 },
                 {
                     id: 'item-3',
@@ -98,7 +101,8 @@ describe('project-io-utils', () => {
                     imageSmoothing: 'high',
                     imageInvert: true,
                     width: 64,
-                    height: 48
+                    height: 48,
+                    rotation: -40
                 },
                 {
                     type: 'icon',
@@ -106,7 +110,8 @@ describe('project-io-utils', () => {
                     width: 60,
                     height: 40,
                     xOffset: -6,
-                    yOffset: 3
+                    yOffset: 3,
+                    rotation: -721
                 },
                 { type: 'shape' },
                 { type: 'unsupported', id: 'item-9' }
@@ -124,6 +129,7 @@ describe('project-io-utils', () => {
         assert.equal(qrItem?.qrErrorCorrectionLevel, 'Q')
         assert.equal(qrItem?.qrVersion, 2)
         assert.equal(qrItem?.qrEncodingMode, 'alphanumeric')
+        assert.equal(qrItem?.rotation, 90)
         const imageItem = state.items.find((item) => item.type === 'image')
         assert.equal(imageItem?.imageName, 'logo.png')
         assert.equal(imageItem?.imageDither, 'ordered')
@@ -132,12 +138,18 @@ describe('project-io-utils', () => {
         assert.equal(imageItem?.imageInvert, true)
         assert.equal(imageItem?.width, 64)
         assert.equal(imageItem?.height, 48)
+        assert.equal(imageItem?.rotation, -40)
         const iconItem = state.items.find((item) => item.type === 'icon')
         assert.equal(iconItem?.iconId, 'icon-printer')
         assert.equal(iconItem?.width, 60)
         assert.equal(iconItem?.height, 40)
         assert.equal(iconItem?.xOffset, -6)
         assert.equal(iconItem?.yOffset, 3)
+        assert.equal(iconItem?.rotation, -1)
+        const textItem = state.items.find((item) => item.type === 'text')
+        assert.equal(textItem?.rotation, 0)
+        const shapeItem = state.items.find((item) => item.type === 'shape')
+        assert.equal(shapeItem?.rotation, 0)
         assert.ok(nextIdCounter > ProjectIoUtils.deriveNextIdCounter([{ id: 'item-2' }]))
     })
 })

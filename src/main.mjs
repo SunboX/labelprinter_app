@@ -112,7 +112,17 @@ const defaultState = {
     parameterDataSourceName: '',
     customFontLinks: [],
     items: [
-        { id: nextId(), type: 'text', text: 'New text', fontFamily: 'Barlow', fontSize: 24, height: 40, xOffset: 4, yOffset: 0 }
+        {
+            id: nextId(),
+            type: 'text',
+            text: 'New text',
+            fontFamily: 'Barlow',
+            fontSize: 24,
+            height: 40,
+            xOffset: 4,
+            yOffset: 0,
+            rotation: 0
+        }
     ]
 }
 
