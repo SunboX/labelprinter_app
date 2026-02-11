@@ -23,6 +23,14 @@ The printer protocol and backend implementation are consumed from:
 - The app validates uploaded JSON and highlights parse or row-level issues.
 - Printing asks for confirmation before large runs (>10 labels).
 
+### URL Parameters
+
+- `project=<embedded-or-json-url>`: load project from shared payload or URL.
+- `projectUrl=<json-url>`: load project JSON from URL.
+- `parameterDataUrl=<json-url>`: load parameter row JSON (array of objects) from URL.
+- `autoPrint=true|1|yes|on`: start printing automatically after URL load completed.
+- `skipBatchConfirm=true|1|yes|on`: skip the >10 labels confirmation prompt.
+
 ## Localization
 
 - Translation bundles live in `src/i18n/en.json` and `src/i18n/de.json`.

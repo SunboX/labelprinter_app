@@ -48,3 +48,51 @@ describe('resolveProjectSource', () => {
         })
     })
 })
+
+describe('resolveParameterDataSource', () => {
+    it('returns remote source when parameterDataUrl is present', () => {
+        const params = new URLSearchParams()
+        params.set(ProjectUrlUtils.PARAMETER_DATA_URL_PARAM, 'https://example.com/parameters.json')
+        assert.deepEqual(ProjectUrlUtils.resolveParameterDataSource(params), {
+            kind: 'remote',
+            value: 'https://example.com/parameters.json'
+        })
+    })
+
+    it('returns null source when parameterDataUrl is missing', () => {
+        const params = new URLSearchParams()
+        assert.deepEqual(ProjectUrlUtils.resolveParameterDataSource(params), {
+            kind: null,
+            value: null
+        })
+    })
+})
+
+describe('resolvePrintOptions', () => {
+    it('parses autoPrint and skipBatchConfirm truthy values', () => {
+        const params = new URLSearchParams()
+        params.set(ProjectUrlUtils.AUTO_PRINT_PARAM, 'true')
+        params.set(ProjectUrlUtils.SKIP_BATCH_CONFIRM_PARAM, '1')
+        assert.deepEqual(ProjectUrlUtils.resolvePrintOptions(params), {
+            autoPrint: true,
+            skipBatchConfirm: true
+        })
+    })
+
+    it('treats present empty values as true for boolean flags', () => {
+        const params = new URLSearchParams(`?${ProjectUrlUtils.AUTO_PRINT_PARAM}&${ProjectUrlUtils.SKIP_BATCH_CONFIRM_PARAM}=`)
+        assert.deepEqual(ProjectUrlUtils.resolvePrintOptions(params), {
+            autoPrint: true,
+            skipBatchConfirm: true
+        })
+    })
+
+    it('returns false for missing or falsy values', () => {
+        const params = new URLSearchParams()
+        params.set(ProjectUrlUtils.AUTO_PRINT_PARAM, 'false')
+        assert.deepEqual(ProjectUrlUtils.resolvePrintOptions(params), {
+            autoPrint: false,
+            skipBatchConfirm: false
+        })
+    })
+})

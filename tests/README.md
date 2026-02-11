@@ -69,6 +69,12 @@
 - Expected: save creates a `.json` file, load restores the same items and settings, and status reflects success.
 - Manual: append `?projectUrl=<url-to-json>` or open a shared `?project=<encoded>` link.
 - Expected: project loads automatically on startup and the Share button creates a link that restores the same layout.
+- Manual: append `?parameterDataUrl=<url-to-parameter-json-array>` to the app URL (optionally together with `project`/`projectUrl`).
+- Expected: parameter rows are fetched on startup, validated, shown in the JSON preview, and auto-create parameter definitions when none exist yet.
+- Manual: append `?projectUrl=<url-to-project-json>&parameterDataUrl=<url-to-parameter-json-array>&autoPrint=true`.
+- Expected: after loading URL content, print starts automatically (subject to browser device permission rules).
+- Manual: append `?projectUrl=<url-to-project-json>&parameterDataUrl=<url-to-many-rows-json>&autoPrint=true&skipBatchConfirm=true`.
+- Expected: the “more than 10 labels” confirmation is skipped and the print job starts immediately.
 
 ## Workspace zoom
 - Unit: `tests/zoom-utils.test.mjs` validates zoom clamping, stepping, label formatting, and display-aware zoom persistence payload matching.

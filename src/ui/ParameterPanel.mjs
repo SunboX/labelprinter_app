@@ -211,44 +211,7 @@ export class ParameterPanel {
                 return
             }
             const rawText = await file.text()
-            const parsed = ParameterTemplateUtils.parseParameterDataJson(rawText)
-
-            this.state.parameterDataSourceName = file.name
-            this.state.parameterDataRaw = rawText
-
-            if (parsed.parseError) {
-                this.state.parameterDataRows = []
-                this.parseError = parsed.parseError
-                this.parseErrorLine = parsed.parseErrorLine
-                this.parseErrorColumn = parsed.parseErrorColumn
-                this.previewText = parsed.prettyText || rawText || ''
-                this.rowLineRanges = []
-                this.#refreshValidationViews(false)
-                const location = this.parseErrorLine
-                    ? this.translate('parameterStatus.parseLocation', {
-                          line: this.parseErrorLine,
-                          column: this.parseErrorColumn || '?'
-                      })
-                    : ''
-                this.setStatus(this.translate('parameterStatus.invalidJson', { location }), 'error')
-                this.#emitChange()
-                return
-            }
-
-            this.#clearParseError()
-            this.state.parameterDataRows = parsed.rows || []
-            const addedCount = this.#autoCreateParametersFromRows(this.state.parameterDataRows)
-            if (addedCount > 0) {
-                this.#renderDefinitions()
-            }
-            this.#refreshValidationViews()
-            const rowCount = this.state.parameterDataRows.length
-            const rowSuffix = rowCount === 1 ? '' : this.translate('parameters.rowPluralSuffix')
-            this.setStatus(
-                this.translate('parameterStatus.loadedRows', { count: rowCount, suffix: rowSuffix }),
-                'success'
-            )
-            this.#emitChange()
+            this.applyParameterDataRawText(rawText, file.name)
         } catch (err) {
             if (err?.name === 'AbortError') {
                 this.setStatus(this.translate('parameterStatus.loadCanceled'), 'info')
@@ -257,6 +220,53 @@ export class ParameterPanel {
             const message = err?.message || this.translate('messages.unknownError')
             this.setStatus(this.translate('parameterStatus.loadFailed', { message }), 'error')
         }
+    }
+
+    /**
+     * Applies parameter rows from raw JSON text.
+     * @param {string} rawText
+     * @param {string} sourceName
+     */
+    applyParameterDataRawText(rawText, sourceName = '') {
+        const safeRawText = typeof rawText === 'string' ? rawText : ''
+        const parsed = ParameterTemplateUtils.parseParameterDataJson(safeRawText)
+
+        this.state.parameterDataSourceName = typeof sourceName === 'string' ? sourceName : ''
+        this.state.parameterDataRaw = safeRawText
+
+        if (parsed.parseError) {
+            this.state.parameterDataRows = []
+            this.parseError = parsed.parseError
+            this.parseErrorLine = parsed.parseErrorLine
+            this.parseErrorColumn = parsed.parseErrorColumn
+            this.previewText = parsed.prettyText || safeRawText || ''
+            this.rowLineRanges = []
+            this.#refreshValidationViews(false)
+            const location = this.parseErrorLine
+                ? this.translate('parameterStatus.parseLocation', {
+                      line: this.parseErrorLine,
+                      column: this.parseErrorColumn || '?'
+                  })
+                : ''
+            this.setStatus(this.translate('parameterStatus.invalidJson', { location }), 'error')
+            this.#emitChange()
+            return
+        }
+
+        this.#clearParseError()
+        this.state.parameterDataRows = parsed.rows || []
+        const addedCount = this.#autoCreateParametersFromRows(this.state.parameterDataRows)
+        if (addedCount > 0) {
+            this.#renderDefinitions()
+        }
+        this.#refreshValidationViews()
+        const rowCount = this.state.parameterDataRows.length
+        const rowSuffix = rowCount === 1 ? '' : this.translate('parameters.rowPluralSuffix')
+        this.setStatus(
+            this.translate('parameterStatus.loadedRows', { count: rowCount, suffix: rowSuffix }),
+            'success'
+        )
+        this.#emitChange()
     }
 
     /**
