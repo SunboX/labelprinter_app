@@ -31,6 +31,7 @@
 ## Preview interactions
 - Unit: `tests/interaction-utils.test.mjs` checks handle positions, hit testing, cursor mapping, handle-edge mapping, interactive item type support, and drag clamping for the preview overlay.
 - Unit: `tests/preview-inline-text-edit.test.mjs` validates source wiring for double-click inline text editing in the preview layer.
+- Unit: `tests/preview-rotation-rendering.test.mjs` verifies rotation transforms and rotated bounds wiring in preview canvas rendering.
 - Manual: click an item to select it, then hold `Ctrl` (Windows/Linux) or `Cmd` (macOS) and click additional items.
 - Expected: multiple items stay selected, alignment controls become active, resize dots are hidden while more than one item is selected, plain click on one selected item keeps the multi-selection, and dragging one selected item moves the full selection together.
 - Manual: double-click a text item on the label preview.
@@ -41,11 +42,14 @@
 - Expected: polygon edges update immediately, and the selection box/hit area matches the drawn polygon footprint instead of a much wider rectangle.
 - Manual: widen the label so the stage requires horizontal scrolling, scroll right, then click/select or drag items near the right side.
 - Expected: hitboxes and selection handles remain aligned with items while scrolled.
+- Manual: add `Text`, `QR-Code`, `Image`, `Icon`, and `Form` items, then adjust each `Rotation (°)` slider.
+- Expected: each object rotates in preview around its center and rotation survives Save/Load.
 
 ## Collapsible item cards
 - Unit: `tests/items-editor-collapsible.test.mjs` verifies the items editor exposes collapse toggles and collapsed-body CSS.
 - Unit: `tests/items-editor-ordering.test.mjs` verifies dragging object cards reorders only the inspector panel order, not `state.items` label order.
 - Unit: `tests/items-editor-selection-collapse.test.mjs` verifies cards auto-expanded by selection are collapsed again when deselected.
+- Unit: `tests/items-editor-rotation-controls.test.mjs` verifies rotation sliders are exposed for text, QR, image, icon, and form item controls.
 - Manual: run `npm start`, open `http://localhost:3000/`, and click the chevron on any object card header.
 - Expected: item settings collapse/expand without deleting values; selecting an item from the preview expands that item for editing.
 - Manual: collapse an item card, click the matching item on the label preview, then deselect it.
@@ -59,7 +63,7 @@
 - Expected: selected items align according to the chosen axis and target.
 
 ## Project save/load
-- Unit: `tests/project-io-utils.test.mjs` validates JSON payload sanitizing, normalization, and id reseeding.
+- Unit: `tests/project-io-utils.test.mjs` validates JSON payload sanitizing, normalization (including rotation), and id reseeding.
 - Unit: `tests/project-url-utils.test.mjs` validates shareable URL payload encoding/decoding and URL parameter source resolution.
 - Manual: run `npm start`, open `http://localhost:3000/`, click Save to export JSON, then click Load and select the file.
 - Expected: save creates a `.json` file, load restores the same items and settings, and status reflects success.
@@ -101,6 +105,7 @@
 
 ## Localization
 - Unit: `tests/i18n.test.mjs` validates locale detection, interpolation, and `data-i18n` attribute application.
+- Unit: `tests/rotation-utils.test.mjs` validates angle normalization and rotated-bounds geometry helpers used by preview rendering.
 - Manual: run `npm start`, open `http://localhost:3000/`, switch language via the top toolbar locale selector (`English` / `Deutsch`).
 - Expected: static UI labels and dynamic editor panels update to the selected language.
 

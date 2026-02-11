@@ -6,6 +6,7 @@ import { QrCodeUtils } from '../QrCodeUtils.mjs'
 import { IconRasterUtils } from '../IconRasterUtils.mjs'
 import { ShapeDrawUtils } from '../ShapeDrawUtils.mjs'
 import { TextSizingUtils } from '../TextSizingUtils.mjs'
+import { RotationUtils } from '../RotationUtils.mjs'
 import { Media, Resolution } from 'labelprinterkit-web/src/index.mjs'
 import { PreviewRendererBase } from './PreviewRendererBase.mjs'
 
@@ -215,82 +216,82 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     const clampedInkLeft = Math.max(0, inkLeft)
                     const clampedInkRight = Math.max(clampedInkLeft, inkRight)
                     const inkWidth = Math.max(1, clampedInkRight - clampedInkLeft)
-                    ctx.save()
-                    ctx.translate(drawX, baselineY)
-                    ctx.scale(1, verticalScale)
-                    ctx.fillText(resolvedText || '', 0, 0)
-                    ctx.restore()
                     const scaledAscent = actualAscent * verticalScale
                     const scaledDescent = actualDescent * verticalScale
                     const inkOffsetX = drawX + clampedInkLeft
+                    const textBounds = {
+                        x: inkOffsetX,
+                        y: baselineY - scaledAscent,
+                        width: inkWidth || textAdvanceWidth || 1,
+                        height: Math.max(1, scaledAscent + scaledDescent)
+                    }
+                    RotationUtils.drawWithRotation(ctx, textBounds, item.rotation, () => {
+                        ctx.save()
+                        ctx.translate(drawX, baselineY)
+                        ctx.scale(1, verticalScale)
+                        ctx.fillText(resolvedText || '', 0, 0)
+                        ctx.restore()
+                    })
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
                         item,
-                        bounds: {
-                            x: inkOffsetX,
-                            y: baselineY - scaledAscent,
-                            width: inkWidth || textAdvanceWidth || 1,
-                            height: Math.max(1, scaledAscent + scaledDescent)
-                        }
+                        bounds: RotationUtils.computeRotatedBounds(textBounds, item.rotation)
                     })
                 } else if (item.type === 'qr') {
                     const qrY = Math.max(0, (canvas.height - item.size) / 2 + yAdjust)
                     const drawX = (item.xOffset || 0) + x
-                    ctx.drawImage(qrCanvas, drawX, qrY, item.size, item.size)
+                    const qrBounds = { x: drawX, y: qrY, width: item.size, height: item.size }
+                    RotationUtils.drawWithRotation(ctx, qrBounds, item.rotation, () => {
+                        ctx.drawImage(qrCanvas, drawX, qrY, item.size, item.size)
+                    })
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
                         item,
-                        bounds: {
-                            x: drawX,
-                            y: qrY,
-                            width: item.size,
-                            height: item.size
-                        }
+                        bounds: RotationUtils.computeRotatedBounds(qrBounds, item.rotation)
                     })
                 } else if (item.type === 'image') {
                     const drawWidth = Math.max(1, imageWidth || item.width || 1)
                     const drawHeight = Math.max(1, imageHeight || item.height || 1)
                     const drawY = Math.max(0, (canvas.height - drawHeight) / 2 + yAdjust)
                     const drawX = (item.xOffset || 0) + x
+                    const imageBounds = { x: drawX, y: drawY, width: drawWidth, height: drawHeight }
                     if (imageCanvas) {
-                        ctx.drawImage(imageCanvas, drawX, drawY, drawWidth, drawHeight)
+                        RotationUtils.drawWithRotation(ctx, imageBounds, item.rotation, () => {
+                            ctx.drawImage(imageCanvas, drawX, drawY, drawWidth, drawHeight)
+                        })
                     }
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
                         item,
-                        bounds: {
-                            x: drawX,
-                            y: drawY,
-                            width: drawWidth,
-                            height: drawHeight
-                        }
+                        bounds: RotationUtils.computeRotatedBounds(imageBounds, item.rotation)
                     })
                 } else if (item.type === 'icon') {
                     const drawWidth = Math.max(1, iconWidth || item.width || 1)
                     const drawHeight = Math.max(1, iconHeight || item.height || 1)
                     const drawY = Math.max(0, (canvas.height - drawHeight) / 2 + yAdjust)
                     const drawX = (item.xOffset || 0) + x
+                    const iconBounds = { x: drawX, y: drawY, width: drawWidth, height: drawHeight }
                     if (iconCanvas) {
-                        ctx.drawImage(iconCanvas, drawX, drawY, drawWidth, drawHeight)
+                        RotationUtils.drawWithRotation(ctx, iconBounds, item.rotation, () => {
+                            ctx.drawImage(iconCanvas, drawX, drawY, drawWidth, drawHeight)
+                        })
                     }
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
                         item,
-                        bounds: {
-                            x: drawX,
-                            y: drawY,
-                            width: drawWidth,
-                            height: drawHeight
-                        }
+                        bounds: RotationUtils.computeRotatedBounds(iconBounds, item.rotation)
                     })
                 } else if (item.type === 'shape') {
                     const drawX = (item.xOffset || 0) + x
                     const drawY = Math.max(0, (canvas.height - shapeHeight) / 2 + yAdjust)
-                    ShapeDrawUtils.drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
+                    const shapeBounds = { x: drawX, y: drawY, width: shapeWidth, height: shapeHeight }
+                    RotationUtils.drawWithRotation(ctx, shapeBounds, item.rotation, () => {
+                        ShapeDrawUtils.drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
+                    })
                     const interactionBounds = ShapeDrawUtils.computeInteractionBounds(
                         item,
                         drawX,
@@ -302,7 +303,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                         id: item.id,
                         type: item.type,
                         item,
-                        bounds: interactionBounds
+                        bounds: RotationUtils.computeRotatedBounds(interactionBounds, item.rotation)
                     })
                 }
                 x += span
@@ -357,82 +358,82 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     const clampedInkLeft = Math.max(0, inkLeft)
                     const clampedInkRight = Math.max(clampedInkLeft, inkRight)
                     const inkWidth = Math.max(1, clampedInkRight - clampedInkLeft)
-                    ctx.save()
-                    ctx.translate(drawX, baselineY)
-                    ctx.scale(1, verticalScale)
-                    ctx.fillText(resolvedText || '', 0, 0)
-                    ctx.restore()
                     const scaledAscent = actualAscent * verticalScale
                     const scaledDescent = actualDescent * verticalScale
                     const inkOffsetX = drawX + clampedInkLeft
+                    const textBounds = {
+                        x: inkOffsetX,
+                        y: baselineY - scaledAscent,
+                        width: inkWidth || textAdvanceWidth || 1,
+                        height: Math.max(1, scaledAscent + scaledDescent)
+                    }
+                    RotationUtils.drawWithRotation(ctx, textBounds, item.rotation, () => {
+                        ctx.save()
+                        ctx.translate(drawX, baselineY)
+                        ctx.scale(1, verticalScale)
+                        ctx.fillText(resolvedText || '', 0, 0)
+                        ctx.restore()
+                    })
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
                         item,
-                        bounds: {
-                            x: inkOffsetX,
-                            y: baselineY - scaledAscent,
-                            width: inkWidth || textAdvanceWidth || 1,
-                            height: Math.max(1, scaledAscent + scaledDescent)
-                        }
+                        bounds: RotationUtils.computeRotatedBounds(textBounds, item.rotation)
                     })
                 } else if (item.type === 'qr') {
                     const qrY = y + Math.max(0, (span - item.size) / 2 + yAdjust)
                     const drawX = item.xOffset || 0
-                    ctx.drawImage(qrCanvas, drawX, qrY, item.size, item.size)
+                    const qrBounds = { x: drawX, y: qrY, width: item.size, height: item.size }
+                    RotationUtils.drawWithRotation(ctx, qrBounds, item.rotation, () => {
+                        ctx.drawImage(qrCanvas, drawX, qrY, item.size, item.size)
+                    })
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
                         item,
-                        bounds: {
-                            x: drawX,
-                            y: qrY,
-                            width: item.size,
-                            height: item.size
-                        }
+                        bounds: RotationUtils.computeRotatedBounds(qrBounds, item.rotation)
                     })
                 } else if (item.type === 'image') {
                     const drawWidth = Math.max(1, imageWidth || item.width || 1)
                     const drawHeight = Math.max(1, imageHeight || item.height || 1)
                     const drawY = y + Math.max(0, (span - drawHeight) / 2 + yAdjust)
                     const drawX = item.xOffset || 0
+                    const imageBounds = { x: drawX, y: drawY, width: drawWidth, height: drawHeight }
                     if (imageCanvas) {
-                        ctx.drawImage(imageCanvas, drawX, drawY, drawWidth, drawHeight)
+                        RotationUtils.drawWithRotation(ctx, imageBounds, item.rotation, () => {
+                            ctx.drawImage(imageCanvas, drawX, drawY, drawWidth, drawHeight)
+                        })
                     }
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
                         item,
-                        bounds: {
-                            x: drawX,
-                            y: drawY,
-                            width: drawWidth,
-                            height: drawHeight
-                        }
+                        bounds: RotationUtils.computeRotatedBounds(imageBounds, item.rotation)
                     })
                 } else if (item.type === 'icon') {
                     const drawWidth = Math.max(1, iconWidth || item.width || 1)
                     const drawHeight = Math.max(1, iconHeight || item.height || 1)
                     const drawY = y + Math.max(0, (span - drawHeight) / 2 + yAdjust)
                     const drawX = item.xOffset || 0
+                    const iconBounds = { x: drawX, y: drawY, width: drawWidth, height: drawHeight }
                     if (iconCanvas) {
-                        ctx.drawImage(iconCanvas, drawX, drawY, drawWidth, drawHeight)
+                        RotationUtils.drawWithRotation(ctx, iconBounds, item.rotation, () => {
+                            ctx.drawImage(iconCanvas, drawX, drawY, drawWidth, drawHeight)
+                        })
                     }
                     layoutItems.push({
                         id: item.id,
                         type: item.type,
                         item,
-                        bounds: {
-                            x: drawX,
-                            y: drawY,
-                            width: drawWidth,
-                            height: drawHeight
-                        }
+                        bounds: RotationUtils.computeRotatedBounds(iconBounds, item.rotation)
                     })
                 } else if (item.type === 'shape') {
                     const drawX = Math.max(0, (canvas.width - shapeWidth) / 2 + (item.xOffset || 0))
                     const drawY = y + Math.max(0, (span - shapeHeight) / 2 + yAdjust)
-                    ShapeDrawUtils.drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
+                    const shapeBounds = { x: drawX, y: drawY, width: shapeWidth, height: shapeHeight }
+                    RotationUtils.drawWithRotation(ctx, shapeBounds, item.rotation, () => {
+                        ShapeDrawUtils.drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
+                    })
                     const interactionBounds = ShapeDrawUtils.computeInteractionBounds(
                         item,
                         drawX,
@@ -444,7 +445,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                         id: item.id,
                         type: item.type,
                         item,
-                        bounds: interactionBounds
+                        bounds: RotationUtils.computeRotatedBounds(interactionBounds, item.rotation)
                     })
                 }
                 y += span
@@ -531,53 +532,75 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             if (isHorizontal) {
                 let start = cursor
                 let size = Math.max(1, block.span || 1)
+                let crossSize = Math.max(1, block.shapeHeight || block.imageHeight || block.iconHeight || block.qrSize || 1)
                 if (item.type === 'text') {
                     const inkLeft = Math.max(0, block.textInkLeft || 0)
                     const inkWidth = Math.max(1, block.textInkWidth || block.textAdvanceWidth || 1)
+                    const textHeight = Math.max(1, (block.ascent || block.fontSizeDots || 0) + (block.descent || 0))
                     start = cursor + (item.xOffset || 0) + inkLeft
                     size = inkWidth
+                    crossSize = textHeight
                 } else if (item.type === 'shape') {
                     start = cursor + (item.xOffset || 0)
                     size = Math.max(1, block.shapeWidth || item.width || 1)
+                    crossSize = Math.max(1, block.shapeHeight || item.height || 1)
                 } else if (item.type === 'image') {
                     start = cursor + (item.xOffset || 0)
                     size = Math.max(1, block.imageWidth || item.width || 1)
+                    crossSize = Math.max(1, block.imageHeight || item.height || 1)
                 } else if (item.type === 'icon') {
                     start = cursor + (item.xOffset || 0)
                     size = Math.max(1, block.iconWidth || item.width || 1)
+                    crossSize = Math.max(1, block.iconHeight || item.height || 1)
                 } else if (item.type === 'qr') {
                     start = cursor + (item.xOffset || 0)
                     size = Math.max(1, block.qrSize || item.size || 1)
+                    crossSize = size
                 }
-                maxEnd = Math.max(maxEnd, start + size)
+                const rotatedBounds = RotationUtils.computeRotatedBounds(
+                    { x: start, y: 0, width: size, height: crossSize },
+                    item.rotation
+                )
+                maxEnd = Math.max(maxEnd, rotatedBounds.x + rotatedBounds.width)
             } else {
                 let start = cursor
                 let size = Math.max(1, block.span || 1)
+                let crossSize = Math.max(1, block.shapeWidth || block.imageWidth || block.iconWidth || block.qrSize || 1)
                 const yAdjust = item.yOffset || 0
                 if (item.type === 'text') {
                     const ascent = block.ascent || block.fontSizeDots || 0
                     const descent = block.descent || 0
                     const textHeight = Math.max(1, ascent + descent)
+                    const textWidth = Math.max(1, block.textInkWidth || block.textAdvanceWidth || 1)
                     start = cursor + (Math.max(0, (block.span || textHeight) - textHeight) / 2 + yAdjust)
                     size = textHeight
+                    crossSize = textWidth
                 } else if (item.type === 'shape') {
                     const shapeHeight = Math.max(1, block.shapeHeight || item.height || 1)
                     start = cursor + Math.max(0, ((block.span || shapeHeight) - shapeHeight) / 2 + yAdjust)
                     size = shapeHeight
+                    crossSize = Math.max(1, block.shapeWidth || item.width || 1)
                 } else if (item.type === 'image') {
                     const imageHeight = Math.max(1, block.imageHeight || item.height || 1)
                     start = cursor + Math.max(0, ((block.span || imageHeight) - imageHeight) / 2 + yAdjust)
                     size = imageHeight
+                    crossSize = Math.max(1, block.imageWidth || item.width || 1)
                 } else if (item.type === 'icon') {
                     const iconHeight = Math.max(1, block.iconHeight || item.height || 1)
                     start = cursor + Math.max(0, ((block.span || iconHeight) - iconHeight) / 2 + yAdjust)
                     size = iconHeight
+                    crossSize = Math.max(1, block.iconWidth || item.width || 1)
                 } else if (item.type === 'qr') {
                     const qrSize = Math.max(1, block.qrSize || item.size || 1)
                     start = cursor + Math.max(0, ((block.span || qrSize) - qrSize) / 2 + yAdjust)
                     size = qrSize
+                    crossSize = qrSize
                 }
-                maxEnd = Math.max(maxEnd, start + size)
+                const rotatedBounds = RotationUtils.computeRotatedBounds(
+                    { x: 0, y: start, width: crossSize, height: size },
+                    item.rotation
+                )
+                maxEnd = Math.max(maxEnd, rotatedBounds.y + rotatedBounds.height)
             }
             cursor += Math.max(0, block.span || 0)
         })

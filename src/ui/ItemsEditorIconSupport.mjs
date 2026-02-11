@@ -1,4 +1,5 @@
 import { IconLibraryUtils } from '../IconLibraryUtils.mjs'
+import { RotationUtils } from '../RotationUtils.mjs'
 import { ItemsEditorImageSupport } from './ItemsEditorImageSupport.mjs'
 
 /**
@@ -31,6 +32,7 @@ export class ItemsEditorIconSupport {
      */
     static normalizeIconItem(item, state) {
         item.iconId = IconLibraryUtils.normalizeIconId(item.iconId)
+        item.rotation = RotationUtils.normalizeDegrees(item.rotation, 0)
         const constrained = ItemsEditorImageSupport.constrainImageDimensionsForOrientation(
             item.width || 72,
             item.height || 72,
@@ -250,6 +252,10 @@ export class ItemsEditorIconSupport {
             item.yOffset = value
             onChange()
         })
-        controls.append(widthCtrl, heightCtrl, offsetCtrl, yOffsetCtrl)
+        const rotationCtrl = createSlider(translate('itemsEditor.sliderRotation'), item.rotation ?? 0, -180, 180, 1, (value) => {
+            item.rotation = value
+            onChange()
+        })
+        controls.append(widthCtrl, heightCtrl, offsetCtrl, yOffsetCtrl, rotationCtrl)
     }
 }

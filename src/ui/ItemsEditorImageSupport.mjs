@@ -1,4 +1,5 @@
 import { ImageRasterUtils } from '../ImageRasterUtils.mjs'
+import { RotationUtils } from '../RotationUtils.mjs'
 import { Media } from 'labelprinterkit-web/src/index.mjs'
 
 /**
@@ -222,6 +223,7 @@ export class ItemsEditorImageSupport {
         item.imageThreshold = normalizedOptions.imageThreshold
         item.imageSmoothing = normalizedOptions.imageSmoothing
         item.imageInvert = normalizedOptions.imageInvert
+        item.rotation = RotationUtils.normalizeDegrees(item.rotation, 0)
 
         const constrainedDimensions = ItemsEditorImageSupport.constrainImageDimensionsForOrientation(
             item.width || 96,
@@ -258,6 +260,10 @@ export class ItemsEditorImageSupport {
 
         const yOffsetCtrl = createSlider(translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -80, 80, 1, (value) => {
             item.yOffset = value
+            onChange()
+        })
+        const rotationCtrl = createSlider(translate('itemsEditor.sliderRotation'), item.rotation ?? 0, -180, 180, 1, (value) => {
+            item.rotation = value
             onChange()
         })
 
@@ -318,6 +324,16 @@ export class ItemsEditorImageSupport {
         invertLabel.append(invertInput, invertText)
         invertCtrl.append(invertLabel)
 
-        controls.append(widthCtrl, heightCtrl, offsetCtrl, yOffsetCtrl, thresholdCtrl, ditherCtrl, smoothingCtrl, invertCtrl)
+        controls.append(
+            widthCtrl,
+            heightCtrl,
+            offsetCtrl,
+            yOffsetCtrl,
+            rotationCtrl,
+            thresholdCtrl,
+            ditherCtrl,
+            smoothingCtrl,
+            invertCtrl
+        )
     }
 }

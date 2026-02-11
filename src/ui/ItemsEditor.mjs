@@ -306,7 +306,8 @@ export class ItemsEditor {
             fontFamily: this.#resolveDefaultFontFamily(),
             fontSize: 24,
             height: 40,
-            xOffset: 4
+            xOffset: 4,
+            rotation: 0
         })
         this.#panelItemOrder.push(id)
         this.#collapsedItemIds.delete(id)
@@ -336,7 +337,8 @@ export class ItemsEditor {
             qrErrorCorrectionLevel: QrCodeUtils.getDefaultErrorCorrectionLevel(),
             qrVersion: QrCodeUtils.getDefaultVersion(),
             qrEncodingMode: QrCodeUtils.getDefaultEncodingMode(),
-            xOffset: 4
+            xOffset: 4,
+            rotation: 0
         })
         this.#panelItemOrder.push(id)
         this.#collapsedItemIds.delete(id)
@@ -367,7 +369,8 @@ export class ItemsEditor {
             width: defaultDimensions.width,
             height: defaultDimensions.height,
             xOffset: 4,
-            yOffset: 0
+            yOffset: 0,
+            rotation: 0
         })
         this.#panelItemOrder.push(id)
         this.#collapsedItemIds.delete(id)
@@ -387,7 +390,8 @@ export class ItemsEditor {
             width: defaultDimensions.width,
             height: defaultDimensions.height,
             xOffset: 4,
-            yOffset: 0
+            yOffset: 0,
+            rotation: 0
         })
         this.#panelItemOrder.push(id)
         this.#collapsedItemIds.delete(id)
@@ -431,7 +435,8 @@ export class ItemsEditor {
             cornerRadius: 10,
             sides: 6,
             xOffset: 4,
-            yOffset: 0
+            yOffset: 0,
+            rotation: 0
         })
         this.#panelItemOrder.push(id)
         this.#collapsedItemIds.delete(id)
@@ -696,6 +701,17 @@ export class ItemsEditor {
             item.yOffset = v
             this.#onChange()
         })
+        const rotationCtrl = this.#createSlider(
+            this.translate('itemsEditor.sliderRotation'),
+            item.rotation ?? 0,
+            -180,
+            180,
+            1,
+            (v) => {
+                item.rotation = v
+                this.#onChange()
+            }
+        )
 
         const fontCtrl = document.createElement('div')
         fontCtrl.className = 'field'
@@ -750,7 +766,7 @@ export class ItemsEditor {
             this.#onChange()
         })
 
-        controls.append(offsetCtrl, yOffsetCtrl, fontCtrl, sizeCtrl, googleFontCtrl)
+        controls.append(offsetCtrl, yOffsetCtrl, rotationCtrl, fontCtrl, sizeCtrl, googleFontCtrl)
     }
     /**
      * Returns font-family options for the current item.
@@ -887,6 +903,17 @@ export class ItemsEditor {
             item.yOffset = v
             this.#onChange()
         })
+        const rotationCtrl = this.#createSlider(
+            this.translate('itemsEditor.sliderRotation'),
+            item.rotation ?? 0,
+            -180,
+            180,
+            1,
+            (v) => {
+                item.rotation = v
+                this.#onChange()
+            }
+        )
         const sizeCtrl = this.#createSlider(this.translate('itemsEditor.sliderQrSize'), item.size, minQrSize, maxQrSize, 1, (v) => {
             item.size = QrSizeUtils.clampQrSizeToLabel(this.state, v)
             if ((item.height || 0) < item.size) {
@@ -957,7 +984,16 @@ export class ItemsEditor {
         })
         encodingModeCtrl.append(encodingModeLabel, encodingModeSelect)
 
-        controls.append(heightCtrl, offsetCtrl, yOffsetCtrl, sizeCtrl, errorCorrectionCtrl, versionCtrl, encodingModeCtrl)
+        controls.append(
+            heightCtrl,
+            offsetCtrl,
+            yOffsetCtrl,
+            rotationCtrl,
+            sizeCtrl,
+            errorCorrectionCtrl,
+            versionCtrl,
+            encodingModeCtrl
+        )
     }
     /**
      * Appends shape controls to the controls container.
@@ -990,7 +1026,18 @@ export class ItemsEditor {
             item.yOffset = v
             this.#onChange()
         })
-        controls.append(widthCtrl, heightCtrl, strokeCtrl, offsetCtrl, yOffsetCtrl)
+        const rotationCtrl = this.#createSlider(
+            this.translate('itemsEditor.sliderRotation'),
+            item.rotation ?? 0,
+            -180,
+            180,
+            1,
+            (v) => {
+                item.rotation = v
+                this.#onChange()
+            }
+        )
+        controls.append(widthCtrl, heightCtrl, strokeCtrl, offsetCtrl, yOffsetCtrl, rotationCtrl)
 
         if (item.shapeType === 'roundRect') {
             const radiusCtrl = this.#createSlider(this.translate('itemsEditor.sliderRadius'), item.cornerRadius || 8, 0, 60, 1, (v) => {

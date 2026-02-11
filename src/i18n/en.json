@@ -165,6 +165,7 @@
         "remove": "Remove",
         "sliderXOffset": "X offset",
         "sliderYOffset": "Y offset",
+        "sliderRotation": "Rotation (°)",
         "fontFamily": "Font family",
         "googleFontUrl": "Google Font URL",
         "googleFontUrlPlaceholder": "https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap",

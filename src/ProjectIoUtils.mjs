@@ -2,6 +2,7 @@ import { ZoomUtils } from './ZoomUtils.mjs'
 import { QrCodeUtils } from './QrCodeUtils.mjs'
 import { ImageRasterUtils } from './ImageRasterUtils.mjs'
 import { IconLibraryUtils } from './IconLibraryUtils.mjs'
+import { RotationUtils } from './RotationUtils.mjs'
 
 /**
  * Project serialization and normalization helpers.
@@ -135,7 +136,8 @@ export class ProjectIoUtils {
                 fontSize: 24,
                 height: 40,
                 xOffset: 4,
-                yOffset: 0
+                yOffset: 0,
+                rotation: 0
             },
             qr: {
                 type: 'qr',
@@ -146,7 +148,8 @@ export class ProjectIoUtils {
                 qrVersion: QrCodeUtils.getDefaultVersion(),
                 qrEncodingMode: QrCodeUtils.getDefaultEncodingMode(),
                 xOffset: 4,
-                yOffset: 0
+                yOffset: 0,
+                rotation: 0
             },
             shape: {
                 type: 'shape',
@@ -157,7 +160,8 @@ export class ProjectIoUtils {
                 cornerRadius: 10,
                 sides: 6,
                 xOffset: 4,
-                yOffset: 0
+                yOffset: 0,
+                rotation: 0
             },
             image: {
                 type: 'image',
@@ -170,7 +174,8 @@ export class ProjectIoUtils {
                 width: 96,
                 height: 96,
                 xOffset: 4,
-                yOffset: 0
+                yOffset: 0,
+                rotation: 0
             },
             icon: {
                 type: 'icon',
@@ -178,7 +183,8 @@ export class ProjectIoUtils {
                 width: 72,
                 height: 72,
                 xOffset: 4,
-                yOffset: 0
+                yOffset: 0,
+                rotation: 0
             }
         }
     }
@@ -203,12 +209,14 @@ export class ProjectIoUtils {
             normalized.height = ProjectIoUtils.#coerceNumber(normalized.height, defaults.height)
             normalized.xOffset = ProjectIoUtils.#coerceNumber(normalized.xOffset, defaults.xOffset)
             normalized.yOffset = ProjectIoUtils.#coerceNumber(normalized.yOffset, defaults.yOffset)
+            normalized.rotation = RotationUtils.normalizeDegrees(normalized.rotation, defaults.rotation)
         }
         if (type === 'qr') {
             normalized.size = ProjectIoUtils.#coerceNumber(normalized.size, defaults.size)
             normalized.height = ProjectIoUtils.#coerceNumber(normalized.height, defaults.height)
             normalized.xOffset = ProjectIoUtils.#coerceNumber(normalized.xOffset, defaults.xOffset)
             normalized.yOffset = ProjectIoUtils.#coerceNumber(normalized.yOffset, defaults.yOffset)
+            normalized.rotation = RotationUtils.normalizeDegrees(normalized.rotation, defaults.rotation)
             const normalizedQrOptions = QrCodeUtils.normalizeItemOptions({
                 qrErrorCorrectionLevel:
                     cleaned.qrErrorCorrectionLevel ?? cleaned.errorCorrectionLevel ?? normalized.qrErrorCorrectionLevel,
@@ -230,12 +238,14 @@ export class ProjectIoUtils {
             normalized.sides = ProjectIoUtils.#coerceNumber(normalized.sides, defaults.sides)
             normalized.xOffset = ProjectIoUtils.#coerceNumber(normalized.xOffset, defaults.xOffset)
             normalized.yOffset = ProjectIoUtils.#coerceNumber(normalized.yOffset, defaults.yOffset)
+            normalized.rotation = RotationUtils.normalizeDegrees(normalized.rotation, defaults.rotation)
         }
         if (type === 'image') {
             normalized.width = Math.max(8, ProjectIoUtils.#coerceNumber(normalized.width, defaults.width))
             normalized.height = Math.max(8, ProjectIoUtils.#coerceNumber(normalized.height, defaults.height))
             normalized.xOffset = ProjectIoUtils.#coerceNumber(normalized.xOffset, defaults.xOffset)
             normalized.yOffset = ProjectIoUtils.#coerceNumber(normalized.yOffset, defaults.yOffset)
+            normalized.rotation = RotationUtils.normalizeDegrees(normalized.rotation, defaults.rotation)
             normalized.imageData = typeof normalized.imageData === 'string' ? normalized.imageData : defaults.imageData
             normalized.imageName = typeof normalized.imageName === 'string' ? normalized.imageName : defaults.imageName
             const normalizedImageOptions = ImageRasterUtils.normalizeItemOptions(normalized)
@@ -249,6 +259,7 @@ export class ProjectIoUtils {
             normalized.height = Math.max(8, ProjectIoUtils.#coerceNumber(normalized.height, defaults.height))
             normalized.xOffset = ProjectIoUtils.#coerceNumber(normalized.xOffset, defaults.xOffset)
             normalized.yOffset = ProjectIoUtils.#coerceNumber(normalized.yOffset, defaults.yOffset)
+            normalized.rotation = RotationUtils.normalizeDegrees(normalized.rotation, defaults.rotation)
             normalized.iconId = IconLibraryUtils.normalizeIconId(normalized.iconId)
         }
 
