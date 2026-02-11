@@ -165,6 +165,7 @@ class AppController {
         this.printController = printController
         this.setStatus = setStatus
         this.i18n = i18n
+        this.urlPrintOptions = { autoPrint: false, skipBatchConfirm: false }
         this.itemsEditor.onChange = this.#handleStateChange.bind(this)
         this.parameterPanel.onChange = this.#handleParameterChange.bind(this)
         this.previewRenderer.onSelectionChange = this.#handleSelectionChange.bind(this)
@@ -185,6 +186,8 @@ class AppController {
      * @returns {Promise<void>}
      */
     async init() {
+        const urlSearchParams = new URLSearchParams(window.location.search)
+        this.urlPrintOptions = ProjectUrlUtils.resolvePrintOptions(urlSearchParams)
         this.#applyLocaleToUi()
         this.#populateSelects()
         this.#restoreBleState()
@@ -199,6 +202,7 @@ class AppController {
         }
         this.#syncZoomControls()
         this.parameterPanel.init()
+        await this.#loadParameterDataFromUrlParameter()
         this.#syncPreviewTemplateValues()
         this.#handleSelectionChange([])
         // Render the list before binding drag to ensure handles exist.
@@ -207,6 +211,9 @@ class AppController {
         this.previewRenderer.bindInteractions()
         this.#bindEvents()
         this.previewRenderer.render()
+        if (loadedProjectFromUrl && this.urlPrintOptions.autoPrint) {
+            await this.#handlePrintClick({ skipBatchConfirm: this.urlPrintOptions.skipBatchConfirm })
+        }
     }
     /**
      * Applies locale-dependent static translations to the document.
@@ -534,6 +541,33 @@ class AppController {
             return false
         }
     }
+
+    /**
+     * Loads parameter JSON rows from a URL query parameter when present.
+     * Supported parameter:
+     * - `parameterDataUrl`: JSON URL reference for parameter rows.
+     * @returns {Promise<boolean>}
+     */
+    async #loadParameterDataFromUrlParameter() {
+        const source = ProjectUrlUtils.resolveParameterDataSource(new URLSearchParams(window.location.search))
+        if (!source.kind || !source.value) {
+            return false
+        }
+        try {
+            const parameterDataUrl = new URL(source.value, window.location.href)
+            const response = await fetch(parameterDataUrl.toString(), { cache: 'no-store' })
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`)
+            }
+            const rawText = await response.text()
+            this.parameterPanel.applyParameterDataRawText(rawText, parameterDataUrl.toString())
+            return true
+        } catch (err) {
+            const message = err?.message || this.#t('messages.unknownError')
+            this.setStatus(this.#t('parameterStatus.loadFailed', { message }), 'error')
+            return false
+        }
+    }
     /**
      * Builds a shareable URL containing the current project payload.
      * @returns {string}
@@ -802,13 +836,14 @@ class AppController {
      * Handles print with parameter validation and batch confirmation.
      * @returns {Promise<void>}
      */
-    async #handlePrintClick() {
+    async #handlePrintClick(options = {}) {
+        const skipBatchConfirm = Boolean(options.skipBatchConfirm)
         if (this.parameterPanel.hasBlockingErrors()) {
             this.setStatus(this.#t('messages.parameterFixBeforePrint'), 'error')
             return
         }
         const parameterValueMaps = this.parameterPanel.buildPrintParameterValueMaps()
-        if (parameterValueMaps.length > 10) {
+        if (parameterValueMaps.length > 10 && !skipBatchConfirm) {
             const confirmed = window.confirm(this.#t('messages.printConfirmMany', { count: parameterValueMaps.length }))
             if (!confirmed) {
                 this.setStatus(this.#t('messages.printCanceled'), 'info')

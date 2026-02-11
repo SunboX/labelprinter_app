@@ -4,6 +4,9 @@
 export class ProjectUrlUtils {
     static #projectParam = 'project'
     static #projectUrlParam = 'projectUrl'
+    static #parameterDataUrlParam = 'parameterDataUrl'
+    static #autoPrintParam = 'autoPrint'
+    static #skipBatchConfirmParam = 'skipBatchConfirm'
 
     /**
      * Returns the query parameter key for embedded project payloads.
@@ -19,6 +22,30 @@ export class ProjectUrlUtils {
      */
     static get PROJECT_URL_PARAM() {
         return ProjectUrlUtils.#projectUrlParam
+    }
+
+    /**
+     * Returns the query parameter key for remote parameter JSON URLs.
+     * @returns {string}
+     */
+    static get PARAMETER_DATA_URL_PARAM() {
+        return ProjectUrlUtils.#parameterDataUrlParam
+    }
+
+    /**
+     * Returns the query parameter key for automatic printing on load.
+     * @returns {string}
+     */
+    static get AUTO_PRINT_PARAM() {
+        return ProjectUrlUtils.#autoPrintParam
+    }
+
+    /**
+     * Returns the query parameter key for skipping the large-batch confirmation.
+     * @returns {string}
+     */
+    static get SKIP_BATCH_CONFIRM_PARAM() {
+        return ProjectUrlUtils.#skipBatchConfirmParam
     }
 
     /**
@@ -102,5 +129,45 @@ export class ProjectUrlUtils {
             return { kind: 'remote', value: remote }
         }
         return { kind: null, value: null }
+    }
+
+    /**
+     * Resolves parameter-data source information from URL query parameters.
+     * @param {URLSearchParams} searchParams
+     * @returns {{ kind: 'remote' | null, value: string | null }}
+     */
+    static resolveParameterDataSource(searchParams) {
+        const remote = searchParams.get(ProjectUrlUtils.PARAMETER_DATA_URL_PARAM)
+        if (remote) {
+            return { kind: 'remote', value: remote }
+        }
+        return { kind: null, value: null }
+    }
+
+    /**
+     * Resolves auto-print related URL options.
+     * @param {URLSearchParams} searchParams
+     * @returns {{ autoPrint: boolean, skipBatchConfirm: boolean }}
+     */
+    static resolvePrintOptions(searchParams) {
+        return {
+            autoPrint: ProjectUrlUtils.#parseBooleanParam(searchParams, ProjectUrlUtils.AUTO_PRINT_PARAM),
+            skipBatchConfirm: ProjectUrlUtils.#parseBooleanParam(searchParams, ProjectUrlUtils.SKIP_BATCH_CONFIRM_PARAM)
+        }
+    }
+
+    /**
+     * Parses a boolean-ish query parameter.
+     * Accepts: 1/true/yes/on and empty-value presence as true.
+     * @param {URLSearchParams} searchParams
+     * @param {string} key
+     * @returns {boolean}
+     */
+    static #parseBooleanParam(searchParams, key) {
+        if (!(searchParams instanceof URLSearchParams)) return false
+        if (!searchParams.has(key)) return false
+        const rawValue = String(searchParams.get(key) || '').trim().toLowerCase()
+        if (!rawValue) return true
+        return ['1', 'true', 'yes', 'on'].includes(rawValue)
     }
 }
