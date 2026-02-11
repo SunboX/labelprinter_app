@@ -106,7 +106,7 @@ export class ParameterTemplateUtils {
     }
 
     /**
-     * Collects placeholders from text and QR items.
+     * Collects placeholders from text, QR, and barcode items.
      * @param {Array<{ type?: string, text?: string, data?: string }>} items
      * @returns {string[]}
      */
@@ -116,7 +116,7 @@ export class ParameterTemplateUtils {
         items.forEach((item) => {
             if (item?.type === 'text') {
                 ParameterTemplateUtils.extractPlaceholders(item.text).forEach((name) => names.add(name))
-            } else if (item?.type === 'qr') {
+            } else if (item?.type === 'qr' || item?.type === 'barcode') {
                 ParameterTemplateUtils.extractPlaceholders(item.data).forEach((name) => names.add(name))
             }
         })
@@ -372,7 +372,7 @@ export class ParameterTemplateUtils {
                     level: 'warning',
                     code: 'unused-definition',
                     parameterName,
-                    message: `Parameter "${parameterName}" is defined but not used in any text or QR template.`
+                    message: `Parameter "${parameterName}" is defined but not used in any text, QR, or barcode template.`
                 })
             }
         })

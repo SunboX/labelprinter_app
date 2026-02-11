@@ -9,6 +9,7 @@ const html = fs.readFileSync(filePath, 'utf8')
 const addButtonSpecs = [
     { attr: 'data-add-text', key: 'objects.addText' },
     { attr: 'data-add-qr', key: 'objects.addQr' },
+    { attr: 'data-add-barcode', key: 'objects.addBarcode' },
     { attr: 'data-add-image', key: 'objects.addImage' },
     { attr: 'data-add-icon', key: 'objects.addIcon' },
     { attr: 'data-add-shape', key: 'objects.addShape' }

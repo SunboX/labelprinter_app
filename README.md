@@ -17,17 +17,18 @@ The printer protocol and backend implementation are consumed from:
 ## Parameters And Batch Printing
 
 - Placeholders use the Mustache-style format `{{parameter_name}}`.
-- Placeholders work in text items (`text`) and QR items (`data`).
+- Placeholders work in text items (`text`), QR items (`data`), and barcode items (`data`).
 - Define parameters with optional defaults in the inspector.
-- Load a JSON file with an array of objects to print one label per row.
-- The app validates uploaded JSON and highlights parse or row-level issues.
+- Load parameter data from JSON, CSV, XLS, XLSX, or ODS to print one label per row.
+- Uploaded spreadsheet formats are converted to JSON preview before validation.
+- The app validates uploaded parameter data and highlights parse or row-level issues.
 - Printing asks for confirmation before large runs (>10 labels).
 
 ### URL Parameters
 
 - `project=<embedded-or-json-url>`: load project from shared payload or URL.
 - `projectUrl=<json-url>`: load project JSON from URL.
-- `parameterDataUrl=<json-url>`: load parameter row JSON (array of objects) from URL.
+- `parameterDataUrl=<data-url>`: load parameter row data from URL (JSON/CSV/XLS/XLSX/ODS).
 - `autoPrint=true|1|yes|on`: start printing automatically after URL load completed.
 - `skipBatchConfirm=true|1|yes|on`: skip the >10 labels confirmation prompt.
 
@@ -36,6 +37,15 @@ The printer protocol and backend implementation are consumed from:
 - Translation bundles live in `src/i18n/en.json` and `src/i18n/de.json`.
 - Runtime localization is handled by `src/I18n.mjs`.
 - Switch language from the top toolbar locale selector (`English` / `Deutsch`).
+
+## Documentation
+
+- `docs/objects-and-alignment.md`: object types, properties, editing behavior, and alignment.
+- `docs/parameter-data-formats.md`: parameter file formats and required CSV/spreadsheet structure.
+- `docs/printers-and-connections.md`: supported printer models, backend setup, and connection troubleshooting.
+- `docs/persistence-and-sharing.md`: save/load/share and URL parameter behavior.
+- `docs/url-parameters.md`: URL parameter reference and examples.
+- `docs/architecture.md`: high-level runtime and startup flow.
 
 ## Dependency
 

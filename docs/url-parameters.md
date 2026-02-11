@@ -6,7 +6,7 @@ This app supports URL-based loading and print behavior flags.
 
 - `project`: Embedded project payload (base64url JSON) or a JSON URL.
 - `projectUrl`: Project JSON URL.
-- `parameterDataUrl`: Parameter data JSON URL (must be a JSON array of objects).
+- `parameterDataUrl`: Parameter data file URL (`.json`, `.csv`, `.xls`, `.xlsx`, `.ods`).
 - `autoPrint`: Auto-start printing after URL loading (`true`, `1`, `yes`, `on`, or empty value).
 - `skipBatchConfirm`: Skip the ">10 labels" confirmation (`true`, `1`, `yes`, `on`, or empty value).
 
@@ -25,6 +25,10 @@ When the app opens, URL-driven flow is:
   - `http://localhost:3000/?projectUrl=https://example.com/project.json`
 - Load project and parameter rows:
   - `http://localhost:3000/?projectUrl=https://example.com/project.json&parameterDataUrl=https://example.com/parameters.json`
+- Load project and CSV parameter rows:
+  - `http://localhost:3000/?projectUrl=https://example.com/project.json&parameterDataUrl=https://example.com/parameters.csv`
+- Load project and XLSX parameter rows:
+  - `http://localhost:3000/?projectUrl=https://example.com/project.json&parameterDataUrl=https://example.com/parameters.xlsx`
 - Auto-print after load:
   - `http://localhost:3000/?projectUrl=https://example.com/project.json&parameterDataUrl=https://example.com/parameters.json&autoPrint=true`
 - Auto-print and skip large-batch confirmation:
@@ -32,6 +36,8 @@ When the app opens, URL-driven flow is:
 
 ## Notes
 
-- Parameter JSON still goes through full validation and preview rendering.
-- Invalid parameter JSON prevents parameter row usage and shows validation errors.
+- All parameter file formats are converted to a normalized JSON array preview in the UI.
+- Converted data still goes through the same parameter validation and preview highlighting.
+- Invalid JSON input prevents parameter row usage and shows JSON parser diagnostics.
+- Invalid spreadsheet input prevents parameter row usage and shows a load error status.
 - Browser/device permission prompts (WebUSB/WebBluetooth) may still require user interaction depending on browser policy.

@@ -25,7 +25,7 @@ export class ProjectUrlUtils {
     }
 
     /**
-     * Returns the query parameter key for remote parameter JSON URLs.
+     * Returns the query parameter key for remote parameter data URLs.
      * @returns {string}
      */
     static get PARAMETER_DATA_URL_PARAM() {

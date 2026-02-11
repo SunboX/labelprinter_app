@@ -3,13 +3,14 @@ import { describe, it } from 'node:test'
 import { ParameterTemplateUtils } from '../src/ParameterTemplateUtils.mjs'
 
 describe('parameter-template-utils', () => {
-    it('collects placeholders from text and qr items', () => {
+    it('collects placeholders from text, qr, and barcode items', () => {
         const placeholders = ParameterTemplateUtils.collectPlaceholdersFromItems([
             { type: 'text', text: 'Host {{host}} on {{port}}' },
             { type: 'qr', data: 'https://{{host}}/status' },
+            { type: 'barcode', data: '{{host}}-{{serial}}' },
             { type: 'shape' }
         ])
-        assert.deepEqual(placeholders.sort(), ['host', 'port'])
+        assert.deepEqual(placeholders.sort(), ['host', 'port', 'serial'])
     })
 
     it('resolves placeholders with defaults and row overrides', () => {

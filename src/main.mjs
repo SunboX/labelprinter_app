@@ -4,6 +4,7 @@ import { PreviewRenderer } from './ui/PreviewRenderer.mjs'
 import { PrintController } from './ui/PrintController.mjs'
 import { ProjectIoUtils } from './ProjectIoUtils.mjs'
 import { ProjectUrlUtils } from './ProjectUrlUtils.mjs'
+import { ParameterDataFileUtils } from './ParameterDataFileUtils.mjs'
 import { ShapeMenuUtils } from './ShapeMenuUtils.mjs'
 import { ZoomUtils } from './ZoomUtils.mjs'
 import { FontFamilyUtils } from './FontFamilyUtils.mjs'
@@ -14,6 +15,7 @@ const els = {
     items: document.querySelector('[data-items]'),
     addText: document.querySelector('[data-add-text]'),
     addQr: document.querySelector('[data-add-qr]'),
+    addBarcode: document.querySelector('[data-add-barcode]'),
     addImage: document.querySelector('[data-add-image]'),
     addIcon: document.querySelector('[data-add-icon]'),
     addShape: document.querySelector('[data-add-shape]'),
@@ -543,9 +545,9 @@ class AppController {
     }
 
     /**
-     * Loads parameter JSON rows from a URL query parameter when present.
+     * Loads parameter rows from a URL query parameter when present.
      * Supported parameter:
-     * - `parameterDataUrl`: JSON URL reference for parameter rows.
+     * - `parameterDataUrl`: URL reference for parameter rows (JSON/CSV/XLS/XLSX/ODS).
      * @returns {Promise<boolean>}
      */
     async #loadParameterDataFromUrlParameter() {
@@ -559,8 +561,11 @@ class AppController {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`)
             }
-            const rawText = await response.text()
-            this.parameterPanel.applyParameterDataRawText(rawText, parameterDataUrl.toString())
+            const { jsonText } = await ParameterDataFileUtils.convertResponseToParameterJsonText(
+                response,
+                parameterDataUrl.toString()
+            )
+            this.parameterPanel.applyParameterDataRawText(jsonText, parameterDataUrl.toString())
             return true
         } catch (err) {
             const message = err?.message || this.#t('messages.unknownError')
@@ -939,6 +944,7 @@ class AppController {
         }
         this.els.addText.addEventListener('click', () => this.itemsEditor.addTextItem())
         this.els.addQr.addEventListener('click', () => this.itemsEditor.addQrItem())
+        if (this.els.addBarcode) this.els.addBarcode.addEventListener('click', () => this.itemsEditor.addBarcodeItem())
         if (this.els.addImage) this.els.addImage.addEventListener('click', () => this.itemsEditor.addImageItem())
         if (this.els.addIcon) this.els.addIcon.addEventListener('click', () => this.itemsEditor.addIconItem())
         if (this.els.shapeMenu && this.els.addShape) {
