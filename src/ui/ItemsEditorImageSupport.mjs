@@ -1,6 +1,7 @@
 import { ImageRasterUtils } from '../ImageRasterUtils.mjs'
 import { RotationUtils } from '../RotationUtils.mjs'
 import { Media } from 'labelprinterkit-web/src/index.mjs'
+import { ItemsEditorControlSupport } from './ItemsEditorControlSupport.mjs'
 
 /**
  * Shared image-item helpers for the items editor.
@@ -224,47 +225,28 @@ export class ItemsEditorImageSupport {
         item.imageSmoothing = normalizedOptions.imageSmoothing
         item.imageInvert = normalizedOptions.imageInvert
         item.rotation = RotationUtils.normalizeDegrees(item.rotation, 0)
-
-        const constrainedDimensions = ItemsEditorImageSupport.constrainImageDimensionsForOrientation(
-            item.width || 96,
-            item.height || 96,
-            state
-        )
-        item.width = constrainedDimensions.width
-        item.height = constrainedDimensions.height
-
         const crossAxisLimit = ItemsEditorImageSupport.resolveImageCrossAxisLimit(state)
-        const widthMax = state.orientation === 'vertical' ? crossAxisLimit : 600
-        const heightMax = state.orientation === 'horizontal' ? crossAxisLimit : 320
-
-        const widthCtrl = createSlider(sizeLabel, item.width || 96, 8, widthMax, 1, (value) => {
-            item.width = value
-            const constrained = ItemsEditorImageSupport.constrainImageDimensionsForOrientation(item.width, item.height || 96, state)
-            item.width = constrained.width
-            item.height = constrained.height
-            onChange()
+        const { widthMax, heightMax } = ItemsEditorControlSupport.resolveDimensionMax(state, crossAxisLimit)
+        const { widthCtrl, heightCtrl } = ItemsEditorControlSupport.createConstrainedDimensionControls({
+            item,
+            state,
+            sizeLabel,
+            heightLabel: translate('itemsEditor.sizeHeight'),
+            minWidth: 8,
+            minHeight: 8,
+            widthMax,
+            heightMax,
+            defaultWidth: 96,
+            defaultHeight: 96,
+            onChange,
+            constrainDimensions: ItemsEditorImageSupport.constrainImageDimensionsForOrientation,
+            createSlider
         })
-
-        const heightCtrl = createSlider(translate('itemsEditor.sizeHeight'), item.height || 96, 8, heightMax, 1, (value) => {
-            item.height = value
-            const constrained = ItemsEditorImageSupport.constrainImageDimensionsForOrientation(item.width || 96, item.height, state)
-            item.width = constrained.width
-            item.height = constrained.height
-            onChange()
-        })
-
-        const offsetCtrl = createSlider(translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, -80, 80, 1, (value) => {
-            item.xOffset = value
-            onChange()
-        })
-
-        const yOffsetCtrl = createSlider(translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -80, 80, 1, (value) => {
-            item.yOffset = value
-            onChange()
-        })
-        const rotationCtrl = createSlider(translate('itemsEditor.sliderRotation'), item.rotation ?? 0, -180, 180, 1, (value) => {
-            item.rotation = value
-            onChange()
+        const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
+            item,
+            translate,
+            onChange,
+            createSlider
         })
 
         const thresholdCtrl = createSlider(translate('itemsEditor.imageThreshold'), item.imageThreshold, 0, 255, 1, (value) => {
@@ -272,57 +254,38 @@ export class ItemsEditorImageSupport {
             onChange()
         })
 
-        const ditherCtrl = document.createElement('div')
-        ditherCtrl.className = 'field'
-        const ditherLabel = document.createElement('label')
-        ditherLabel.textContent = translate('itemsEditor.imageDither')
-        const ditherSelect = document.createElement('select')
-        ImageRasterUtils.DITHER_MODES.forEach((mode) => {
-            const option = document.createElement('option')
-            option.value = mode
-            option.textContent = translate(`itemsEditor.imageDither${mode.replaceAll('-', '')}`)
-            ditherSelect.appendChild(option)
+        const { field: ditherCtrl } = ItemsEditorControlSupport.createSelectField({
+            labelText: translate('itemsEditor.imageDither'),
+            value: item.imageDither,
+            options: ImageRasterUtils.DITHER_MODES.map((mode) => ({
+                value: mode,
+                label: translate(`itemsEditor.imageDither${mode.replaceAll('-', '')}`)
+            })),
+            onChange: (value) => {
+                item.imageDither = value
+                onChange()
+            }
         })
-        ditherSelect.value = item.imageDither
-        ditherSelect.addEventListener('change', (event) => {
-            item.imageDither = event.target.value
-            onChange()
+        const { field: smoothingCtrl } = ItemsEditorControlSupport.createSelectField({
+            labelText: translate('itemsEditor.imageSmoothing'),
+            value: item.imageSmoothing,
+            options: ImageRasterUtils.SMOOTHING_MODES.map((mode) => ({
+                value: mode,
+                label: translate(`itemsEditor.imageSmoothing${mode}`)
+            })),
+            onChange: (value) => {
+                item.imageSmoothing = value
+                onChange()
+            }
         })
-        ditherCtrl.append(ditherLabel, ditherSelect)
-
-        const smoothingCtrl = document.createElement('div')
-        smoothingCtrl.className = 'field'
-        const smoothingLabel = document.createElement('label')
-        smoothingLabel.textContent = translate('itemsEditor.imageSmoothing')
-        const smoothingSelect = document.createElement('select')
-        ImageRasterUtils.SMOOTHING_MODES.forEach((mode) => {
-            const option = document.createElement('option')
-            option.value = mode
-            option.textContent = translate(`itemsEditor.imageSmoothing${mode}`)
-            smoothingSelect.appendChild(option)
+        const { field: invertCtrl } = ItemsEditorControlSupport.createCheckboxField({
+            labelText: translate('itemsEditor.imageInvert'),
+            checked: Boolean(item.imageInvert),
+            onChange: (checked) => {
+                item.imageInvert = checked
+                onChange()
+            }
         })
-        smoothingSelect.value = item.imageSmoothing
-        smoothingSelect.addEventListener('change', (event) => {
-            item.imageSmoothing = event.target.value
-            onChange()
-        })
-        smoothingCtrl.append(smoothingLabel, smoothingSelect)
-
-        const invertCtrl = document.createElement('div')
-        invertCtrl.className = 'field'
-        const invertLabel = document.createElement('label')
-        invertLabel.className = 'checkbox-row'
-        const invertInput = document.createElement('input')
-        invertInput.type = 'checkbox'
-        invertInput.checked = Boolean(item.imageInvert)
-        invertInput.addEventListener('change', (event) => {
-            item.imageInvert = event.target.checked
-            onChange()
-        })
-        const invertText = document.createElement('span')
-        invertText.textContent = translate('itemsEditor.imageInvert')
-        invertLabel.append(invertInput, invertText)
-        invertCtrl.append(invertLabel)
 
         controls.append(
             widthCtrl,

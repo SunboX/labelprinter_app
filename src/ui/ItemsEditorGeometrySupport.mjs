@@ -1,5 +1,6 @@
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { QrCodeUtils } from '../QrCodeUtils.mjs'
+import { ItemsEditorControlSupport } from './ItemsEditorControlSupport.mjs'
 
 /**
  * Shared QR and shape control helpers for the items editor.
@@ -29,17 +30,15 @@ export class ItemsEditorGeometrySupport {
             item.height = value
             onChange()
         })
-        const offsetCtrl = createSlider(translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, 0, 50, 1, (value) => {
-            item.xOffset = value
-            onChange()
-        })
-        const yOffsetCtrl = createSlider(translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -50, 50, 1, (value) => {
-            item.yOffset = value
-            onChange()
-        })
-        const rotationCtrl = createSlider(translate('itemsEditor.sliderRotation'), item.rotation ?? 0, -180, 180, 1, (value) => {
-            item.rotation = value
-            onChange()
+        const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
+            item,
+            translate,
+            onChange,
+            createSlider,
+            xMin: 0,
+            xMax: 50,
+            yMin: -50,
+            yMax: 50
         })
         const sizeCtrl = createSlider(translate('itemsEditor.sliderQrSize'), item.size, minQrSize, maxQrSize, 1, (value) => {
             item.size = QrSizeUtils.clampQrSizeToLabel(state, value)
@@ -149,17 +148,15 @@ export class ItemsEditorGeometrySupport {
             item.strokeWidth = value
             onChange()
         })
-        const offsetCtrl = createSlider(translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, -50, 50, 1, (value) => {
-            item.xOffset = value
-            onChange()
-        })
-        const yOffsetCtrl = createSlider(translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -80, 80, 1, (value) => {
-            item.yOffset = value
-            onChange()
-        })
-        const rotationCtrl = createSlider(translate('itemsEditor.sliderRotation'), item.rotation ?? 0, -180, 180, 1, (value) => {
-            item.rotation = value
-            onChange()
+        const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
+            item,
+            translate,
+            onChange,
+            createSlider,
+            xMin: -50,
+            xMax: 50,
+            yMin: -80,
+            yMax: 80
         })
         controls.append(widthCtrl, heightCtrl, strokeCtrl, offsetCtrl, yOffsetCtrl, rotationCtrl)
 

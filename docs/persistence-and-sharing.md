@@ -2,6 +2,8 @@
 
 This document describes project persistence and startup automation features.
 
+For security/privacy implications of shared URLs and remote loading, see `docs/security-and-privacy.md`.
+
 ## Save Project
 
 Use the top-bar **Save** button.
@@ -19,6 +21,11 @@ Saved project includes:
 - Parameters/defaults.
 - Parameter data rows (if loaded).
 - Custom Google font links.
+
+Notes:
+
+- Runtime-only cache fields are removed from saved items.
+- Parameter definitions, parameter rows, and custom font links are normalized before export.
 
 ## Load Project
 
@@ -45,15 +52,44 @@ Notes:
 - Generated share link embeds project JSON in URL.
 - Generated link intentionally removes `projectUrl` to avoid source conflicts.
 
+## Local Browser Preferences
+
+The app also stores non-project preferences in browser localStorage:
+
+- `labelprinter-app.zoom-preference.v1`: stores zoom + display fingerprint (`screen` metrics + `devicePixelRatio`); zoom is restored only when the current display fingerprint matches.
+- `labelprinter-app.google-font-links.v1`: stores added Google Fonts CSS URLs; links are reloaded on startup.
+- `labelprinter_app_locale`: stores the selected UI locale (`en` / `de`).
+
+When a project is loaded from URL (`project`/`projectUrl`), project values are applied first and local zoom/font restoration is not applied on top.
+
+## Browser Capability Matrix
+
+The app detects browser capabilities and applies fallbacks automatically.
+
+| Feature | Preferred API | Fallback behavior |
+| --- | --- | --- |
+| Save project | `window.showSaveFilePicker` | file-name prompt + browser download |
+| Load project | `window.showOpenFilePicker` | hidden `<input type="file">` |
+| Load parameter file | `window.showOpenFilePicker` | hidden `<input type="file">` |
+| Share URL | `navigator.share` | clipboard copy (`navigator.clipboard.writeText`) |
+| Share URL (no clipboard) | `navigator.share` / clipboard | `window.prompt(...)` with URL text |
+| Installed fonts | `window.queryLocalFonts` | curated fallback font list |
+
+Notes:
+
+- In restricted/private contexts, localStorage writes may fail silently.
+- Device permission dialogs for printing are still browser-controlled.
+
 ## URL Parameters
 
 Supported query parameters:
 
-- `project`: embedded project payload (base64url JSON) or project URL.
+- `project`: embedded project payload (base64url JSON), project URL, or URL-encoded raw JSON object.
 - `projectUrl`: explicit project JSON URL.
 - `parameterDataUrl`: parameter data file URL (`.json`, `.csv`, `.xls`, `.xlsx`, `.ods`).
 - `autoPrint`: auto-start printing after URL loading.
 - `skipBatchConfirm`: skip “more than 10 labels” confirmation.
+- `lang`: app locale (`en` / `de`).
 
 Boolean parsing (`autoPrint`, `skipBatchConfirm`):
 

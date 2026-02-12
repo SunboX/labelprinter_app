@@ -26,11 +26,12 @@ The printer protocol and backend implementation are consumed from:
 
 ### URL Parameters
 
-- `project=<embedded-or-json-url>`: load project from shared payload or URL.
+- `project=<embedded-or-json-url-or-raw-json>`: load project from shared payload, URL, or raw JSON object.
 - `projectUrl=<json-url>`: load project JSON from URL.
 - `parameterDataUrl=<data-url>`: load parameter row data from URL (JSON/CSV/XLS/XLSX/ODS).
 - `autoPrint=true|1|yes|on`: start printing automatically after URL load completed.
 - `skipBatchConfirm=true|1|yes|on`: skip the >10 labels confirmation prompt.
+- `lang=en|de`: set UI language.
 
 ## Localization
 
@@ -45,6 +46,12 @@ The printer protocol and backend implementation are consumed from:
 - `docs/printers-and-connections.md`: supported printer models, backend setup, and connection troubleshooting.
 - `docs/persistence-and-sharing.md`: save/load/share and URL parameter behavior.
 - `docs/url-parameters.md`: URL parameter reference and examples.
+- `docs/localization.md`: locale support and translation binding behavior.
+- `docs/icon-library-maintenance.md`: how to add/validate icon assets.
+- `docs/project-json-schema.md`: persisted project structure and object field reference.
+- `docs/security-and-privacy.md`: share URL and remote-loading security notes.
+- `docs/troubleshooting.md`: common issues and fixes.
+- `docs/contributing-object-types.md`: checklist for adding new object types.
 - `docs/architecture.md`: high-level runtime and startup flow.
 
 ## Dependency

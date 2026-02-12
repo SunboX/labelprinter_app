@@ -194,330 +194,19 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         ctx.fillRect(0, 0, canvas.width, canvas.height)
         ctx.fillStyle = '#000'
 
-        if (isHorizontal) {
-            let x = feedPadStart
-            for (const {
-                ref: item,
-                span,
-                fontSizeDots,
-                family,
-                ascent,
-                descent,
-                shapeWidth,
-                shapeHeight,
-                imageWidth,
-                imageHeight,
-                iconWidth,
-                iconHeight,
-                barcodeWidth,
-                barcodeHeight,
-                textAdvanceWidth,
-                textVerticalScale,
-                resolvedText,
-                qrCanvas,
-                imageCanvas,
-                iconCanvas,
-                barcodeCanvas
-            } of blocks) {
-                const yAdjust = item.yOffset || 0
-                if (item.type === 'text') {
-                    const resolvedSize =
-                        fontSizeDots || Math.min(Math.max(8, Math.round((item.fontSize || 16) * textDotScale)), maxFontDots)
-                    ctx.font = `${resolvedSize}px ${family || item.fontFamily || 'sans-serif'}`
-                    ctx.textBaseline = 'alphabetic'
-                    const verticalScale = Number.isFinite(textVerticalScale) ? textVerticalScale : 1
-                    const a = ascent || resolvedSize * verticalScale
-                    const d = descent || 0
-                    const blockH = a + d
-                    const baselineY = (canvas.height - blockH) / 2 + a + yAdjust
-                    const drawX = (item.xOffset || 0) + x
-                    const textMetrics = ctx.measureText(resolvedText || '')
-                    const inkLeft = Number.isFinite(textMetrics.actualBoundingBoxLeft)
-                        ? textMetrics.actualBoundingBoxLeft
-                        : 0
-                    const inkRight = Number.isFinite(textMetrics.actualBoundingBoxRight)
-                        ? textMetrics.actualBoundingBoxRight
-                        : textMetrics.width
-                    const actualAscent = Number.isFinite(textMetrics.actualBoundingBoxAscent)
-                        ? textMetrics.actualBoundingBoxAscent
-                        : a
-                    const actualDescent = Number.isFinite(textMetrics.actualBoundingBoxDescent)
-                        ? textMetrics.actualBoundingBoxDescent
-                        : d
-                    const clampedInkLeft = Math.max(0, inkLeft)
-                    const clampedInkRight = Math.max(clampedInkLeft, inkRight)
-                    const inkWidth = Math.max(1, clampedInkRight - clampedInkLeft)
-                    const scaledAscent = actualAscent * verticalScale
-                    const scaledDescent = actualDescent * verticalScale
-                    const inkOffsetX = drawX + clampedInkLeft
-                    const textBounds = {
-                        x: inkOffsetX,
-                        y: baselineY - scaledAscent,
-                        width: inkWidth || textAdvanceWidth || 1,
-                        height: Math.max(1, scaledAscent + scaledDescent)
-                    }
-                    RotationUtils.drawWithRotation(ctx, textBounds, item.rotation, () => {
-                        ctx.save()
-                        ctx.translate(drawX, baselineY)
-                        ctx.scale(1, verticalScale)
-                        ctx.fillText(resolvedText || '', 0, 0)
-                        ctx.restore()
-                    })
-                    layoutItems.push({
-                        id: item.id,
-                        type: item.type,
-                        item,
-                        bounds: RotationUtils.computeRotatedBounds(textBounds, item.rotation)
-                    })
-                } else if (item.type === 'qr') {
-                    const qrY = Math.max(0, (canvas.height - item.size) / 2 + yAdjust)
-                    const drawX = (item.xOffset || 0) + x
-                    const qrBounds = { x: drawX, y: qrY, width: item.size, height: item.size }
-                    RotationUtils.drawWithRotation(ctx, qrBounds, item.rotation, () => {
-                        ctx.drawImage(qrCanvas, drawX, qrY, item.size, item.size)
-                    })
-                    layoutItems.push({
-                        id: item.id,
-                        type: item.type,
-                        item,
-                        bounds: RotationUtils.computeRotatedBounds(qrBounds, item.rotation)
-                    })
-                } else if (item.type === 'barcode') {
-                    const drawWidth = Math.max(16, barcodeWidth || item.width || 16)
-                    const drawHeight = Math.max(16, barcodeHeight || item.height || 16)
-                    const drawY = Math.max(0, (canvas.height - drawHeight) / 2 + yAdjust)
-                    const drawX = (item.xOffset || 0) + x
-                    const barcodeBounds = { x: drawX, y: drawY, width: drawWidth, height: drawHeight }
-                    if (barcodeCanvas) {
-                        RotationUtils.drawWithRotation(ctx, barcodeBounds, item.rotation, () => {
-                            ctx.drawImage(barcodeCanvas, drawX, drawY, drawWidth, drawHeight)
-                        })
-                    }
-                    layoutItems.push({
-                        id: item.id,
-                        type: item.type,
-                        item,
-                        bounds: RotationUtils.computeRotatedBounds(barcodeBounds, item.rotation)
-                    })
-                } else if (item.type === 'image') {
-                    const drawWidth = Math.max(1, imageWidth || item.width || 1)
-                    const drawHeight = Math.max(1, imageHeight || item.height || 1)
-                    const drawY = Math.max(0, (canvas.height - drawHeight) / 2 + yAdjust)
-                    const drawX = (item.xOffset || 0) + x
-                    const imageBounds = { x: drawX, y: drawY, width: drawWidth, height: drawHeight }
-                    if (imageCanvas) {
-                        RotationUtils.drawWithRotation(ctx, imageBounds, item.rotation, () => {
-                            ctx.drawImage(imageCanvas, drawX, drawY, drawWidth, drawHeight)
-                        })
-                    }
-                    layoutItems.push({
-                        id: item.id,
-                        type: item.type,
-                        item,
-                        bounds: RotationUtils.computeRotatedBounds(imageBounds, item.rotation)
-                    })
-                } else if (item.type === 'icon') {
-                    const drawWidth = Math.max(1, iconWidth || item.width || 1)
-                    const drawHeight = Math.max(1, iconHeight || item.height || 1)
-                    const drawY = Math.max(0, (canvas.height - drawHeight) / 2 + yAdjust)
-                    const drawX = (item.xOffset || 0) + x
-                    const iconBounds = { x: drawX, y: drawY, width: drawWidth, height: drawHeight }
-                    if (iconCanvas) {
-                        RotationUtils.drawWithRotation(ctx, iconBounds, item.rotation, () => {
-                            ctx.drawImage(iconCanvas, drawX, drawY, drawWidth, drawHeight)
-                        })
-                    }
-                    layoutItems.push({
-                        id: item.id,
-                        type: item.type,
-                        item,
-                        bounds: RotationUtils.computeRotatedBounds(iconBounds, item.rotation)
-                    })
-                } else if (item.type === 'shape') {
-                    const drawX = (item.xOffset || 0) + x
-                    const drawY = Math.max(0, (canvas.height - shapeHeight) / 2 + yAdjust)
-                    const shapeBounds = { x: drawX, y: drawY, width: shapeWidth, height: shapeHeight }
-                    RotationUtils.drawWithRotation(ctx, shapeBounds, item.rotation, () => {
-                        ShapeDrawUtils.drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
-                    })
-                    const interactionBounds = ShapeDrawUtils.computeInteractionBounds(
-                        item,
-                        drawX,
-                        drawY,
-                        shapeWidth,
-                        shapeHeight
-                    )
-                    layoutItems.push({
-                        id: item.id,
-                        type: item.type,
-                        item,
-                        bounds: RotationUtils.computeRotatedBounds(interactionBounds, item.rotation)
-                    })
-                }
-                x += span
-            }
-        } else {
-            let y = feedPadStart
-            for (const {
-                ref: item,
-                span,
-                fontSizeDots,
-                family,
-                ascent,
-                descent,
-                shapeWidth,
-                shapeHeight,
-                imageWidth,
-                imageHeight,
-                iconWidth,
-                iconHeight,
-                barcodeWidth,
-                barcodeHeight,
-                textAdvanceWidth,
-                textVerticalScale,
-                resolvedText,
-                qrCanvas,
-                imageCanvas,
-                iconCanvas,
-                barcodeCanvas
-            } of blocks) {
-                const yAdjust = item.yOffset || 0
-                if (item.type === 'text') {
-                    const resolvedSize =
-                        fontSizeDots || Math.min(Math.max(8, Math.round((item.fontSize || 16) * textDotScale)), maxFontDots)
-                    ctx.font = `${resolvedSize}px ${family || item.fontFamily || 'sans-serif'}`
-                    ctx.textBaseline = 'alphabetic'
-                    const verticalScale = Number.isFinite(textVerticalScale) ? textVerticalScale : 1
-                    const a = ascent || resolvedSize * verticalScale
-                    const d = descent || 0
-                    const blockH = a + d
-                    const baselineY = y + (span - blockH) / 2 + a + yAdjust
-                    const drawX = item.xOffset || 0
-                    const textMetrics = ctx.measureText(resolvedText || '')
-                    const inkLeft = Number.isFinite(textMetrics.actualBoundingBoxLeft)
-                        ? textMetrics.actualBoundingBoxLeft
-                        : 0
-                    const inkRight = Number.isFinite(textMetrics.actualBoundingBoxRight)
-                        ? textMetrics.actualBoundingBoxRight
-                        : textMetrics.width
-                    const actualAscent = Number.isFinite(textMetrics.actualBoundingBoxAscent)
-                        ? textMetrics.actualBoundingBoxAscent
-                        : a
-                    const actualDescent = Number.isFinite(textMetrics.actualBoundingBoxDescent)
-                        ? textMetrics.actualBoundingBoxDescent
-                        : d
-                    const clampedInkLeft = Math.max(0, inkLeft)
-                    const clampedInkRight = Math.max(clampedInkLeft, inkRight)
-                    const inkWidth = Math.max(1, clampedInkRight - clampedInkLeft)
-                    const scaledAscent = actualAscent * verticalScale
-                    const scaledDescent = actualDescent * verticalScale
-                    const inkOffsetX = drawX + clampedInkLeft
-                    const textBounds = {
-                        x: inkOffsetX,
-                        y: baselineY - scaledAscent,
-                        width: inkWidth || textAdvanceWidth || 1,
-                        height: Math.max(1, scaledAscent + scaledDescent)
-                    }
-                    RotationUtils.drawWithRotation(ctx, textBounds, item.rotation, () => {
-                        ctx.save()
-                        ctx.translate(drawX, baselineY)
-                        ctx.scale(1, verticalScale)
-                        ctx.fillText(resolvedText || '', 0, 0)
-                        ctx.restore()
-                    })
-                    layoutItems.push({
-                        id: item.id,
-                        type: item.type,
-                        item,
-                        bounds: RotationUtils.computeRotatedBounds(textBounds, item.rotation)
-                    })
-                } else if (item.type === 'qr') {
-                    const qrY = y + Math.max(0, (span - item.size) / 2 + yAdjust)
-                    const drawX = item.xOffset || 0
-                    const qrBounds = { x: drawX, y: qrY, width: item.size, height: item.size }
-                    RotationUtils.drawWithRotation(ctx, qrBounds, item.rotation, () => {
-                        ctx.drawImage(qrCanvas, drawX, qrY, item.size, item.size)
-                    })
-                    layoutItems.push({
-                        id: item.id,
-                        type: item.type,
-                        item,
-                        bounds: RotationUtils.computeRotatedBounds(qrBounds, item.rotation)
-                    })
-                } else if (item.type === 'barcode') {
-                    const drawWidth = Math.max(16, barcodeWidth || item.width || 16)
-                    const drawHeight = Math.max(16, barcodeHeight || item.height || 16)
-                    const drawY = y + Math.max(0, (span - drawHeight) / 2 + yAdjust)
-                    const drawX = item.xOffset || 0
-                    const barcodeBounds = { x: drawX, y: drawY, width: drawWidth, height: drawHeight }
-                    if (barcodeCanvas) {
-                        RotationUtils.drawWithRotation(ctx, barcodeBounds, item.rotation, () => {
-                            ctx.drawImage(barcodeCanvas, drawX, drawY, drawWidth, drawHeight)
-                        })
-                    }
-                    layoutItems.push({
-                        id: item.id,
-                        type: item.type,
-                        item,
-                        bounds: RotationUtils.computeRotatedBounds(barcodeBounds, item.rotation)
-                    })
-                } else if (item.type === 'image') {
-                    const drawWidth = Math.max(1, imageWidth || item.width || 1)
-                    const drawHeight = Math.max(1, imageHeight || item.height || 1)
-                    const drawY = y + Math.max(0, (span - drawHeight) / 2 + yAdjust)
-                    const drawX = item.xOffset || 0
-                    const imageBounds = { x: drawX, y: drawY, width: drawWidth, height: drawHeight }
-                    if (imageCanvas) {
-                        RotationUtils.drawWithRotation(ctx, imageBounds, item.rotation, () => {
-                            ctx.drawImage(imageCanvas, drawX, drawY, drawWidth, drawHeight)
-                        })
-                    }
-                    layoutItems.push({
-                        id: item.id,
-                        type: item.type,
-                        item,
-                        bounds: RotationUtils.computeRotatedBounds(imageBounds, item.rotation)
-                    })
-                } else if (item.type === 'icon') {
-                    const drawWidth = Math.max(1, iconWidth || item.width || 1)
-                    const drawHeight = Math.max(1, iconHeight || item.height || 1)
-                    const drawY = y + Math.max(0, (span - drawHeight) / 2 + yAdjust)
-                    const drawX = item.xOffset || 0
-                    const iconBounds = { x: drawX, y: drawY, width: drawWidth, height: drawHeight }
-                    if (iconCanvas) {
-                        RotationUtils.drawWithRotation(ctx, iconBounds, item.rotation, () => {
-                            ctx.drawImage(iconCanvas, drawX, drawY, drawWidth, drawHeight)
-                        })
-                    }
-                    layoutItems.push({
-                        id: item.id,
-                        type: item.type,
-                        item,
-                        bounds: RotationUtils.computeRotatedBounds(iconBounds, item.rotation)
-                    })
-                } else if (item.type === 'shape') {
-                    const drawX = Math.max(0, (canvas.width - shapeWidth) / 2 + (item.xOffset || 0))
-                    const drawY = y + Math.max(0, (span - shapeHeight) / 2 + yAdjust)
-                    const shapeBounds = { x: drawX, y: drawY, width: shapeWidth, height: shapeHeight }
-                    RotationUtils.drawWithRotation(ctx, shapeBounds, item.rotation, () => {
-                        ShapeDrawUtils.drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
-                    })
-                    const interactionBounds = ShapeDrawUtils.computeInteractionBounds(
-                        item,
-                        drawX,
-                        drawY,
-                        shapeWidth,
-                        shapeHeight
-                    )
-                    layoutItems.push({
-                        id: item.id,
-                        type: item.type,
-                        item,
-                        bounds: RotationUtils.computeRotatedBounds(interactionBounds, item.rotation)
-                    })
-                }
-                y += span
-            }
+        let flowCursor = feedPadStart
+        for (const block of blocks) {
+            this._renderFlowBlock({
+                ctx,
+                block,
+                flowCursor,
+                canvas,
+                isHorizontal,
+                textDotScale,
+                maxFontDots,
+                layoutItems
+            })
+            flowCursor += block.span
         }
 
         // Preview shows only the printable area; margins are hinted in render().
@@ -537,6 +226,286 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             media: effectiveMedia,
             layoutItems
         }
+    }
+
+    /**
+     * Renders one block on the flow axis and appends interactive bounds.
+     * @param {{
+     *  ctx: CanvasRenderingContext2D,
+     *  block: object,
+     *  flowCursor: number,
+     *  canvas: HTMLCanvasElement,
+     *  isHorizontal: boolean,
+     *  textDotScale: number,
+     *  maxFontDots: number,
+     *  layoutItems: Array<object>
+     * }} options
+     */
+    _renderFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, textDotScale, maxFontDots, layoutItems }) {
+        const item = block?.ref
+        if (!item) return
+
+        if (item.type === 'text') {
+            this._renderTextFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, textDotScale, maxFontDots, layoutItems })
+            return
+        }
+        if (item.type === 'qr') {
+            this._renderQrFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, layoutItems })
+            return
+        }
+        if (item.type === 'barcode') {
+            this._renderRasterFlowBlock({
+                ctx,
+                block,
+                flowCursor,
+                canvas,
+                isHorizontal,
+                layoutItems,
+                drawCanvas: block.barcodeCanvas,
+                drawWidth: Math.max(16, block.barcodeWidth || item.width || 16),
+                drawHeight: Math.max(16, block.barcodeHeight || item.height || 16)
+            })
+            return
+        }
+        if (item.type === 'image') {
+            this._renderRasterFlowBlock({
+                ctx,
+                block,
+                flowCursor,
+                canvas,
+                isHorizontal,
+                layoutItems,
+                drawCanvas: block.imageCanvas,
+                drawWidth: Math.max(1, block.imageWidth || item.width || 1),
+                drawHeight: Math.max(1, block.imageHeight || item.height || 1)
+            })
+            return
+        }
+        if (item.type === 'icon') {
+            this._renderRasterFlowBlock({
+                ctx,
+                block,
+                flowCursor,
+                canvas,
+                isHorizontal,
+                layoutItems,
+                drawCanvas: block.iconCanvas,
+                drawWidth: Math.max(1, block.iconWidth || item.width || 1),
+                drawHeight: Math.max(1, block.iconHeight || item.height || 1)
+            })
+            return
+        }
+        if (item.type === 'shape') {
+            this._renderShapeFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, layoutItems })
+        }
+    }
+
+    /**
+     * Renders one text block on the flow axis and appends interactive bounds.
+     * @param {{
+     *  ctx: CanvasRenderingContext2D,
+     *  block: object,
+     *  flowCursor: number,
+     *  canvas: HTMLCanvasElement,
+     *  isHorizontal: boolean,
+     *  textDotScale: number,
+     *  maxFontDots: number,
+     *  layoutItems: Array<object>
+     * }} options
+     */
+    _renderTextFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, textDotScale, maxFontDots, layoutItems }) {
+        const item = block.ref
+        const resolvedSize =
+            block.fontSizeDots || Math.min(Math.max(8, Math.round((item.fontSize || 16) * textDotScale)), maxFontDots)
+        ctx.font = `${resolvedSize}px ${block.family || item.fontFamily || 'sans-serif'}`
+        ctx.textBaseline = 'alphabetic'
+        const verticalScale = Number.isFinite(block.textVerticalScale) ? block.textVerticalScale : 1
+        const ascent = block.ascent || resolvedSize * verticalScale
+        const descent = block.descent || 0
+        const blockHeight = ascent + descent
+        const yAdjust = item.yOffset || 0
+        const baselineY = isHorizontal
+            ? (canvas.height - blockHeight) / 2 + ascent + yAdjust
+            : flowCursor + (block.span - blockHeight) / 2 + ascent + yAdjust
+        const drawX = this._resolveFlowDrawX(item, flowCursor, isHorizontal)
+        const textMetrics = ctx.measureText(block.resolvedText || '')
+        const inkLeft = Number.isFinite(textMetrics.actualBoundingBoxLeft) ? textMetrics.actualBoundingBoxLeft : 0
+        const inkRight = Number.isFinite(textMetrics.actualBoundingBoxRight)
+            ? textMetrics.actualBoundingBoxRight
+            : textMetrics.width
+        const actualAscent = Number.isFinite(textMetrics.actualBoundingBoxAscent) ? textMetrics.actualBoundingBoxAscent : ascent
+        const actualDescent = Number.isFinite(textMetrics.actualBoundingBoxDescent)
+            ? textMetrics.actualBoundingBoxDescent
+            : descent
+        const clampedInkLeft = Math.max(0, inkLeft)
+        const clampedInkRight = Math.max(clampedInkLeft, inkRight)
+        const inkWidth = Math.max(1, clampedInkRight - clampedInkLeft)
+        const scaledAscent = actualAscent * verticalScale
+        const scaledDescent = actualDescent * verticalScale
+        const textBounds = {
+            x: drawX + clampedInkLeft,
+            y: baselineY - scaledAscent,
+            width: inkWidth || block.textAdvanceWidth || 1,
+            height: Math.max(1, scaledAscent + scaledDescent)
+        }
+        RotationUtils.drawWithRotation(ctx, textBounds, item.rotation, () => {
+            ctx.save()
+            ctx.translate(drawX, baselineY)
+            ctx.scale(1, verticalScale)
+            ctx.fillText(block.resolvedText || '', 0, 0)
+            ctx.restore()
+        })
+        layoutItems.push({
+            id: item.id,
+            type: item.type,
+            item,
+            bounds: RotationUtils.computeRotatedBounds(textBounds, item.rotation)
+        })
+    }
+
+    /**
+     * Renders one QR block on the flow axis and appends interactive bounds.
+     * @param {{
+     *  ctx: CanvasRenderingContext2D,
+     *  block: object,
+     *  flowCursor: number,
+     *  canvas: HTMLCanvasElement,
+     *  isHorizontal: boolean,
+     *  layoutItems: Array<object>
+     * }} options
+     */
+    _renderQrFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, layoutItems }) {
+        const item = block.ref
+        const drawSize = Math.max(1, item.size || block.qrSize || 1)
+        const drawX = this._resolveFlowDrawX(item, flowCursor, isHorizontal)
+        const drawY = this._resolveCenteredFlowDrawY({
+            flowCursor,
+            span: block.span,
+            drawHeight: drawSize,
+            canvasHeight: canvas.height,
+            yAdjust: item.yOffset || 0,
+            isHorizontal
+        })
+        const qrBounds = { x: drawX, y: drawY, width: drawSize, height: drawSize }
+        RotationUtils.drawWithRotation(ctx, qrBounds, item.rotation, () => {
+            ctx.drawImage(block.qrCanvas, drawX, drawY, drawSize, drawSize)
+        })
+        layoutItems.push({
+            id: item.id,
+            type: item.type,
+            item,
+            bounds: RotationUtils.computeRotatedBounds(qrBounds, item.rotation)
+        })
+    }
+
+    /**
+     * Renders one raster block (barcode/image/icon) on the flow axis and appends bounds.
+     * @param {{
+     *  ctx: CanvasRenderingContext2D,
+     *  block: object,
+     *  flowCursor: number,
+     *  canvas: HTMLCanvasElement,
+     *  isHorizontal: boolean,
+     *  layoutItems: Array<object>,
+     *  drawCanvas: HTMLCanvasElement | null,
+     *  drawWidth: number,
+     *  drawHeight: number
+     * }} options
+     */
+    _renderRasterFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, layoutItems, drawCanvas, drawWidth, drawHeight }) {
+        const item = block.ref
+        const safeWidth = Math.max(1, drawWidth)
+        const safeHeight = Math.max(1, drawHeight)
+        const drawX = this._resolveFlowDrawX(item, flowCursor, isHorizontal)
+        const drawY = this._resolveCenteredFlowDrawY({
+            flowCursor,
+            span: block.span,
+            drawHeight: safeHeight,
+            canvasHeight: canvas.height,
+            yAdjust: item.yOffset || 0,
+            isHorizontal
+        })
+        const bounds = { x: drawX, y: drawY, width: safeWidth, height: safeHeight }
+        if (drawCanvas) {
+            RotationUtils.drawWithRotation(ctx, bounds, item.rotation, () => {
+                ctx.drawImage(drawCanvas, drawX, drawY, safeWidth, safeHeight)
+            })
+        }
+        layoutItems.push({
+            id: item.id,
+            type: item.type,
+            item,
+            bounds: RotationUtils.computeRotatedBounds(bounds, item.rotation)
+        })
+    }
+
+    /**
+     * Renders one shape block on the flow axis and appends interactive bounds.
+     * @param {{
+     *  ctx: CanvasRenderingContext2D,
+     *  block: object,
+     *  flowCursor: number,
+     *  canvas: HTMLCanvasElement,
+     *  isHorizontal: boolean,
+     *  layoutItems: Array<object>
+     * }} options
+     */
+    _renderShapeFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, layoutItems }) {
+        const item = block.ref
+        const shapeWidth = Math.max(1, block.shapeWidth || item.width || 1)
+        const shapeHeight = Math.max(1, block.shapeHeight || item.height || 1)
+        const drawX = isHorizontal
+            ? this._resolveFlowDrawX(item, flowCursor, isHorizontal)
+            : Math.max(0, (canvas.width - shapeWidth) / 2 + (item.xOffset || 0))
+        const drawY = this._resolveCenteredFlowDrawY({
+            flowCursor,
+            span: block.span,
+            drawHeight: shapeHeight,
+            canvasHeight: canvas.height,
+            yAdjust: item.yOffset || 0,
+            isHorizontal
+        })
+        const shapeBounds = { x: drawX, y: drawY, width: shapeWidth, height: shapeHeight }
+        RotationUtils.drawWithRotation(ctx, shapeBounds, item.rotation, () => {
+            ShapeDrawUtils.drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
+        })
+        const interactionBounds = ShapeDrawUtils.computeInteractionBounds(item, drawX, drawY, shapeWidth, shapeHeight)
+        layoutItems.push({
+            id: item.id,
+            type: item.type,
+            item,
+            bounds: RotationUtils.computeRotatedBounds(interactionBounds, item.rotation)
+        })
+    }
+
+    /**
+     * Resolves X position for flow items by orientation.
+     * @param {object} item
+     * @param {number} flowCursor
+     * @param {boolean} isHorizontal
+     * @returns {number}
+     */
+    _resolveFlowDrawX(item, flowCursor, isHorizontal) {
+        return isHorizontal ? (item.xOffset || 0) + flowCursor : item.xOffset || 0
+    }
+
+    /**
+     * Resolves centered Y position for flow items by orientation.
+     * @param {{
+     *  flowCursor: number,
+     *  span: number,
+     *  drawHeight: number,
+     *  canvasHeight: number,
+     *  yAdjust: number,
+     *  isHorizontal: boolean
+     * }} options
+     * @returns {number}
+     */
+    _resolveCenteredFlowDrawY({ flowCursor, span, drawHeight, canvasHeight, yAdjust, isHorizontal }) {
+        if (isHorizontal) {
+            return Math.max(0, (canvasHeight - drawHeight) / 2 + yAdjust)
+        }
+        return flowCursor + Math.max(0, (span - drawHeight) / 2 + yAdjust)
     }
 
     /**

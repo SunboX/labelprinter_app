@@ -177,6 +177,86 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
     }
 
     /**
+     * Returns whether a next selection set matches the current selection set.
+     * @param {Set<string>} nextSelection
+     * @returns {boolean}
+     */
+    _isSelectionUnchanged(nextSelection) {
+        if (!(nextSelection instanceof Set)) return false
+        if (nextSelection.size !== this._selectedItemIds.size) return false
+        for (const id of nextSelection) {
+            if (!this._selectedItemIds.has(id)) {
+                return false
+            }
+        }
+        return true
+    }
+
+    /**
+     * Applies a new selection set and optionally emits selection change.
+     * @param {Set<string>} nextSelection
+     * @param {boolean} [emitChange=true]
+     * @returns {boolean}
+     */
+    _applySelection(nextSelection, emitChange = true) {
+        if (this._isSelectionUnchanged(nextSelection)) {
+            return false
+        }
+        this._selectedItemIds = nextSelection
+        if (emitChange) {
+            this._emitSelectionChange()
+        }
+        return true
+    }
+
+    /**
+     * Selects exactly one item id.
+     * @param {string} itemId
+     * @param {boolean} [emitChange=true]
+     * @returns {boolean}
+     */
+    _selectOnlyItem(itemId, emitChange = true) {
+        if (typeof itemId !== 'string' || !itemId) return false
+        return this._applySelection(new Set([itemId]), emitChange)
+    }
+
+    /**
+     * Applies a drag/resize offset delta to an item.
+     * @param {object} item
+     * @param {number} deltaLeft
+     * @param {number} deltaTop
+     */
+    _applyOffsetDelta(item, deltaLeft, deltaTop) {
+        if (deltaLeft) {
+            item.xOffset = Math.round((item.xOffset || 0) + deltaLeft)
+        }
+        if (deltaTop) {
+            item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
+        }
+    }
+
+    /**
+     * Resizes an image-like item while constraining it to printable width.
+     * @param {object} item
+     * @param {object} event
+     * @param {number} minSize
+     */
+    _resizeConstrainedImageLikeItem(item, event, minSize) {
+        const widthDots = Math.max(minSize, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
+        const heightDots = Math.max(minSize, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
+        const media = Media[this.state.media] || Media.W24
+        const printWidth = Math.max(8, media?.printArea || 128)
+        const constrained = this._constrainImageDimensionsToPrintWidth(
+            widthDots,
+            heightDots,
+            printWidth,
+            this.state.orientation === 'horizontal'
+        )
+        item.width = Math.max(minSize, constrained.width)
+        item.height = Math.max(minSize, constrained.height)
+    }
+
+    /**
      * Returns the allowed resize handles for a specific interactive entry.
      * @param {{ item?: object } | null | undefined} entry
      * @returns {string[]}
@@ -258,20 +338,7 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
             // Fallback for environments where `dblclick` may be swallowed by drag handling.
             event.preventDefault()
             event.stopImmediatePropagation()
-            const nextSelection = new Set([entry.id])
-            let selectionChanged = nextSelection.size !== this._selectedItemIds.size
-            if (!selectionChanged) {
-                for (const id of nextSelection) {
-                    if (!this._selectedItemIds.has(id)) {
-                        selectionChanged = true
-                        break
-                    }
-                }
-            }
-            if (selectionChanged) {
-                this._selectedItemIds = nextSelection
-                this._emitSelectionChange()
-            }
+            this._selectOnlyItem(entry.id)
             this._activeItemId = entry.id
             this._hoverItemId = entry.id
             this._startInlineTextEdit(entry)
@@ -331,20 +398,7 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         if (entry.type !== 'text') return
         event.preventDefault()
         event.stopImmediatePropagation()
-        const nextSelection = new Set([entry.id])
-        let selectionChanged = nextSelection.size !== this._selectedItemIds.size
-        if (!selectionChanged) {
-            for (const id of nextSelection) {
-                if (!this._selectedItemIds.has(id)) {
-                    selectionChanged = true
-                    break
-                }
-            }
-        }
-        if (selectionChanged) {
-            this._selectedItemIds = nextSelection
-            this._emitSelectionChange()
-        }
+        this._selectOnlyItem(entry.id)
         this._activeItemId = entry.id
         this._hoverItemId = entry.id
         this._startInlineTextEdit(entry)
@@ -357,20 +411,7 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
      */
     _openIconPickerFromPreview(entry) {
         if (!entry || entry.type !== 'icon') return
-        const nextSelection = new Set([entry.id])
-        let selectionChanged = nextSelection.size !== this._selectedItemIds.size
-        if (!selectionChanged) {
-            for (const id of nextSelection) {
-                if (!this._selectedItemIds.has(id)) {
-                    selectionChanged = true
-                    break
-                }
-            }
-        }
-        if (selectionChanged) {
-            this._selectedItemIds = nextSelection
-            this._emitSelectionChange()
-        }
+        this._selectOnlyItem(entry.id)
         this._activeItemId = entry.id
         this._hoverItemId = entry.id
         this._emitItemEditorRequest({ itemId: entry.id, type: entry.type })
@@ -626,9 +667,7 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         const entry = this._getEntryFromEvent(event)
         if (!entry) return
         if (!this._selectedItemIds.has(entry.id)) {
-            this._selectedItemIds.clear()
-            this._selectedItemIds.add(entry.id)
-            this._emitSelectionChange()
+            this._selectOnlyItem(entry.id)
         }
         this._activeItemId = entry.id
         this._hoverItemId = entry.id
@@ -707,9 +746,7 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         const entry = this._getEntryFromEvent(event)
         if (!entry) return
         if (!this._selectedItemIds.has(entry.id)) {
-            this._selectedItemIds.clear()
-            this._selectedItemIds.add(entry.id)
-            this._emitSelectionChange()
+            this._selectOnlyItem(entry.id)
         }
         const item = entry.item
         this._activeItemId = entry.id
@@ -754,93 +791,30 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
             const heightDots = Math.max(2, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
             item.width = widthDots
             item.height = heightDots
-            if (deltaLeft) {
-                item.xOffset = Math.round((item.xOffset || 0) + deltaLeft)
-            }
-            if (deltaTop) {
-                item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
-            }
+            this._applyOffsetDelta(item, deltaLeft, deltaTop)
         } else if (item.type === 'image') {
-            const widthDots = Math.max(8, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
-            const heightDots = Math.max(8, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
-            const media = Media[this.state.media] || Media.W24
-            const printWidth = Math.max(8, media?.printArea || 128)
-            const constrained = this._constrainImageDimensionsToPrintWidth(
-                widthDots,
-                heightDots,
-                printWidth,
-                this.state.orientation === 'horizontal'
-            )
-            item.width = constrained.width
-            item.height = constrained.height
-            if (deltaLeft) {
-                item.xOffset = Math.round((item.xOffset || 0) + deltaLeft)
-            }
-            if (deltaTop) {
-                item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
-            }
+            this._resizeConstrainedImageLikeItem(item, event, 8)
+            this._applyOffsetDelta(item, deltaLeft, deltaTop)
         } else if (item.type === 'icon') {
-            const widthDots = Math.max(8, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
-            const heightDots = Math.max(8, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
-            const media = Media[this.state.media] || Media.W24
-            const printWidth = Math.max(8, media?.printArea || 128)
-            const constrained = this._constrainImageDimensionsToPrintWidth(
-                widthDots,
-                heightDots,
-                printWidth,
-                this.state.orientation === 'horizontal'
-            )
-            item.width = constrained.width
-            item.height = constrained.height
-            if (deltaLeft) {
-                item.xOffset = Math.round((item.xOffset || 0) + deltaLeft)
-            }
-            if (deltaTop) {
-                item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
-            }
+            this._resizeConstrainedImageLikeItem(item, event, 8)
+            this._applyOffsetDelta(item, deltaLeft, deltaTop)
         } else if (item.type === 'barcode') {
-            const widthDots = Math.max(16, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
-            const heightDots = Math.max(16, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
-            const media = Media[this.state.media] || Media.W24
-            const printWidth = Math.max(8, media?.printArea || 128)
-            const constrained = this._constrainImageDimensionsToPrintWidth(
-                widthDots,
-                heightDots,
-                printWidth,
-                this.state.orientation === 'horizontal'
-            )
-            item.width = Math.max(16, constrained.width)
-            item.height = Math.max(16, constrained.height)
-            if (deltaLeft) {
-                item.xOffset = Math.round((item.xOffset || 0) + deltaLeft)
-            }
-            if (deltaTop) {
-                item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
-            }
+            this._resizeConstrainedImageLikeItem(item, event, 16)
+            this._applyOffsetDelta(item, deltaLeft, deltaTop)
         } else if (item.type === 'qr') {
             const widthDots = Math.max(1, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
             const heightDots = Math.max(1, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
             const sizeDots = QrSizeUtils.clampQrSizeToLabel(this.state, Math.max(widthDots, heightDots))
             item.size = sizeDots
             item.height = sizeDots
-            if (deltaLeft) {
-                item.xOffset = Math.round((item.xOffset || 0) + deltaLeft)
-            }
-            if (deltaTop) {
-                item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
-            }
+            this._applyOffsetDelta(item, deltaLeft, deltaTop)
         } else if (item.type === 'text') {
             const startRect = this._interaction.startRect
             const scaleX = startRect.width ? (event.rect?.width || startRect.width) / startRect.width : 1
             const scaleY = startRect.height ? (event.rect?.height || startRect.height) / startRect.height : 1
             const scale = Math.max(scaleX, scaleY)
             item.fontSize = Math.max(8, Math.round((this._interaction.startItem.fontSize || 16) * scale))
-            if (deltaLeft) {
-                item.xOffset = Math.round((item.xOffset || 0) + deltaLeft)
-            }
-            if (deltaTop) {
-                item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
-            }
+            this._applyOffsetDelta(item, deltaLeft, deltaTop)
         }
         this._debugLog('resize:move', {
             id: entry.id,

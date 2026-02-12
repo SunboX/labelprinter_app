@@ -10,6 +10,8 @@ This repository is the label printer application (editor/UI) and references `lab
 - `src/main.mjs`: app controller and wiring
 - `src/ui/`: UI modules (`ItemsEditor`, `PreviewRenderer`, `PrintController`)
 - `src/*-utils.mjs`: app utility modules
+- `src/i18n/`: locale bundles (`en.json`, `de.json`)
+- `src/assets/icons/`: SVG icon catalog used by icon objects
 - `src/server.mjs`: local development static server
 - `tests/`: app-focused unit and manual-test docs
 
@@ -25,6 +27,13 @@ This repository is the label printer application (editor/UI) and references `lab
   2. Load parameter rows from URL (if provided)
   3. Trigger auto-print (if enabled and project came from URL)
 - `src/ui/ParameterPanel.mjs` provides `applyParameterDataRawText(...)` so both file uploads and URL-fetched parameter files use the same validation/rendering pipeline after conversion to JSON.
+- `src/I18n.mjs` resolves locale from URL/storage/browser before UI initialization.
+
+## Icon Catalog Runtime
+
+- `src/assets/icons/icon-manifest.mjs` defines icon metadata (`file`, `id`, `category`, `label`).
+- `src/IconLibraryUtils.mjs` validates SVG root metadata (`id`, `category`, `label`) on first use.
+- Invalid icons are skipped with console warnings, and icon ids fall back to the default catalog icon.
 
 ## External Library
 

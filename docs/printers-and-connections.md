@@ -14,6 +14,23 @@ The app currently exposes these model classes in the UI:
 
 Select the model in the **Printer model** dropdown before printing.
 
+## Model/Backend Support Matrix
+
+The app exposes all listed models for both backends. Actual device compatibility still depends on hardware/firmware capabilities.
+
+| Printer model (UI) | WebUSB (USB) | WebBluetooth (BLE) | Notes |
+| --- | --- | --- | --- |
+| `P700` | Supported by app | Supported by app | BLE requires correct GATT UUIDs and a BLE-capable target device/profile |
+| `P750W` | Supported by app | Supported by app | BLE support depends on firmware/profile availability |
+| `E500` | Supported by app | Supported by app | BLE support depends on firmware/profile availability |
+| `E550W` | Supported by app | Supported by app | BLE support depends on firmware/profile availability |
+| `H500` | Supported by app | Supported by app | BLE support depends on firmware/profile availability |
+
+Important:
+
+- The app does not ship model-specific BLE UUID presets.
+- You must provide valid UUID values for your exact BLE profile/device.
+
 ## Browser And Environment Requirements
 
 Printing requires browser device APIs:
