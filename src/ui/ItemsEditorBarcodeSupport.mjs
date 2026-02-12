@@ -1,6 +1,7 @@
 import { BarcodeUtils } from '../BarcodeUtils.mjs'
 import { RotationUtils } from '../RotationUtils.mjs'
 import { ItemsEditorImageSupport } from './ItemsEditorImageSupport.mjs'
+import { ItemsEditorControlSupport } from './ItemsEditorControlSupport.mjs'
 
 /**
  * Shared barcode-item helpers for the items editor.
@@ -54,49 +55,27 @@ export class ItemsEditorBarcodeSupport {
     static appendBarcodeControls({ item, controls, sizeLabel, state, translate, onChange, createSlider }) {
         ItemsEditorBarcodeSupport.normalizeBarcodeItem(item, state)
         const crossAxisLimit = ItemsEditorImageSupport.resolveImageCrossAxisLimit(state)
-        const widthMax = state.orientation === 'vertical' ? crossAxisLimit : 600
-        const heightMax = state.orientation === 'horizontal' ? crossAxisLimit : 320
-
-        const widthCtrl = createSlider(sizeLabel, item.width || 220, 16, widthMax, 1, (value) => {
-            item.width = value
-            const constrained = ItemsEditorImageSupport.constrainImageDimensionsForOrientation(
-                item.width,
-                item.height || 64,
-                state
-            )
-            item.width = Math.max(16, constrained.width)
-            item.height = Math.max(16, constrained.height)
-            onChange()
-        })
-        const heightCtrl = createSlider(
-            translate('itemsEditor.sizeHeight'),
-            item.height || 64,
-            16,
+        const { widthMax, heightMax } = ItemsEditorControlSupport.resolveDimensionMax(state, crossAxisLimit)
+        const { widthCtrl, heightCtrl } = ItemsEditorControlSupport.createConstrainedDimensionControls({
+            item,
+            state,
+            sizeLabel,
+            heightLabel: translate('itemsEditor.sizeHeight'),
+            minWidth: 16,
+            minHeight: 16,
+            widthMax,
             heightMax,
-            1,
-            (value) => {
-                item.height = value
-                const constrained = ItemsEditorImageSupport.constrainImageDimensionsForOrientation(
-                    item.width || 220,
-                    item.height,
-                    state
-                )
-                item.width = Math.max(16, constrained.width)
-                item.height = Math.max(16, constrained.height)
-                onChange()
-            }
-        )
-        const offsetCtrl = createSlider(translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, -80, 80, 1, (value) => {
-            item.xOffset = value
-            onChange()
+            defaultWidth: 220,
+            defaultHeight: 64,
+            onChange,
+            constrainDimensions: ItemsEditorImageSupport.constrainImageDimensionsForOrientation,
+            createSlider
         })
-        const yOffsetCtrl = createSlider(translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -80, 80, 1, (value) => {
-            item.yOffset = value
-            onChange()
-        })
-        const rotationCtrl = createSlider(translate('itemsEditor.sliderRotation'), item.rotation ?? 0, -180, 180, 1, (value) => {
-            item.rotation = value
-            onChange()
+        const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
+            item,
+            translate,
+            onChange,
+            createSlider
         })
         const moduleWidthCtrl = createSlider(
             translate('itemsEditor.barcodeModuleWidth'),
@@ -121,39 +100,23 @@ export class ItemsEditorBarcodeSupport {
             }
         )
 
-        const formatCtrl = document.createElement('div')
-        formatCtrl.className = 'field'
-        const formatLabel = document.createElement('label')
-        formatLabel.textContent = translate('itemsEditor.barcodeFormat')
-        const formatSelect = document.createElement('select')
-        BarcodeUtils.getSupportedFormats().forEach((format) => {
-            const option = document.createElement('option')
-            option.value = format
-            option.textContent = format
-            formatSelect.append(option)
+        const { field: formatCtrl } = ItemsEditorControlSupport.createSelectField({
+            labelText: translate('itemsEditor.barcodeFormat'),
+            value: item.barcodeFormat,
+            options: BarcodeUtils.getSupportedFormats().map((format) => ({ value: format, label: format })),
+            onChange: (value) => {
+                item.barcodeFormat = BarcodeUtils.normalizeFormat(value)
+                onChange()
+            }
         })
-        formatSelect.value = item.barcodeFormat
-        formatSelect.addEventListener('change', (event) => {
-            item.barcodeFormat = BarcodeUtils.normalizeFormat(event.target.value)
-            onChange()
+        const { field: showTextCtrl } = ItemsEditorControlSupport.createCheckboxField({
+            labelText: translate('itemsEditor.barcodeShowText'),
+            checked: Boolean(item.barcodeShowText),
+            onChange: (checked) => {
+                item.barcodeShowText = checked
+                onChange()
+            }
         })
-        formatCtrl.append(formatLabel, formatSelect)
-
-        const showTextCtrl = document.createElement('div')
-        showTextCtrl.className = 'field'
-        const showTextLabel = document.createElement('label')
-        showTextLabel.className = 'checkbox-row'
-        const showTextInput = document.createElement('input')
-        showTextInput.type = 'checkbox'
-        showTextInput.checked = Boolean(item.barcodeShowText)
-        showTextInput.addEventListener('change', (event) => {
-            item.barcodeShowText = event.target.checked
-            onChange()
-        })
-        const showTextText = document.createElement('span')
-        showTextText.textContent = translate('itemsEditor.barcodeShowText')
-        showTextLabel.append(showTextInput, showTextText)
-        showTextCtrl.append(showTextLabel)
 
         controls.append(
             widthCtrl,

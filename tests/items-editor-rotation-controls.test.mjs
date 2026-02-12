@@ -7,6 +7,7 @@ const itemsEditorSource = fs.readFileSync(path.join(process.cwd(), 'src/ui/Items
 const imageSupportSource = fs.readFileSync(path.join(process.cwd(), 'src/ui/ItemsEditorImageSupport.mjs'), 'utf8')
 const iconSupportSource = fs.readFileSync(path.join(process.cwd(), 'src/ui/ItemsEditorIconSupport.mjs'), 'utf8')
 const barcodeSupportSource = fs.readFileSync(path.join(process.cwd(), 'src/ui/ItemsEditorBarcodeSupport.mjs'), 'utf8')
+const geometrySupportSource = fs.readFileSync(path.join(process.cwd(), 'src/ui/ItemsEditorGeometrySupport.mjs'), 'utf8')
 
 describe('items editor rotation controls', () => {
     it('adds rotation defaults and sliders for text, qr, barcode, and shape items', () => {
@@ -18,8 +19,9 @@ describe('items editor rotation controls', () => {
     })
 
     it('adds rotation sliders for image, icon, and barcode items', () => {
-        assert.match(imageSupportSource, /createSlider\(translate\('itemsEditor\.sliderRotation'/)
-        assert.match(iconSupportSource, /createSlider\(translate\('itemsEditor\.sliderRotation'/)
-        assert.match(barcodeSupportSource, /createSlider\(translate\('itemsEditor\.sliderRotation'/)
+        assert.match(imageSupportSource, /ItemsEditorControlSupport\.createOffsetAndRotationControls\(/)
+        assert.match(iconSupportSource, /ItemsEditorControlSupport\.createOffsetAndRotationControls\(/)
+        assert.match(barcodeSupportSource, /ItemsEditorControlSupport\.createOffsetAndRotationControls\(/)
+        assert.match(geometrySupportSource, /ItemsEditorControlSupport\.createOffsetAndRotationControls\(/)
     })
 })

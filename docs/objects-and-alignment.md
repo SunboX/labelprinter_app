@@ -23,6 +23,20 @@ Notes:
 - Multi-selection hides resize handles (move + align only).
 - When multiple items are selected, dragging one selected item moves the full selection.
 - Object cards can be reordered in the **Objects** panel using drag handles; this reorders settings cards only.
+- Width/height controls for image-like objects are constrained to the printable cross-axis (depends on media width + orientation).
+
+## Interaction Cheatsheet
+
+- `Click` object: select object.
+- `Ctrl+Click` (Windows/Linux) or `Cmd+Click` (macOS): add/remove object in selection.
+- `Drag` selected object: move object.
+- `Drag` one object within a multi-selection: move whole selection.
+- `Drag` handle dots (single selection): resize.
+- `Double-click` text: inline text edit.
+- `Double-click` image: open image picker for that item.
+- `Double-click` icon: open icon picker for that item.
+- Inline text edit `Enter`: apply.
+- Inline text edit `Esc`: cancel.
 
 ## Text Object
 
@@ -87,6 +101,17 @@ Handling:
 - Invalid barcode payload/format combinations show a visible placeholder block instead of breaking rendering.
 - Width/height are constrained to the printable cross-axis based on orientation/media, similar to images/icons.
 
+Supported `barcodeFormat` values:
+
+- `CODE128`, `CODE128A`, `CODE128B`, `CODE128C`
+- `CODE39`
+- `EAN13`, `EAN8`, `EAN5`, `EAN2`
+- `UPC`, `UPCE`
+- `ITF14`
+- `MSI`, `MSI10`, `MSI11`, `MSI1010`, `MSI1110`
+- `codabar`
+- `pharmacode`
+
 ## Image Object
 
 Description: Uploaded raster image converted to printer-like black/white output.
@@ -129,6 +154,15 @@ Handling:
 - Choose icon from the popup icon picker.
 - Double-click icon in preview to open picker for that item.
 - Size is constrained similarly to image objects.
+- Picker entries are grouped by category and rendered as an overlay.
+- Icon previews are loaded lazily when the picker is opened.
+
+Icon asset requirements (for maintainers adding icons):
+
+- Icons are defined in `src/assets/icons/icon-manifest.mjs`.
+- SVG files are loaded from `src/assets/icons/`.
+- Each SVG root must include matching `id`, `category`, and `label` attributes.
+- Icons failing metadata validation are excluded and a warning is printed in the browser console.
 
 ## Form Object
 

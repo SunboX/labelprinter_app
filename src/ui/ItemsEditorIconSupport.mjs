@@ -1,6 +1,7 @@
 import { IconLibraryUtils } from '../IconLibraryUtils.mjs'
 import { RotationUtils } from '../RotationUtils.mjs'
 import { ItemsEditorImageSupport } from './ItemsEditorImageSupport.mjs'
+import { ItemsEditorControlSupport } from './ItemsEditorControlSupport.mjs'
 
 /**
  * Shared icon-item helpers for the items editor.
@@ -217,44 +218,27 @@ export class ItemsEditorIconSupport {
     static appendIconControls({ item, controls, sizeLabel, state, translate, onChange, createSlider }) {
         ItemsEditorIconSupport.normalizeIconItem(item, state)
         const crossAxisLimit = ItemsEditorImageSupport.resolveImageCrossAxisLimit(state)
-        const widthMax = state.orientation === 'vertical' ? crossAxisLimit : 600
-        const heightMax = state.orientation === 'horizontal' ? crossAxisLimit : 320
-
-        const widthCtrl = createSlider(sizeLabel, item.width || 72, 8, widthMax, 1, (value) => {
-            item.width = value
-            const constrained = ItemsEditorImageSupport.constrainImageDimensionsForOrientation(
-                item.width,
-                item.height || 72,
-                state
-            )
-            item.width = constrained.width
-            item.height = constrained.height
-            onChange()
+        const { widthMax, heightMax } = ItemsEditorControlSupport.resolveDimensionMax(state, crossAxisLimit)
+        const { widthCtrl, heightCtrl } = ItemsEditorControlSupport.createConstrainedDimensionControls({
+            item,
+            state,
+            sizeLabel,
+            heightLabel: translate('itemsEditor.sizeHeight'),
+            minWidth: 8,
+            minHeight: 8,
+            widthMax,
+            heightMax,
+            defaultWidth: 72,
+            defaultHeight: 72,
+            onChange,
+            constrainDimensions: ItemsEditorImageSupport.constrainImageDimensionsForOrientation,
+            createSlider
         })
-
-        const heightCtrl = createSlider(translate('itemsEditor.sizeHeight'), item.height || 72, 8, heightMax, 1, (value) => {
-            item.height = value
-            const constrained = ItemsEditorImageSupport.constrainImageDimensionsForOrientation(
-                item.width || 72,
-                item.height,
-                state
-            )
-            item.width = constrained.width
-            item.height = constrained.height
-            onChange()
-        })
-
-        const offsetCtrl = createSlider(translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, -80, 80, 1, (value) => {
-            item.xOffset = value
-            onChange()
-        })
-        const yOffsetCtrl = createSlider(translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -80, 80, 1, (value) => {
-            item.yOffset = value
-            onChange()
-        })
-        const rotationCtrl = createSlider(translate('itemsEditor.sliderRotation'), item.rotation ?? 0, -180, 180, 1, (value) => {
-            item.rotation = value
-            onChange()
+        const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
+            item,
+            translate,
+            onChange,
+            createSlider
         })
         controls.append(widthCtrl, heightCtrl, offsetCtrl, yOffsetCtrl, rotationCtrl)
     }
