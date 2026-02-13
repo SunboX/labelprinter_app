@@ -1,5 +1,7 @@
 import { FontFamilyUtils } from '../FontFamilyUtils.mjs'
 import { BarcodeUtils } from '../BarcodeUtils.mjs'
+import { QrSizeUtils } from '../QrSizeUtils.mjs'
+import { QrCodeUtils } from '../QrCodeUtils.mjs'
 import { ItemsEditorImageSupport } from './ItemsEditorImageSupport.mjs'
 import { ItemsEditorIconSupport } from './ItemsEditorIconSupport.mjs'
 import { ItemsEditorBarcodeSupport } from './ItemsEditorBarcodeSupport.mjs'
