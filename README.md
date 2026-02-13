@@ -41,6 +41,7 @@ The printer protocol and backend implementation are consumed from:
 
 ## Documentation
 
+- `docs/getting-started.md`: step-by-step editor guide from setup to print.
 - `docs/objects-and-alignment.md`: object types, properties, editing behavior, and alignment.
 - `docs/parameter-data-formats.md`: parameter file formats and required CSV/spreadsheet structure.
 - `docs/printers-and-connections.md`: supported printer models, backend setup, and connection troubleshooting.

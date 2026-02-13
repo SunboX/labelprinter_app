@@ -41,6 +41,10 @@ function getOpeningTag(buttonMarkup) {
 }
 
 describe('objects action icon buttons', () => {
+    it('renders a localized add-object hint above the icon row', () => {
+        assert.match(html, /<p[^>]*data-i18n="objects\.addHint"[^>]*>/)
+    })
+
     it('render SVG-only add buttons with i18n tooltip and aria labels', () => {
         for (const spec of addButtonSpecs) {
             const buttonMarkup = getButtonMarkup(spec.attr)
