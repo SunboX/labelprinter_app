@@ -69,6 +69,7 @@
     "objects": {
         "title": "Objects",
         "description": "Drag to reorder. Adjust offsets, fonts, QR/barcode/image/icon settings, and forms.",
+        "addHint": "Click an icon below to add it to the label.",
         "addText": "Text",
         "addQr": "QR-Code",
         "addBarcode": "Barcode",

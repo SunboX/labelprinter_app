@@ -335,6 +335,15 @@
     margin-bottom: 4px;
 }
 
+.objects-add-hint {
+    margin: 2px 0 8px;
+    padding: 6px 10px;
+    border: 1px dashed rgba(143, 184, 255, 0.38);
+    border-radius: 10px;
+    background: rgba(74, 155, 255, 0.08);
+    color: #d2e2ff;
+}
+
 .objects-actions > button {
     flex: 1;
     min-height: 58px;
