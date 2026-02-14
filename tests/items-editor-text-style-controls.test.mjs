@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+import fs from 'node:fs'
+import path from 'node:path'
+
+const itemsEditorSource = fs.readFileSync(path.join(process.cwd(), 'src/ui/ItemsEditor.mjs'), 'utf8')
+const en = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'src/i18n/en.json'), 'utf8'))
+const de = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'src/i18n/de.json'), 'utf8'))
+
+describe('items-editor text style controls', () => {
+    it('adds text defaults for bold, italic and underline', () => {
+        assert.match(itemsEditorSource, /textBold:\s*false/)
+        assert.match(itemsEditorSource, /textItalic:\s*false/)
+        assert.match(itemsEditorSource, /textUnderline:\s*false/)
+    })
+
+    it('renders text style checkbox controls', () => {
+        assert.match(itemsEditorSource, /itemsEditor\.textBold/)
+        assert.match(itemsEditorSource, /itemsEditor\.textItalic/)
+        assert.match(itemsEditorSource, /itemsEditor\.textUnderline/)
+    })
+
+    it('includes i18n labels for text style controls', () => {
+        assert.equal(typeof en.itemsEditor.textBold, 'string')
+        assert.equal(typeof en.itemsEditor.textItalic, 'string')
+        assert.equal(typeof en.itemsEditor.textUnderline, 'string')
+        assert.equal(typeof de.itemsEditor.textBold, 'string')
+        assert.equal(typeof de.itemsEditor.textItalic, 'string')
+        assert.equal(typeof de.itemsEditor.textUnderline, 'string')
+    })
+})

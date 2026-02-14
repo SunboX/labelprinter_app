@@ -46,6 +46,29 @@ Printing uses browser device APIs (`WebUSB`, `WebBluetooth`).
 - `autoPrint` can start print flow automatically, but device permission prompts may still require interaction.
 - Use only trusted printer devices and known BLE UUID profiles.
 
+## AI Assistant Endpoint
+
+The in-app assistant chooses endpoint by host:
+
+- localhost: `POST /api/chat` (Node route in `src/server.mjs`)
+- live host: `POST /api/chat.php` (PHP endpoint)
+
+Security guidance:
+
+- Never place OpenAI API keys in frontend JavaScript.
+- Store API keys server-side only (for this app: `.env` / server env variables).
+- Keep tool execution allowlisted and validated.
+- Keep per-IP rate limiting enabled.
+- Log errors without logging sensitive payloads.
+
+Each assistant request sends the current rendered label canvas image to the active assistant endpoint.
+If sketches are attached, those images are sent as additional attachments.
+
+Docs grounding notes:
+
+- Assistant docs grounding happens server-side from files on disk.
+- You can keep docs private (non-public path) and set `AI_DOCS_DIR` to that location.
+
 ## Third-Party Resources
 
 The app serves JS dependencies locally from `node_modules` and loads user-provided Google Fonts URLs only from `fonts.googleapis.com` (validated).

@@ -12,6 +12,7 @@
         "express": "^4.19.2"
     },
     "dependencies": {
+        "dotenv": "^16.4.7",
         "interactjs": "^1.10.27",
         "jsbarcode": "^3.12.1",
         "labelprinterkit-web": "git+ssh://git@github.com/SunboX/labelprinterkit.git",

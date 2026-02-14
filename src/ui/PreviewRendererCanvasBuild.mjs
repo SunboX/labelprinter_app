@@ -6,6 +6,7 @@ import { IconRasterUtils } from '../IconRasterUtils.mjs'
 import { ShapeDrawUtils } from '../ShapeDrawUtils.mjs'
 import { TextSizingUtils } from '../TextSizingUtils.mjs'
 import { RotationUtils } from '../RotationUtils.mjs'
+import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { Media, Resolution } from 'labelprinterkit-web/src/index.mjs'
 import { PreviewRendererCanvasSupport } from './PreviewRendererCanvasSupport.mjs'
 import { PreviewRendererBase } from './PreviewRendererBase.mjs'
@@ -65,21 +66,29 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 const {
                     size: fontSizeDots,
                     advanceWidth: textAdvanceWidth,
-                    height: textHeight,
+                    totalHeight: textTotalHeight,
                     ascent,
                     descent,
                     inkLeft,
-                    inkWidth
+                    inkWidth,
+                    lineGap,
+                    lines: textLines,
+                    lineMetrics,
+                    underlineOffset,
+                    underlineThickness
                 } = PreviewRendererCanvasSupport.resolveTextMetrics({
                     ctx: measureCtx,
                     text: resolvedText,
                     family,
                     requestedSize: requestedSizeDots,
-                    maxHeight: maxFontDots
+                    maxHeight: maxFontDots,
+                    bold: Boolean(item.textBold),
+                    italic: Boolean(item.textItalic),
+                    underline: Boolean(item.textUnderline)
                 })
                 const scaledAscent = ascent * textVerticalScale
                 const scaledDescent = descent * textVerticalScale
-                const scaledTextHeight = Math.max(1, scaledAscent + scaledDescent)
+                const scaledTextHeight = Math.max(1, textTotalHeight * textVerticalScale)
                 // Keep base flow dimensions stable while dragging; offsets are visual translation only.
                 const span = isHorizontal
                     ? Math.max(textAdvanceWidth, scaledTextHeight)
@@ -96,7 +105,13 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     family,
                     ascent: scaledAscent,
                     descent: scaledDescent,
-                    textVerticalScale
+                    textVerticalScale,
+                    textLines,
+                    textLineGap: lineGap,
+                    textLineMetrics: lineMetrics,
+                    textTotalHeight: scaledTextHeight,
+                    textUnderlineOffset: underlineOffset,
+                    textUnderlineThickness: underlineThickness
                 })
                 continue
             }
@@ -172,9 +187,10 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
 
             if (item.type === 'qr') {
                 const resolvedQrData = ParameterTemplateUtils.resolveTemplateString(item.data || '', parameterValues)
-                const qrCanvas = await PreviewRendererCanvasSupport.getCachedQrCanvas(this, resolvedQrData, item.size, item)
-                const span = Math.max(item.height, item.size)
-                blocks.push({ ref: item, span, qrSize: item.size, qrCanvas })
+                const qrSize = QrSizeUtils.clampQrSizeToLabel(this.state, Number(item.size) || 1)
+                const qrCanvas = await PreviewRendererCanvasSupport.getCachedQrCanvas(this, resolvedQrData, qrSize, item)
+                const span = qrSize
+                blocks.push({ ref: item, span, qrSize, qrCanvas })
             }
         }
 
@@ -317,44 +333,157 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         const item = block.ref
         const resolvedSize =
             block.fontSizeDots || Math.min(Math.max(8, Math.round((item.fontSize || 16) * textDotScale)), maxFontDots)
-        ctx.font = `${resolvedSize}px ${block.family || item.fontFamily || 'sans-serif'}`
+        ctx.font = PreviewRendererCanvasSupport.buildTextFontDeclaration({
+            size: resolvedSize,
+            family: block.family || item.fontFamily || 'sans-serif',
+            bold: Boolean(item.textBold),
+            italic: Boolean(item.textItalic)
+        })
         ctx.textBaseline = 'alphabetic'
         const verticalScale = Number.isFinite(block.textVerticalScale) ? block.textVerticalScale : 1
-        const ascent = block.ascent || resolvedSize * verticalScale
-        const descent = block.descent || 0
-        const blockHeight = ascent + descent
+        const underlineMetrics = PreviewRendererCanvasSupport.computeUnderlineMetrics(resolvedSize, 1)
+        const underlineOffset = Math.max(1, Number(block.textUnderlineOffset || underlineMetrics.offset)) * verticalScale
+        const underlineThickness = Math.max(1, Number(block.textUnderlineThickness || underlineMetrics.thickness)) * verticalScale
+        const textLines = Array.isArray(block.textLines) && block.textLines.length ? block.textLines : [block.resolvedText || '']
+        const lineMetrics = Array.isArray(block.textLineMetrics) ? block.textLineMetrics : []
+        const scaledLineGap = Math.max(0, Number(block.textLineGap || 0) * verticalScale)
+        const fallbackAscent = Math.max(1, Number(block.ascent || resolvedSize * verticalScale))
+        const fallbackDescent = Math.max(0, Number(block.descent || 0))
         const yAdjust = item.yOffset || 0
-        const baselineY = isHorizontal
-            ? (canvas.height - blockHeight) / 2 + ascent + yAdjust
-            : flowCursor + (block.span - blockHeight) / 2 + ascent + yAdjust
         const drawX = this._resolveFlowDrawX(item, flowCursor, isHorizontal)
-        const textMetrics = ctx.measureText(block.resolvedText || '')
-        const inkLeft = Number.isFinite(textMetrics.actualBoundingBoxLeft) ? textMetrics.actualBoundingBoxLeft : 0
-        const inkRight = Number.isFinite(textMetrics.actualBoundingBoxRight)
-            ? textMetrics.actualBoundingBoxRight
-            : textMetrics.width
-        const actualAscent = Number.isFinite(textMetrics.actualBoundingBoxAscent) ? textMetrics.actualBoundingBoxAscent : ascent
-        const actualDescent = Number.isFinite(textMetrics.actualBoundingBoxDescent)
-            ? textMetrics.actualBoundingBoxDescent
-            : descent
-        const clampedInkLeft = Math.max(0, inkLeft)
-        const clampedInkRight = Math.max(clampedInkLeft, inkRight)
-        const inkWidth = Math.max(1, clampedInkRight - clampedInkLeft)
-        const scaledAscent = actualAscent * verticalScale
-        const scaledDescent = actualDescent * verticalScale
-        const textBounds = {
-            x: drawX + clampedInkLeft,
-            y: baselineY - scaledAscent,
-            width: inkWidth || block.textAdvanceWidth || 1,
-            height: Math.max(1, scaledAscent + scaledDescent)
+
+        // Preserve the previous single-line metrics/rendering path so existing text sizing snapshots stay stable.
+        if (textLines.length === 1) {
+            const singleLineUnderlineExtra = item.textUnderline ? underlineOffset + underlineThickness : 0
+            const blockHeight = fallbackAscent + fallbackDescent + singleLineUnderlineExtra
+            const baselineY = isHorizontal
+                ? (canvas.height - blockHeight) / 2 + fallbackAscent + yAdjust
+                : flowCursor + (block.span - blockHeight) / 2 + fallbackAscent + yAdjust
+            const textMetrics = ctx.measureText(block.resolvedText || '')
+            const inkLeft = Number.isFinite(textMetrics.actualBoundingBoxLeft) ? textMetrics.actualBoundingBoxLeft : 0
+            const inkRight = Number.isFinite(textMetrics.actualBoundingBoxRight)
+                ? textMetrics.actualBoundingBoxRight
+                : textMetrics.width
+            const actualAscent = Number.isFinite(textMetrics.actualBoundingBoxAscent)
+                ? textMetrics.actualBoundingBoxAscent
+                : fallbackAscent
+            const actualDescent = Number.isFinite(textMetrics.actualBoundingBoxDescent)
+                ? textMetrics.actualBoundingBoxDescent
+                : fallbackDescent
+            const clampedInkLeft = Math.max(0, inkLeft)
+            const clampedInkRight = Math.max(clampedInkLeft, inkRight)
+            const inkWidth = Math.max(1, clampedInkRight - clampedInkLeft)
+            const scaledAscent = actualAscent * verticalScale
+            const scaledDescent = actualDescent * verticalScale
+            const underlineBoundsHeight = singleLineUnderlineExtra
+            const underlineY = baselineY + underlineOffset
+            const textBounds = {
+                x: drawX + clampedInkLeft,
+                y: baselineY - scaledAscent,
+                width: inkWidth || block.textAdvanceWidth || 1,
+                height: Math.max(1, scaledAscent + scaledDescent + underlineBoundsHeight)
+            }
+            RotationUtils.drawWithRotation(ctx, textBounds, item.rotation, () => {
+                ctx.save()
+                ctx.translate(drawX, baselineY)
+                ctx.scale(1, verticalScale)
+                ctx.fillText(block.resolvedText || '', 0, 0)
+                ctx.restore()
+                if (item.textUnderline) {
+                    ctx.save()
+                    ctx.beginPath()
+                    ctx.lineWidth = underlineThickness
+                    ctx.strokeStyle = '#000'
+                    ctx.moveTo(drawX + clampedInkLeft, underlineY)
+                    ctx.lineTo(drawX + clampedInkLeft + inkWidth, underlineY)
+                    ctx.stroke()
+                    ctx.restore()
+                }
+            })
+            layoutItems.push({
+                id: item.id,
+                type: item.type,
+                item,
+                bounds: RotationUtils.computeRotatedBounds(textBounds, item.rotation)
+            })
+            return
         }
-        RotationUtils.drawWithRotation(ctx, textBounds, item.rotation, () => {
-            ctx.save()
-            ctx.translate(drawX, baselineY)
-            ctx.scale(1, verticalScale)
-            ctx.fillText(block.resolvedText || '', 0, 0)
-            ctx.restore()
+
+        const blockHeight = Math.max(1, Number(block.textTotalHeight || fallbackAscent + fallbackDescent))
+        const blockTop = isHorizontal
+            ? (canvas.height - blockHeight) / 2 + yAdjust
+            : flowCursor + (block.span - blockHeight) / 2 + yAdjust
+        const textRenderBounds = {
+            x: drawX,
+            y: blockTop,
+            width: Math.max(1, Number(block.textInkWidth || block.textAdvanceWidth || 1)),
+            height: blockHeight
+        }
+        let cursorY = blockTop
+        const renderedLineBounds = []
+        RotationUtils.drawWithRotation(ctx, textRenderBounds, item.rotation, () => {
+            textLines.forEach((line, index) => {
+                const metric = lineMetrics[index]
+                const lineAscent = Math.max(1, Number(metric?.ascent || fallbackAscent / Math.max(1, verticalScale)))
+                const lineDescent = Math.max(0, Number(metric?.descent || fallbackDescent / Math.max(1, verticalScale)))
+                const scaledAscent = lineAscent * verticalScale
+                const scaledDescent = lineDescent * verticalScale
+                const baselineY = cursorY + scaledAscent
+                const localInkLeft = Math.max(0, Number(metric?.inkLeft || 0))
+                const localInkWidth = Math.max(1, Number(metric?.inkWidth || metric?.advanceWidth || block.textAdvanceWidth || 1))
+                renderedLineBounds.push({
+                    x: drawX + localInkLeft,
+                    y: baselineY - scaledAscent,
+                    width: localInkWidth,
+                    height: Math.max(1, scaledAscent + scaledDescent + (item.textUnderline ? underlineOffset + underlineThickness : 0))
+                })
+
+                ctx.save()
+                ctx.translate(drawX, baselineY)
+                ctx.scale(1, verticalScale)
+                ctx.fillText(String(line || ''), 0, 0)
+                ctx.restore()
+                if (item.textUnderline) {
+                    const underlineY = baselineY + underlineOffset
+                    ctx.save()
+                    ctx.beginPath()
+                    ctx.lineWidth = underlineThickness
+                    ctx.strokeStyle = '#000'
+                    ctx.moveTo(drawX + localInkLeft, underlineY)
+                    ctx.lineTo(drawX + localInkLeft + localInkWidth, underlineY)
+                    ctx.stroke()
+                    ctx.restore()
+                }
+
+                cursorY += scaledAscent + scaledDescent
+                if (index < textLines.length - 1) {
+                    cursorY += scaledLineGap
+                }
+            })
         })
+
+        const textBounds = renderedLineBounds.reduce(
+            (acc, entry) => {
+                if (!acc) return { ...entry }
+                const x = Math.min(acc.x, entry.x)
+                const y = Math.min(acc.y, entry.y)
+                const right = Math.max(acc.x + acc.width, entry.x + entry.width)
+                const bottom = Math.max(acc.y + acc.height, entry.y + entry.height)
+                return {
+                    x,
+                    y,
+                    width: Math.max(1, right - x),
+                    height: Math.max(1, bottom - y)
+                }
+            },
+            null
+        ) || {
+            x: drawX,
+            y: blockTop,
+            width: Math.max(1, Number(block.textInkWidth || block.textAdvanceWidth || 1)),
+            height: blockHeight
+        }
+
         layoutItems.push({
             id: item.id,
             type: item.type,
@@ -376,7 +505,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      */
     _renderQrFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, layoutItems }) {
         const item = block.ref
-        const drawSize = Math.max(1, item.size || block.qrSize || 1)
+        const drawSize = Math.max(1, block.qrSize || item.size || 1)
         const drawX = this._resolveFlowDrawX(item, flowCursor, isHorizontal)
         const drawY = this._resolveCenteredFlowDrawY({
             flowCursor,
@@ -578,7 +707,10 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 if (item.type === 'text') {
                     const inkLeft = Math.max(0, block.textInkLeft || 0)
                     const inkWidth = Math.max(1, block.textInkWidth || block.textAdvanceWidth || 1)
-                    const textHeight = Math.max(1, (block.ascent || block.fontSizeDots || 0) + (block.descent || 0))
+                    const textHeight = Math.max(
+                        1,
+                        block.textTotalHeight || (block.ascent || block.fontSizeDots || 0) + (block.descent || 0)
+                    )
                     start = cursor + (item.xOffset || 0) + inkLeft
                     size = inkWidth
                     crossSize = textHeight
@@ -617,9 +749,10 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 )
                 const yAdjust = item.yOffset || 0
                 if (item.type === 'text') {
-                    const ascent = block.ascent || block.fontSizeDots || 0
-                    const descent = block.descent || 0
-                    const textHeight = Math.max(1, ascent + descent)
+                    const textHeight = Math.max(
+                        1,
+                        block.textTotalHeight || (block.ascent || block.fontSizeDots || 0) + (block.descent || 0)
+                    )
                     const textWidth = Math.max(1, block.textInkWidth || block.textAdvanceWidth || 1)
                     start = cursor + (Math.max(0, (block.span || textHeight) - textHeight) / 2 + yAdjust)
                     size = textHeight

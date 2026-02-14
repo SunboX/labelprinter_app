@@ -47,6 +47,9 @@ Properties:
 - `text`: displayed text content (supports `{{parameter_name}}` placeholders).
 - `fontFamily`: selected font family (local + added Google fonts).
 - `fontSize`: text size.
+- `textBold`: bold style toggle.
+- `textItalic`: italic style toggle.
+- `textUnderline`: underline style toggle.
 - `xOffset`: horizontal offset.
 - `yOffset`: vertical offset.
 - `rotation`: rotation in degrees.
@@ -65,7 +68,6 @@ Properties:
 
 - `data`: QR payload text (supports `{{parameter_name}}` placeholders).
 - `size`: QR square size (dots).
-- `height`: layout span in dots.
 - `xOffset`: horizontal offset.
 - `yOffset`: vertical offset.
 - `rotation`: rotation in degrees.
@@ -76,6 +78,7 @@ Properties:
 Handling:
 
 - Size is clamped to label limits.
+- QR is always square. Width/height are not edited independently.
 - Changing QR options invalidates and rebuilds QR render cache automatically.
 
 ## Barcode Object
