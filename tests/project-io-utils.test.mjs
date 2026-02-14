@@ -140,6 +140,7 @@ describe('project-io-utils', () => {
         assert.equal(qrItem?.qrErrorCorrectionLevel, 'Q')
         assert.equal(qrItem?.qrVersion, 2)
         assert.equal(qrItem?.qrEncodingMode, 'alphanumeric')
+        assert.equal(qrItem?.height, qrItem?.size)
         assert.equal(qrItem?.rotation, 90)
         const imageItem = state.items.find((item) => item.type === 'image')
         assert.equal(imageItem?.imageName, 'logo.png')
@@ -167,9 +168,43 @@ describe('project-io-utils', () => {
         assert.equal(barcodeItem?.barcodeMargin, 7)
         assert.equal(barcodeItem?.rotation, 1)
         const textItem = state.items.find((item) => item.type === 'text')
+        assert.equal(textItem?.textBold, false)
+        assert.equal(textItem?.textItalic, false)
+        assert.equal(textItem?.textUnderline, false)
         assert.equal(textItem?.rotation, 0)
         const shapeItem = state.items.find((item) => item.type === 'shape')
         assert.equal(shapeItem?.rotation, 0)
         assert.ok(nextIdCounter > ProjectIoUtils.deriveNextIdCounter([{ id: 'item-2' }]))
+    })
+
+    it('normalizes text style aliases and keeps qr square on load', () => {
+        const raw = {
+            items: [
+                {
+                    id: 'item-1',
+                    type: 'text',
+                    text: 'Styled',
+                    bold: 'true',
+                    kursiv: '1',
+                    underline: 'yes'
+                },
+                {
+                    id: 'item-2',
+                    type: 'qr',
+                    data: 'https://example.com',
+                    width: 98,
+                    height: 120
+                }
+            ]
+        }
+        const { state } = ProjectIoUtils.normalizeProjectState(raw, defaultState)
+        const textItem = state.items.find((item) => item.id === 'item-1')
+        assert.equal(textItem?.textBold, true)
+        assert.equal(textItem?.textItalic, true)
+        assert.equal(textItem?.textUnderline, true)
+        const qrItem = state.items.find((item) => item.id === 'item-2')
+        assert.equal(qrItem?.size, 98)
+        assert.equal(qrItem?.height, 98)
+        assert.equal(Object.prototype.hasOwnProperty.call(qrItem || {}, 'width'), false)
     })
 })

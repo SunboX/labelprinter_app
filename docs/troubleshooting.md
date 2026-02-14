@@ -1,5 +1,36 @@
 # Troubleshooting
 
+## Assistant Request Fails
+
+Symptoms:
+
+- Assistant panel shows request failed (`HTTP 404`, `Server not configured`, or similar).
+- Assistant cannot answer or apply actions.
+
+Checks:
+
+- On localhost, verify the Node backend route is available at `POST /api/chat`.
+- On live hosting, verify the PHP endpoint exists at `POST /api/chat.php`.
+- Verify `.env` is available to the backend and contains `OPENAI_API_KEY`.
+- Verify OpenAI API key is configured server-side.
+- Check server logs for upstream errors and rate limiting (`429`).
+- Ensure endpoint returns JSON and allows `POST`.
+
+See [ai-assistant.md](./ai-assistant.md) for endpoint setup.
+
+## Assistant Ignores Documentation
+
+Symptoms:
+
+- Assistant answers generic editor advice but misses details from your docs.
+
+Checks:
+
+- Ensure docs files are present in the configured docs path.
+- Verify `AI_DOCS_ENABLED=true`.
+- Verify `AI_DOCS_DIR` points to the real folder (public or private).
+- Verify `AI_DOCS_FILES` lists the markdown files you want grounded.
+
 ## Project/Parameter URL Load Fails
 
 Symptoms:

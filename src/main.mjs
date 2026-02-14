@@ -9,82 +9,15 @@ import { ShapeMenuUtils } from './ShapeMenuUtils.mjs'
 import { ZoomUtils } from './ZoomUtils.mjs'
 import { FontFamilyUtils } from './FontFamilyUtils.mjs'
 import { I18n } from './I18n.mjs'
-import { Media, Resolution, P700, P750W, E500, E550W, H500 } from 'labelprinterkit-web/src/index.mjs'
+import { AppElements } from './AppElements.mjs'
+import { AppRuntimeConfig } from './AppRuntimeConfig.mjs'
+import { AiActionBridge } from './ui/AiActionBridge.mjs'
+import { AiAssistantPanel } from './ui/AiAssistantPanel.mjs'
+import { Media, Resolution } from 'labelprinterkit-web/src/index.mjs'
 
-const els = {
-    items: document.querySelector('[data-items]'),
-    addText: document.querySelector('[data-add-text]'),
-    addQr: document.querySelector('[data-add-qr]'),
-    addBarcode: document.querySelector('[data-add-barcode]'),
-    addImage: document.querySelector('[data-add-image]'),
-    addIcon: document.querySelector('[data-add-icon]'),
-    addShape: document.querySelector('[data-add-shape]'),
-    shapeMenu: document.querySelector('[data-shape-menu]'),
-    saveProject: document.querySelector('[data-save-project]'),
-    loadProject: document.querySelector('[data-load-project]'),
-    shareProject: document.querySelector('[data-share-project]'),
-    loadInput: document.querySelector('[data-load-input]'),
-    print: document.querySelector('[data-print]'),
-    status: document.querySelector('[data-status]'),
-    mode: document.querySelector('[data-mode]'),
-    media: document.querySelector('[data-media]'),
-    orientation: document.querySelector('[data-orientation]'),
-    resolution: document.querySelector('[data-resolution]'),
-    mediaLength: document.querySelector('[data-media-length]'),
-    printer: document.querySelector('[data-printer]'),
-    preview: document.querySelector('[data-preview]'),
-    dimensions: document.querySelector('[data-dimensions]'),
-    zoomOut: document.querySelector('[data-zoom-out]'),
-    zoomIn: document.querySelector('[data-zoom-in]'),
-    zoomReset: document.querySelector('[data-zoom-reset]'),
-    zoomRange: document.querySelector('[data-zoom-range]'),
-    zoomLabel: document.querySelector('[data-zoom-label]'),
-    localeSelect: document.querySelector('[data-locale-select]'),
-    alignMenu: document.querySelector('.align-dropdown'),
-    alignMenuTrigger: document.querySelector('[data-align-menu-trigger]'),
-    alignReference: document.querySelector('[data-align-reference]'),
-    alignLeft: document.querySelector('[data-align-left]'),
-    alignCenter: document.querySelector('[data-align-center]'),
-    alignRight: document.querySelector('[data-align-right]'),
-    alignTop: document.querySelector('[data-align-top]'),
-    alignMiddle: document.querySelector('[data-align-middle]'),
-    alignBottom: document.querySelector('[data-align-bottom]'),
-    rulerX: document.querySelector('[data-ruler-x]'),
-    rulerY: document.querySelector('[data-ruler-y]'),
-    labelWidth: document.querySelector('[data-label-width]'),
-    canvasWrap: document.querySelector('.canvas-wrap'),
-    labelPlate: document.querySelector('.label-plate'),
-    bleFields: document.querySelector('.ble-fields'),
-    bleService: document.querySelector('[data-ble-service]'),
-    bleWrite: document.querySelector('[data-ble-write]'),
-    bleNotify: document.querySelector('[data-ble-notify]'),
-    bleFilter: document.querySelector('[data-ble-filter]'),
-    parameterDefinitions: document.querySelector('[data-parameter-definitions]'),
-    addParameter: document.querySelector('[data-add-parameter]'),
-    loadParameterData: document.querySelector('[data-load-parameter-data]'),
-    downloadParameterExample: document.querySelector('[data-download-parameter-example]'),
-    parameterDataInput: document.querySelector('[data-parameter-data-input]'),
-    parameterDataPanel: document.querySelector('[data-parameter-data-panel]'),
-    parameterDataMeta: document.querySelector('[data-parameter-data-meta]'),
-    parameterIssues: document.querySelector('[data-parameter-issues]'),
-    parameterPreview: document.querySelector('[data-parameter-preview]'),
-    objectsScrollIndicator: document.querySelector('[data-objects-scroll-indicator]')
-}
-
-const printerMap = { P700, P750W, E500, E550W, H500 }
-const shapeTypes = [
-    { id: 'rect', labelKey: 'shapes.rect' },
-    { id: 'roundRect', labelKey: 'shapes.roundRect' },
-    { id: 'oval', labelKey: 'shapes.oval' },
-    { id: 'polygon', labelKey: 'shapes.polygon' },
-    { id: 'line', labelKey: 'shapes.line' },
-    { id: 'triangle', labelKey: 'shapes.triangle' },
-    { id: 'diamond', labelKey: 'shapes.diamond' },
-    { id: 'arrowRight', labelKey: 'shapes.arrowRight' },
-    { id: 'arrowLeft', labelKey: 'shapes.arrowLeft' },
-    { id: 'plus', labelKey: 'shapes.plus' },
-    { id: 'dot', labelKey: 'shapes.dot' }
-]
+const els = AppElements.query(document)
+const printerMap = AppRuntimeConfig.createPrinterMap()
+const shapeTypes = AppRuntimeConfig.createShapeTypes()
 let idCounter = 1
 
 /**
@@ -94,41 +27,49 @@ let idCounter = 1
 function nextId() {
     return `item-${idCounter++}`
 }
-const defaultState = {
-    media: 'W9',
-    mediaLengthMm: null,
-    zoom: 1,
-    resolution: 'LOW',
-    orientation: 'horizontal',
-    backend: 'usb',
-    printer: 'P700',
-    ble: {
-        serviceUuid: '0000xxxx-0000-1000-8000-00805f9b34fb',
-        writeCharacteristicUuid: '0000yyyy-0000-1000-8000-00805f9b34fb',
-        notifyCharacteristicUuid: '0000zzzz-0000-1000-8000-00805f9b34fb',
-        namePrefix: 'PT-'
-    },
-    parameters: [],
-    parameterDataRows: [],
-    parameterDataRaw: '',
-    parameterDataSourceName: '',
-    customFontLinks: [],
-    items: [
-        {
-            id: nextId(),
-            type: 'text',
-            text: 'New text',
-            fontFamily: 'Barlow',
-            fontSize: 24,
-            height: 40,
-            xOffset: 4,
-            yOffset: 0,
-            rotation: 0
-        }
-    ]
-}
+const defaultState = AppRuntimeConfig.createDefaultState(nextId)
 
 let state = JSON.parse(JSON.stringify(defaultState))
+const EXTENSION_ASYNC_CHANNEL_CLOSED_MESSAGE =
+    'A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received'
+
+/**
+ * Extracts a normalized message string from unknown error-like values.
+ * @param {unknown} errorLike
+ * @returns {string}
+ */
+function extractErrorLikeMessage(errorLike) {
+    if (!errorLike || typeof errorLike !== 'object') {
+        return String(errorLike || '').trim()
+    }
+    if ('message' in errorLike) {
+        return String(/** @type {{ message?: unknown }} */ (errorLike).message || '').trim()
+    }
+    return String(errorLike).trim()
+}
+
+/**
+ * Returns true when the message is the known browser-extension message-channel noise.
+ * @param {string} message
+ * @returns {boolean}
+ */
+function isExtensionMessageChannelNoise(message) {
+    return String(message || '').includes(EXTENSION_ASYNC_CHANNEL_CLOSED_MESSAGE)
+}
+
+/**
+ * Installs a narrow unhandled-rejection filter for browser-extension runtime noise.
+ * This prevents extension-originated promise rejections from surfacing as app errors.
+ */
+function installRuntimeNoiseGuards() {
+    window.addEventListener('unhandledrejection', (event) => {
+        const message = extractErrorLikeMessage(event?.reason)
+        if (!isExtensionMessageChannelNoise(message)) return
+        event.preventDefault()
+        console.info('Ignored browser-extension runtime message-channel rejection:', message)
+    })
+}
+installRuntimeNoiseGuards()
 
 /**
  * Updates the status banner.
@@ -1036,9 +977,40 @@ async function startApp() {
     const parameterPanel = new ParameterPanel(els, state, setStatus, noop, translate)
     const printController = new PrintController(els, state, printerMap, previewRenderer, setStatus, translate)
     const app = new AppController(els, state, itemsEditor, parameterPanel, previewRenderer, printController, setStatus, i18n)
+    const aiActionBridge = new AiActionBridge({
+        els,
+        state,
+        itemsEditor,
+        parameterPanel,
+        previewRenderer,
+        printController,
+        translate,
+        shapeTypes
+    })
+    const aiAssistant = new AiAssistantPanel(
+        {
+            overlay: els.aiOverlay,
+            toggle: els.aiToggle,
+            close: els.aiClose,
+            messages: els.aiMessages,
+            input: els.aiInput,
+            send: els.aiSend,
+            working: els.aiWorking,
+            attachSketch: els.aiAttachSketch,
+            imageInput: els.aiImageInput,
+            attachments: els.aiAttachments
+        },
+        setStatus,
+        translate
+    )
+    aiAssistant.onRunActions = (actions, context) => aiActionBridge.runActions(actions, context)
+    aiAssistant.getUiState = () => aiActionBridge.getUiStateSnapshot()
+    aiAssistant.getActionCapabilities = () => aiActionBridge.getActionCapabilities()
+    aiAssistant.getRenderedLabelAttachment = () => previewRenderer.getRenderedLabelAttachment()
 
     await itemsEditor.loadInstalledFontFamilies()
     await app.init()
+    await aiAssistant.init()
 }
 
 startApp().catch((err) => {

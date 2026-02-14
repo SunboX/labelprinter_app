@@ -75,3 +75,11 @@ Complete persistence and sharing behavior is in:
 ## 8. Troubleshooting
 
 If something does not behave as expected, start with [troubleshooting.md](./troubleshooting.md).
+
+## 9. (Optional) Use The AI Assistant
+
+1. Open the assistant from the top toolbar.
+2. Ask how to do something, or describe changes you want on the label.
+3. Optionally attach a sketch image.
+
+Assistant scope, supported actions, and backend routing are in [ai-assistant.md](./ai-assistant.md).
