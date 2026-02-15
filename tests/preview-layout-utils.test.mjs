@@ -76,9 +76,9 @@ describe('computeAutoLabelLengthDots', () => {
         assert.equal(length, 148)
     })
 
-    it('shrinks back to baseline when content moves left again', () => {
+    it('shrinks to rendered content when items overlap on the flow axis', () => {
         const length = PreviewLayoutUtils.computeAutoLabelLengthDots(120, 90, 8, 60)
-        assert.equal(length, 120)
+        assert.equal(length, 98)
     })
 
     it('respects min length when baseline is short', () => {
