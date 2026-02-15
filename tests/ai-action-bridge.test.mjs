@@ -15,7 +15,7 @@ describe('ai-action-bridge', () => {
         assert.match(source, /case 'clear_items':/)
         assert.match(source, /if \(forceRebuild && !normalizedActions\.some\(\(action\) => action\.action === 'clear_items'\)\)/)
         assert.match(source, /allowCreateIfMissing:\s*forceRebuild \|\| Boolean\(options\.allowCreateIfMissing\)/)
-        assert.match(source, /if \(forceRebuild\) \{\s*this\.\#postProcessRebuildArtifacts\(\)/s)
+        assert.match(source, /if \(forceRebuild\) \{\s*await this\.\#postProcessRebuildArtifacts\([^)]*\)/s)
     })
 
     it('normalizes common AI key aliases to canonical item keys', () => {
@@ -47,16 +47,17 @@ describe('ai-action-bridge', () => {
     })
 
     it('falls back to add_item when rebuild mode receives update for a missing item', () => {
-        assert.match(source, /const hasExplicitPointer = this\.\#hasExplicitItemPointer\(action\)/)
-        assert.match(source, /runContext\?\.allowCreateIfMissing && !hasExplicitPointer/)
-        assert.match(source, /if \(runContext\?\.allowCreateIfMissing && !hasExplicitPointer\)/)
-        assert.match(source, /#inferItemTypeForMissingUpdate\(action, changes\)/)
+        assert.match(source, /const hasExplicitPointer = this\.\#hasExplicitItemPointer\(workingAction\)/)
+        assert.match(source, /runContext\?\.allowCreateIfMissing && \(!hasExplicitPointer \|\| !isSelectionPointer\)/)
+        assert.match(source, /#inferItemTypeForMissingUpdate\(workingAction, changes\)/)
         assert.match(source, /action:\s*'add_item'/)
+        assert.match(source, /itemRefs:\s*new Map\(\)/)
+        assert.match(source, /runContext\.itemRefs\.set\(`item-\$\{nextIndex\}`,\s*createdItem\.id\)/)
     })
 
     it('sanitizes rebuild output by de-duplicating aggregate text and enforcing qr size floor', () => {
-        assert.match(source, /#postProcessRebuildArtifacts\(\)/)
-        assert.match(source, /#findDuplicatedAggregateTextItem\(\)/)
+        assert.match(source, /#postProcessRebuildArtifacts\(options = \{\}\)/)
+        assert.match(source, /AiRebuildPostProcessUtils\.findDuplicatedAggregateTextItem\(this\.state\.items\)/)
         assert.match(source, /QrSizeUtils\.computeMaxQrSizeDots\(this\.state\) \* 0\.6/)
         assert.match(source, /item\.width = nextSize/)
     })

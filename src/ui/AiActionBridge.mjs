@@ -1,13 +1,12 @@
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { RotationUtils } from '../RotationUtils.mjs'
-/**
- * Allowlisted action runtime used by the in-app assistant.
- * All mutating operations go through strict action handlers.
- */
+import { AiInventoryRebuildUtils } from './AiInventoryRebuildUtils.mjs'
+import { AiRebuildPostProcessUtils } from './AiRebuildPostProcessUtils.mjs'
+/** Allowlisted action runtime used by the in-app assistant. */
 export class AiActionBridge {
     #translate = (key) => key
     #shapeTypeIds = []
-
+    #debugEnabled = false
     /**
      * @param {object} context
      * @param {object} context.els
@@ -30,8 +29,8 @@ export class AiActionBridge {
         this.#shapeTypeIds = Array.isArray(context.shapeTypes)
             ? context.shapeTypes.map((shape) => String(shape?.id || '')).filter(Boolean)
             : []
+        this.#debugEnabled = this.#resolveDebugEnabled()
     }
-
     /**
      * Sets translation callback.
      * @param {(key: string, params?: Record<string, string | number>) => string} callback
@@ -39,7 +38,6 @@ export class AiActionBridge {
     set translate(callback) {
         this.#translate = typeof callback === 'function' ? callback : (key) => key
     }
-
     /**
      * Returns translation callback.
      * @returns {(key: string, params?: Record<string, string | number>) => string}
@@ -47,7 +45,6 @@ export class AiActionBridge {
     get translate() {
         return this.#translate
     }
-
     /**
      * Returns a compact UI state snapshot used as model context.
      * @returns {Record<string, any>}
@@ -82,7 +79,6 @@ export class AiActionBridge {
             items
         }
     }
-
     /**
      * Returns assistant action capabilities for backend prompts.
      * @returns {Record<string, any>}
@@ -130,11 +126,10 @@ export class AiActionBridge {
             ]
         }
     }
-
     /**
      * Executes a list of model-requested editor actions.
      * @param {Array<Record<string, any>>} actions
-     * @param {{ forceRebuild?: boolean, allowCreateIfMissing?: boolean }} [options]
+     * @param {{ forceRebuild?: boolean, allowCreateIfMissing?: boolean, preferredMedia?: string }} [options]
      * @returns {Promise<{ executed: string[], errors: string[] }>}
      */
     async runActions(actions, options = {}) {
@@ -155,7 +150,9 @@ export class AiActionBridge {
         }
         const runContext = {
             touchedItemIds: new Set(),
-            allowCreateIfMissing: forceRebuild || Boolean(options.allowCreateIfMissing)
+            allowCreateIfMissing: forceRebuild || Boolean(options.allowCreateIfMissing),
+            itemRefs: new Map(),
+            itemCounter: 0
         }
         for (const action of normalizedActions) {
             try {
@@ -166,11 +163,10 @@ export class AiActionBridge {
             }
         }
         if (forceRebuild) {
-            this.#postProcessRebuildArtifacts()
+            await this.#postProcessRebuildArtifacts(options)
         }
         return { executed, errors }
     }
-
     /**
      * Normalizes one action payload.
      * @param {Record<string, any>} rawAction
@@ -193,7 +189,6 @@ export class AiActionBridge {
         }
         return { ...rawAction, action: actionName }
     }
-
     /**
      * Routes one normalized action to the corresponding allowlisted handler.
      * @param {{ action: string, [key: string]: any }} action
@@ -226,7 +221,6 @@ export class AiActionBridge {
                 throw new Error(this.translate('assistant.actionUnsupported', { action: action.action }))
         }
     }
-
     /**
      * Adds a new item using existing editor add flows.
      * @param {{ itemType?: string, type?: string, shapeType?: string, properties?: Record<string, any> }} action
@@ -255,13 +249,23 @@ export class AiActionBridge {
         if (changes && typeof changes === 'object') {
             this.#applyItemChanges(createdItem, changes)
         }
+        if (runContext?.itemRefs instanceof Map) {
+            const nextIndex = Number(runContext.itemCounter || 0) + 1
+            runContext.itemCounter = nextIndex
+            runContext.itemRefs.set(`item-${nextIndex}`, createdItem.id)
+            const explicitRef = String(action?.itemId || action?.id || action?.ref || '')
+                .trim()
+                .toLowerCase()
+            if (explicitRef && !['selected', 'current', 'first', 'last', 'latest', 'newest', 'recent'].includes(explicitRef)) {
+                runContext.itemRefs.set(explicitRef, createdItem.id)
+            }
+        }
         this.#rememberTouchedItem(runContext, createdItem.id)
         this.previewRenderer.setSelectedItemIds([createdItem.id])
         this.itemsEditor.setSelectedItemIds([createdItem.id])
         this.#renderAfterMutation()
         return this.translate('assistant.actionAddedItem', { type: createdItem.type, id: createdItem.id })
     }
-
     /**
      * Updates properties of one item.
      * @param {{ itemId?: string, itemIndex?: number, target?: string, changes?: Record<string, any>, properties?: Record<string, any>, itemType?: string, type?: string, shapeType?: string }} action
@@ -269,26 +273,51 @@ export class AiActionBridge {
      * @returns {string}
      */
     #updateItem(action, runContext) {
+        const workingAction = { ...action }
+        const explicitItemId = String(workingAction.itemId || '')
+            .trim()
+            .toLowerCase()
+        const isSemanticPointer = ['selected', 'current', 'first', 'last', 'latest', 'newest', 'recent'].includes(
+            explicitItemId
+        )
+        if (explicitItemId && !isSemanticPointer && runContext?.itemRefs instanceof Map) {
+            const mappedId = runContext.itemRefs.get(explicitItemId)
+            if (mappedId) {
+                workingAction.itemId = mappedId
+            }
+        }
         const changes = this.#extractItemChangesPayload(action)
         if (!changes || typeof changes !== 'object') {
             throw new Error(this.translate('assistant.actionNoChanges'))
         }
-        const item = this.#resolveTargetItem(action)
+        const item = this.#resolveTargetItem(workingAction)
         if (!item) {
-            const hasExplicitPointer = this.#hasExplicitItemPointer(action)
-            if (runContext?.allowCreateIfMissing && !hasExplicitPointer) {
-                const fallbackType = this.#inferItemTypeForMissingUpdate(action, changes)
-                return this.#addItem(
+            const hasExplicitPointer = this.#hasExplicitItemPointer(workingAction)
+            const pointerToken = String(workingAction.target || workingAction.itemId || '')
+                .trim()
+                .toLowerCase()
+            const isSelectionPointer = pointerToken === 'selected' || pointerToken === 'current'
+            if (runContext?.allowCreateIfMissing && (!hasExplicitPointer || !isSelectionPointer)) {
+                const fallbackType = this.#inferItemTypeForMissingUpdate(workingAction, changes)
+                const summary = this.#addItem(
                     {
                         action: 'add_item',
                         itemType: fallbackType,
-                        shapeType: String(action.shapeType || changes.shapeType || 'rect'),
+                        shapeType: String(workingAction.shapeType || changes.shapeType || 'rect'),
                         properties: changes
                     },
                     runContext
                 )
+                const createdItem = this.state.items[this.state.items.length - 1]
+                if (createdItem?.id && explicitItemId && runContext?.itemRefs instanceof Map) {
+                    runContext.itemRefs.set(explicitItemId, createdItem.id)
+                }
+                return summary
             }
             throw new Error(this.translate('assistant.actionItemNotFound'))
+        }
+        if (explicitItemId && !isSemanticPointer && runContext?.itemRefs instanceof Map) {
+            runContext.itemRefs.set(explicitItemId, item.id)
         }
         const changedKeys = this.#applyItemChanges(item, changes)
         if (!changedKeys.length) {
@@ -300,7 +329,6 @@ export class AiActionBridge {
         this.#renderAfterMutation()
         return this.translate('assistant.actionUpdatedItem', { id: item.id, keys: changedKeys.join(', ') })
     }
-
     /**
      * Removes one or multiple items.
      * @param {{ itemId?: string, itemIds?: string[], itemIndex?: number, target?: string }} action
@@ -336,7 +364,6 @@ export class AiActionBridge {
         this.#renderAfterMutation()
         return this.translate('assistant.actionRemovedItems', { count: removedCount })
     }
-
     /**
      * Removes all current items and clears selection.
      * @returns {string}
@@ -349,7 +376,6 @@ export class AiActionBridge {
         this.#renderAfterMutation()
         return this.translate('assistant.actionRemovedItems', { count: removedCount })
     }
-
     /**
      * Applies label settings changes via existing form controls.
      * @param {{ settings?: Record<string, any>, backend?: string, printer?: string, media?: string, resolution?: string, orientation?: string, mediaLengthMm?: number | null }} action
@@ -378,7 +404,6 @@ export class AiActionBridge {
         this.#renderAfterMutation()
         return this.translate('assistant.actionUpdatedLabel', { keys: changed.join(', ') })
     }
-
     /**
      * Selects items by id.
      * @param {{ itemIds?: string[] }} action
@@ -389,13 +414,22 @@ export class AiActionBridge {
         const ids = Array.isArray(action.itemIds)
             ? action.itemIds.map((id) => String(id || '').trim()).filter(Boolean)
             : []
-        const validIds = ids.filter((id) => this.state.items.some((item) => item.id === id))
+        const resolvedIds = ids.map((id) => {
+            const lowered = id.toLowerCase()
+            if (runContext?.itemRefs instanceof Map && runContext.itemRefs.has(lowered)) {
+                return String(runContext.itemRefs.get(lowered) || '')
+            }
+            return this.#resolveTargetAlias(id)?.id || id
+        })
+        const validIds = ids
+            .map((_, index) => resolvedIds[index])
+            .filter((id, index, entries) => entries.indexOf(id) === index)
+            .filter((id) => this.state.items.some((item) => item.id === id))
         this.previewRenderer.setSelectedItemIds(validIds)
         this.itemsEditor.setSelectedItemIds(validIds)
         validIds.forEach((id) => this.#rememberTouchedItem(runContext, id))
         return this.translate('assistant.actionSelectedItems', { count: validIds.length })
     }
-
     /**
      * Aligns currently selected items.
      * @param {{ mode?: string, reference?: string }} action
@@ -406,11 +440,19 @@ export class AiActionBridge {
         const explicitIds = Array.isArray(action.itemIds)
             ? action.itemIds.map((id) => String(id || '').trim()).filter(Boolean)
             : []
-        const validExplicitIds = explicitIds.filter((id) => this.state.items.some((item) => item.id === id))
+        const validExplicitIds = explicitIds
+            .map((id) => {
+                const lowered = id.toLowerCase()
+                if (runContext?.itemRefs instanceof Map && runContext.itemRefs.has(lowered)) {
+                    return String(runContext.itemRefs.get(lowered) || '')
+                }
+                return this.#resolveTargetAlias(id)?.id || id
+            })
+            .filter((id) => this.state.items.some((item) => item.id === id))
         if (validExplicitIds.length) {
             this.previewRenderer.setSelectedItemIds(validExplicitIds)
             this.itemsEditor.setSelectedItemIds(validExplicitIds)
-        } else if (!this.previewRenderer.getSelectedItemIds().length) {
+        } else if (!explicitIds.length && !this.previewRenderer.getSelectedItemIds().length) {
             const touchedIds = Array.from(runContext.touchedItemIds).filter((id) =>
                 this.state.items.some((item) => item.id === id)
             )
@@ -435,7 +477,6 @@ export class AiActionBridge {
         this.previewRenderer.getSelectedItemIds().forEach((id) => this.#rememberTouchedItem(runContext, id))
         return this.translate('assistant.actionAlignedItems', { count: result.count, mode, reference })
     }
-
     /**
      * Starts printing through the same validation flow as the print button.
      * @param {{ skipBatchConfirm?: boolean }} action
@@ -456,7 +497,6 @@ export class AiActionBridge {
         await this.printController.print(maps)
         return this.translate('assistant.actionPrintStarted', { count: maps.length })
     }
-
     /**
      * Delegates to the save project button flow.
      * @returns {string}
@@ -468,7 +508,6 @@ export class AiActionBridge {
         this.els.saveProject.click()
         return this.translate('assistant.actionSaveTriggered')
     }
-
     /**
      * Delegates to the share project button flow.
      * @returns {string}
@@ -480,7 +519,6 @@ export class AiActionBridge {
         this.els.shareProject.click()
         return this.translate('assistant.actionShareTriggered')
     }
-
     /**
      * Returns one target item resolved from id/index/selection shortcuts.
      * @param {{ itemId?: string, itemIndex?: number, target?: string }} action
@@ -511,7 +549,6 @@ export class AiActionBridge {
         if (targetItem) return targetItem
         return null
     }
-
     /**
      * Resolves semantic target aliases to concrete items.
      * @param {string} rawToken
@@ -533,7 +570,6 @@ export class AiActionBridge {
         }
         return null
     }
-
     /**
      * Returns true when the action explicitly points to a target item.
      * @param {{ itemId?: string, itemIndex?: number, target?: string }} action
@@ -545,7 +581,6 @@ export class AiActionBridge {
         if (String(action?.target || '').trim()) return true
         return false
     }
-
     /**
      * Applies property changes to one item and returns changed keys.
      * @param {Record<string, any>} item
@@ -569,7 +604,6 @@ export class AiActionBridge {
         Object.entries(normalizedChanges).forEach(([key, value]) => {
             switch (key) {
                 case 'text':
-                case 'data':
                 case 'fontFamily':
                 case 'iconId':
                 case 'barcodeFormat':
@@ -579,6 +613,13 @@ export class AiActionBridge {
                 case 'imageSmoothing': {
                     if (typeof value !== 'string') return
                     item[key] = value
+                    changedKeys.push(key)
+                    return
+                }
+                case 'data': {
+                    if (!['qr', 'barcode'].includes(item.type)) return
+                    if (typeof value !== 'string') return
+                    item.data = value
                     changedKeys.push(key)
                     return
                 }
@@ -662,6 +703,7 @@ export class AiActionBridge {
                     return
                 }
                 case 'size': {
+                    if (item.type !== 'qr') return
                     const numberValue = Number(value)
                     if (!Number.isFinite(numberValue)) return
                     item.size = QrSizeUtils.clampQrSizeToLabel(this.state, Math.round(numberValue))
@@ -696,7 +738,6 @@ export class AiActionBridge {
         })
         return changedKeys
     }
-
     /**
      * Expands nested structures into flat item properties.
      * @param {Record<string, any>} rawChanges
@@ -739,7 +780,6 @@ export class AiActionBridge {
         }
         return expanded
     }
-
     /**
      * Normalizes common model key aliases to canonical editor item keys.
      * @param {Record<string, any>} rawChanges
@@ -797,7 +837,6 @@ export class AiActionBridge {
         })
         return normalized
     }
-
     /**
      * Coerces common truthy/falsy values to booleans.
      * @param {unknown} value
@@ -815,7 +854,6 @@ export class AiActionBridge {
         }
         return Boolean(value)
     }
-
     /**
      * Extracts property changes from multiple supported action payload shapes.
      * @param {Record<string, any>} action
@@ -849,7 +887,6 @@ export class AiActionBridge {
         })
         return Object.keys(inferredChanges).length ? inferredChanges : null
     }
-
     /**
      * Infers a best-effort item type when an update target is missing in rebuild mode.
      * @param {{ itemType?: string, type?: string, shapeType?: string }} action
@@ -882,7 +919,6 @@ export class AiActionBridge {
         }
         return 'text'
     }
-
     /**
      * Adds an item id to this action-run context.
      * @param {{ touchedItemIds: Set<string> }} runContext
@@ -894,7 +930,6 @@ export class AiActionBridge {
         if (!normalizedId) return
         runContext.touchedItemIds.add(normalizedId)
     }
-
     /**
      * Sets a select value when the option exists and dispatches an event.
      * @param {HTMLSelectElement | null | undefined} select
@@ -913,22 +948,80 @@ export class AiActionBridge {
         select.dispatchEvent(new Event(eventName, { bubbles: true }))
         return [keyName]
     }
-
     /**
      * Re-renders editor and preview after action-based state mutation.
      */
     #renderAfterMutation() {
         this.parameterPanel.handleItemTemplatesChanged()
         this.itemsEditor.render()
-        this.previewRenderer.render()
+        void this.previewRenderer.render()
+    }
+    /**
+     * Re-renders editor and preview after mutation and waits until preview bounds are up to date.
+     * @returns {Promise<void>}
+     */
+    async #renderAfterMutationAsync() {
+        this.parameterPanel.handleItemTemplatesChanged()
+        this.itemsEditor.render()
+        const renderResult = this.previewRenderer.render()
+        if (renderResult && typeof renderResult.then === 'function') {
+            await renderResult
+        }
+        await this.#waitForPreviewIdle()
     }
 
     /**
+     * Waits until the preview renderer is not busy and has no queued rerender.
+     * Needed because render() can return early while a frame is still in progress.
+     * @param {number} [timeoutMs=1200]
+     * @returns {Promise<void>}
+     */
+    async #waitForPreviewIdle(timeoutMs = 1200) {
+        const startedAt = Date.now()
+        while (Boolean(this.previewRenderer?._previewBusy) || Boolean(this.previewRenderer?._previewQueued)) {
+            if (Date.now() - startedAt >= timeoutMs) {
+                this.#debugLog('render-wait-timeout', {
+                    timeoutMs,
+                    previewBusy: Boolean(this.previewRenderer?._previewBusy),
+                    previewQueued: Boolean(this.previewRenderer?._previewQueued),
+                    interactiveItemCount: this.previewRenderer?._interactiveItemsById?.size || 0
+                })
+                break
+            }
+            await new Promise((resolve) => setTimeout(resolve, 8))
+        }
+    }
+    /**
      * Applies deterministic cleanup for sketch-rebuild runs.
      * Removes duplicated aggregate text blocks and enforces a visible QR size floor.
+     * @param {{ preferredMedia?: string }} [options]
+     * @returns {Promise<void>}
      */
-    #postProcessRebuildArtifacts() {
-        const aggregateTextItem = this.#findDuplicatedAggregateTextItem()
+    async #postProcessRebuildArtifacts(options = {}) {
+        this.#debugLog('postprocess:start', {
+            itemCountBefore: Array.isArray(this.state.items) ? this.state.items.length : 0,
+            preferredMedia: String(options.preferredMedia || '').trim()
+        })
+        const preferredMedia = String(options.preferredMedia || '').trim()
+        if (preferredMedia) {
+            const changed = this.#setSelectValue(this.els.media, preferredMedia, 'media', 'change')
+            if (changed.length) {
+                await this.#renderAfterMutationAsync()
+            }
+        }
+        const appliedInventoryTemplate = await AiInventoryRebuildUtils.tryApplyInventoryTemplate({
+            state: this.state,
+            previewRenderer: this.previewRenderer,
+            renderAfterMutation: () => this.#renderAfterMutationAsync()
+        })
+        this.#debugLog('postprocess:template', {
+            appliedInventoryTemplate,
+            itemCountAfterTemplate: Array.isArray(this.state.items) ? this.state.items.length : 0
+        })
+        if (appliedInventoryTemplate) {
+            return
+        }
+        const aggregateTextItem = AiRebuildPostProcessUtils.findDuplicatedAggregateTextItem(this.state.items)
         let didMutate = false
         if (aggregateTextItem) {
             const aggregateId = aggregateTextItem.id
@@ -960,40 +1053,36 @@ export class AiActionBridge {
         })
 
         if (didMutate) {
-            this.#renderAfterMutation()
+            await this.#renderAfterMutationAsync()
+        }
+        this.#debugLog('postprocess:finish', {
+            didMutate,
+            itemCountAfter: Array.isArray(this.state.items) ? this.state.items.length : 0
+        })
+    }
+    /**
+     * Resolves whether assistant debug logs are enabled.
+     * @returns {boolean}
+     */
+    #resolveDebugEnabled() {
+        try {
+            const queryValue = new URLSearchParams(globalThis?.window?.location?.search || '').get('aiDebug')
+            const localValue = globalThis?.window?.localStorage?.getItem('AI_DEBUG_LOGS')
+            const raw = String(queryValue || localValue || '')
+                .trim()
+                .toLowerCase()
+            return ['1', 'true', 'yes', 'on'].includes(raw)
+        } catch (_error) {
+            return false
         }
     }
-
     /**
-     * Detects an aggregated multiline text item duplicated by split text lines.
-     * @returns {Record<string, any> | null}
+     * Emits one assistant runtime debug event.
+     * @param {string} event
+     * @param {Record<string, any>} [context]
      */
-    #findDuplicatedAggregateTextItem() {
-        const textItems = this.state.items.filter((item) => item.type === 'text')
-        if (textItems.length < 2) return null
-        const normalizedRows = textItems.map((item) => {
-            const text = String(item.text || '')
-            const normalized = text
-                .toLowerCase()
-                .replace(/\s+/g, ' ')
-                .trim()
-            const nonEmptyLineCount = text
-                .split('\n')
-                .map((line) => line.trim())
-                .filter(Boolean).length
-            return { item, text, normalized, nonEmptyLineCount }
-        })
-        const aggregateCandidates = normalizedRows
-            .filter((row) => row.nonEmptyLineCount >= 4 && row.normalized.length >= 24)
-            .sort((left, right) => right.nonEmptyLineCount - left.nonEmptyLineCount)
-        for (const candidate of aggregateCandidates) {
-            const overlapCount = normalizedRows
-                .filter((row) => row.item.id !== candidate.item.id && row.normalized.length >= 4)
-                .reduce((count, row) => count + (candidate.normalized.includes(row.normalized) ? 1 : 0), 0)
-            if (overlapCount >= 2) {
-                return candidate.item
-            }
-        }
-        return null
+    #debugLog(event, context = {}) {
+        if (!this.#debugEnabled) return
+        console.info(`[assistant-debug-bridge] ${event}`, context)
     }
 }

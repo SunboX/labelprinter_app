@@ -1,5 +1,6 @@
 import { AiResponseUtils } from '../AiResponseUtils.mjs'
 import { AssistantErrorUtils } from '../AssistantErrorUtils.mjs'
+import { MediaIntentUtils } from '../MediaIntentUtils.mjs'
 
 /**
  * In-app assistant chat panel with optional sketch attachments and action execution.
@@ -16,6 +17,7 @@ export class AiAssistantPanel {
     #busy = false
     #bound = false
     #endpoint = ''
+    #debugEnabled = false
 
     /**
      * @param {object} els
@@ -91,6 +93,8 @@ export class AiAssistantPanel {
      */
     async init() {
         this.#endpoint = this.#resolveEndpoint()
+        this.#debugEnabled = this.#resolveDebugEnabled()
+        this.#debugLog('panel-init', { endpoint: this.#endpoint, debugEnabled: this.#debugEnabled })
         this.#bindEvents()
         this.#setBusyState(false)
         this.#appendMessage('assistant', this.translate('assistant.welcome'))
@@ -119,13 +123,52 @@ export class AiAssistantPanel {
      * @returns {string}
      */
     #resolveEndpoint() {
+        return this.#isLocalHost() ? '/api/chat' : '/api/chat.php'
+    }
+
+    /**
+     * Resolves whether client-side assistant debug logs are enabled.
+     * Priority: URL query `aiDebug`, then localStorage key `AI_DEBUG_LOGS`.
+     * @returns {boolean}
+     */
+    #resolveDebugEnabled() {
+        const parseFlag = (value) => {
+            const normalized = String(value || '')
+                .trim()
+                .toLowerCase()
+            if (!normalized) return null
+            if (['1', 'true', 'yes', 'on'].includes(normalized)) return true
+            if (['0', 'false', 'no', 'off'].includes(normalized)) return false
+            return null
+        }
+        const queryFlag = parseFlag(new URLSearchParams(window.location.search).get('aiDebug'))
+        if (typeof queryFlag === 'boolean') return queryFlag
+        try {
+            const storageFlag = parseFlag(window.localStorage.getItem('AI_DEBUG_LOGS'))
+            if (typeof storageFlag === 'boolean') return storageFlag
+        } catch (_error) {
+            return this.#isLocalHost()
+        }
+        return this.#isLocalHost()
+    }
+
+    /**
+     * Emits one client-side assistant debug log entry when enabled.
+     * @param {string} event
+     * @param {Record<string, any>} [context]
+     */
+    #debugLog(event, context = {}) {
+        if (!this.#debugEnabled) return
+        console.info(`[assistant-debug-ui] ${event}`, context)
+    }
+
+    /**
+     * Returns true when running on localhost.
+     * @returns {boolean}
+     */
+    #isLocalHost() {
         const host = String(window.location.hostname || '').toLowerCase()
-        const isLocalHost =
-            host === 'localhost' ||
-            host === '127.0.0.1' ||
-            host === '::1' ||
-            host.endsWith('.localhost')
-        return isLocalHost ? '/api/chat' : '/api/chat.php'
+        return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.localhost')
     }
 
     /**
@@ -243,6 +286,15 @@ export class AiAssistantPanel {
             userText: rawText,
             hasUserAttachments: userAttachmentCount > 0
         })
+        this.#debugLog('request-start', {
+            textLength: rawText.length,
+            userTextPreview: rawText.slice(0, 120),
+            userAttachmentCount,
+            forceRebuild: actionContext.forceRebuild,
+            allowCreateIfMissing: actionContext.allowCreateIfMissing,
+            preferredMedia: String(actionContext.preferredMedia || ''),
+            hasPreviousResponseId: Boolean(this.#previousResponseId)
+        })
         const outgoingAttachments = this.#attachments.map((attachment) => ({
             name: attachment.name,
             mime_type: attachment.mimeType,
@@ -252,6 +304,10 @@ export class AiAssistantPanel {
         if (renderedLabelAttachment) {
             outgoingAttachments.unshift(renderedLabelAttachment)
         }
+        this.#debugLog('request-attachments', {
+            outgoingAttachmentCount: outgoingAttachments.length,
+            outgoingAttachmentNames: outgoingAttachments.map((attachment) => String(attachment?.name || 'unnamed'))
+        })
         this.#attachments = []
         this.#renderAttachments()
         try {
@@ -259,12 +315,42 @@ export class AiAssistantPanel {
                 startFresh: actionContext.forceRebuild
             })
             const assistantText = AiResponseUtils.extractOutputText(response)
+            const extractedActions = AiResponseUtils.extractActions(response)
+            this.#debugLog('response-received', {
+                requestId: String(response?._requestId || ''),
+                status: String(response?.status || ''),
+                incompleteReason: AiResponseUtils.extractIncompleteReason(response),
+                functionCallCount: AiResponseUtils.countFunctionCalls(response),
+                outputTextLength: assistantText.length,
+                extractedActionCount: extractedActions.length
+            })
+            this.#debugLog('response-actions', {
+                actions: extractedActions.map((entry, index) => ({
+                    index,
+                    action: String(entry?.action || ''),
+                    itemId: String(entry?.itemId || entry?.target || ''),
+                    keys: Object.keys(entry || {}).slice(0, 20)
+                }))
+            })
             if (assistantText) {
                 this.#appendMessage('assistant', assistantText)
             }
-            const actions = AiResponseUtils.extractActions(response)
+            const actions = extractedActions
             if (actions.length) {
+                const uiStateBeforeActions = this.#summarizeUiStateForDebug(this.#getUiState())
                 const actionResult = await this.#onRunActions(actions, actionContext)
+                const uiStateAfterActions = this.#summarizeUiStateForDebug(this.#getUiState())
+                this.#debugLog('action-run-complete', {
+                    requestId: String(response?._requestId || ''),
+                    executedCount: actionResult.executed.length,
+                    errorCount: actionResult.errors.length,
+                    forceRebuild: actionContext.forceRebuild,
+                    preferredMedia: String(actionContext.preferredMedia || ''),
+                    executed: actionResult.executed,
+                    errors: actionResult.errors,
+                    uiStateBeforeActions,
+                    uiStateAfterActions
+                })
                 if (actionResult.executed.length) {
                     this.#appendMessage(
                         'system',
@@ -305,6 +391,10 @@ export class AiAssistantPanel {
             this.#previousResponseId = typeof response?.id === 'string' ? response.id : this.#previousResponseId
         } catch (error) {
             const message = AssistantErrorUtils.buildRuntimeErrorMessage(error, this.translate)
+            this.#debugLog('request-error', {
+                message,
+                rawError: String(error?.message || error || '')
+            })
             this.#appendMessage('system', this.translate('assistant.requestFailed', { message }))
             this.setStatus(this.translate('assistant.requestFailed', { message }), 'error')
         } finally {
@@ -316,15 +406,54 @@ export class AiAssistantPanel {
     /**
      * Builds action runtime hints used to execute assistant tool calls safely.
      * @param {{ userText: string, hasUserAttachments: boolean }} options
-     * @returns {{ forceRebuild: boolean, allowCreateIfMissing: boolean }}
+     * @returns {{ forceRebuild: boolean, allowCreateIfMissing: boolean, preferredMedia: 'W3_5' | 'W6' | 'W9' | 'W12' | 'W18' | 'W24' | '' }}
      */
     #buildActionRunContext(options) {
         const userText = String(options?.userText || '')
         const hasUserAttachments = Boolean(options?.hasUserAttachments)
         const forceRebuild = this.#isRebuildIntent(userText, hasUserAttachments)
+        const preferredMedia = this.#resolvePreferredMediaFromText(userText)
         return {
             forceRebuild,
-            allowCreateIfMissing: forceRebuild
+            allowCreateIfMissing: forceRebuild,
+            preferredMedia
+        }
+    }
+
+    /**
+     * Extracts an explicit media width intent from user text (e.g. "24mm" or "W24").
+     * @param {string} userText
+     * @returns {'W3_5' | 'W6' | 'W9' | 'W12' | 'W18' | 'W24' | ''}
+     */
+    #resolvePreferredMediaFromText(userText) {
+        return MediaIntentUtils.resolvePreferredMedia(String(userText || ''))
+    }
+
+    /**
+     * Builds a compact UI-state summary for debug logs.
+     * @param {Record<string, any>} rawUiState
+     * @returns {{ media: string, orientation: string, selectedItemIds: string[], itemCount: number, items: Array<Record<string, any>> }}
+     */
+    #summarizeUiStateForDebug(rawUiState) {
+        const uiState = rawUiState && typeof rawUiState === 'object' ? rawUiState : {}
+        const items = Array.isArray(uiState.items) ? uiState.items : []
+        return {
+            media: String(uiState.media || ''),
+            orientation: String(uiState.orientation || ''),
+            selectedItemIds: Array.isArray(uiState.selectedItemIds)
+                ? uiState.selectedItemIds.map((entry) => String(entry || '')).filter(Boolean)
+                : [],
+            itemCount: items.length,
+            items: items.slice(0, 12).map((item) => ({
+                id: String(item?.id || ''),
+                type: String(item?.type || ''),
+                xOffset: Number(item?.xOffset || 0),
+                yOffset: Number(item?.yOffset || 0),
+                width: Number(item?.width || 0),
+                height: Number(item?.height || 0),
+                textPreview: typeof item?.textPreview === 'string' ? item.textPreview : undefined,
+                dataPreview: typeof item?.dataPreview === 'string' ? item.dataPreview : undefined
+            }))
         }
     }
 
@@ -372,13 +501,26 @@ export class AiAssistantPanel {
             ui_capabilities: this.#getActionCapabilities(),
             attachments
         }
+        this.#debugLog('request-payload', {
+            endpoint: this.#endpoint,
+            startFresh: shouldStartFresh,
+            previousResponseId: payload.previous_response_id ? String(payload.previous_response_id) : '',
+            uiItemCount: Array.isArray(payload.ui_state?.items) ? payload.ui_state.items.length : 0
+        })
         const response = await fetch(this.#endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         })
+        const requestId = String(response.headers.get('X-AI-Request-Id') || '')
         if (!response.ok) {
             const parsedError = await this.#parseErrorResponse(response)
+            this.#debugLog('request-http-error', {
+                requestId,
+                status: Number(response.status || 0),
+                parsedErrorPayload: parsedError.payload,
+                parsedErrorText: parsedError.text
+            })
             const detail = AssistantErrorUtils.buildRequestErrorMessage({
                 status: Number(response.status || 0),
                 payload: parsedError.payload,
@@ -387,7 +529,11 @@ export class AiAssistantPanel {
             })
             throw new Error(detail || this.translate('assistant.errorHttp', { status: response.status || '?' }))
         }
-        return response.json()
+        const parsedResponse = await response.json()
+        if (parsedResponse && typeof parsedResponse === 'object') {
+            parsedResponse._requestId = requestId
+        }
+        return parsedResponse
     }
 
     /**
