@@ -68,6 +68,9 @@ All items share:
 | `text` | `string` | Supports `{{parameter_name}}` placeholders |
 | `fontFamily` | `string` | |
 | `fontSize` | `number` | |
+| `textBold` | `boolean` | Bold style |
+| `textItalic` | `boolean` | Italic style |
+| `textUnderline` | `boolean` | Underline style |
 | `height` | `number` | Layout span |
 
 ### `qr` Item
@@ -76,7 +79,7 @@ All items share:
 | --- | --- | --- |
 | `data` | `string` | Supports `{{parameter_name}}` placeholders |
 | `size` | `number` | QR side length |
-| `height` | `number` | Layout span |
+| `height` | `number` | Stored for compatibility; normalized to `size` |
 | `qrErrorCorrectionLevel` | `string` | `L`, `M`, `Q`, `H` |
 | `qrVersion` | `number` | `0` = auto |
 | `qrEncodingMode` | `string` | `auto`, `byte`, `alphanumeric`, `numeric` |

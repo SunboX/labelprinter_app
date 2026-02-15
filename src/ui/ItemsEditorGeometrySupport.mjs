@@ -11,25 +11,22 @@ export class ItemsEditorGeometrySupport {
      * @param {{
      *  item: object,
      *  controls: HTMLElement,
-     *  sizeLabel: string,
      *  state: object,
      *  translate: (key: string, params?: Record<string, string | number>) => string,
      *  onChange: () => void,
      *  createSlider: (label: string, value: number, min: number, max: number, step: number, onInput: (value: number) => void) => HTMLDivElement
      * }} options
      */
-    static appendQrControls({ item, controls, sizeLabel, state, translate, onChange, createSlider }) {
+    static appendQrControls({ item, controls, state, translate, onChange, createSlider }) {
         const normalizedOptions = QrCodeUtils.normalizeItemOptions(item)
         item.qrErrorCorrectionLevel = normalizedOptions.qrErrorCorrectionLevel
         item.qrVersion = normalizedOptions.qrVersion
         item.qrEncodingMode = normalizedOptions.qrEncodingMode
+        item.size = QrSizeUtils.clampQrSizeToLabel(state, item.size || QrSizeUtils.MIN_QR_SIZE_DOTS)
+        item.height = item.size
 
         const maxQrSize = QrSizeUtils.computeMaxQrSizeDots(state)
         const minQrSize = Math.max(1, Math.min(QrSizeUtils.MIN_QR_SIZE_DOTS, maxQrSize))
-        const heightCtrl = createSlider(sizeLabel, item.height, 20, 280, 1, (value) => {
-            item.height = value
-            onChange()
-        })
         const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
             item,
             translate,
@@ -42,9 +39,7 @@ export class ItemsEditorGeometrySupport {
         })
         const sizeCtrl = createSlider(translate('itemsEditor.sliderQrSize'), item.size, minQrSize, maxQrSize, 1, (value) => {
             item.size = QrSizeUtils.clampQrSizeToLabel(state, value)
-            if ((item.height || 0) < item.size) {
-                item.height = item.size
-            }
+            item.height = item.size
             item._qrCache = null
             onChange()
         })
@@ -111,7 +106,6 @@ export class ItemsEditorGeometrySupport {
         encodingModeCtrl.append(encodingModeLabel, encodingModeSelect)
 
         controls.append(
-            heightCtrl,
             offsetCtrl,
             yOffsetCtrl,
             rotationCtrl,
