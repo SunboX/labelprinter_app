@@ -41,7 +41,7 @@ export class PreviewLayoutUtils {
     }
 
     /**
-     * Computes the auto label length in dots from baseline flow and content extent.
+     * Computes the auto label length in dots from content extent.
      * @param {number} baseLengthDots
      * @param {number} contentEndDots
      * @param {number} trailingPaddingDots
@@ -49,12 +49,14 @@ export class PreviewLayoutUtils {
      * @returns {number}
      */
     static computeAutoLabelLengthDots(baseLengthDots, contentEndDots, trailingPaddingDots, minLengthDots) {
-        const safeBase = Math.max(0, Number.isFinite(baseLengthDots) ? baseLengthDots : 0)
+        // Keep this argument for compatibility with existing callers; auto sizing is
+        // intentionally driven by actual rendered content so overlap/stacking can shrink length.
+        void baseLengthDots
         const safeContentEnd = Math.max(0, Number.isFinite(contentEndDots) ? contentEndDots : 0)
         const safeTrailingPadding = Math.max(0, Number.isFinite(trailingPaddingDots) ? trailingPaddingDots : 0)
         const safeMin = Math.max(0, Number.isFinite(minLengthDots) ? minLengthDots : 0)
         const dynamicLength = safeContentEnd + safeTrailingPadding
-        return Math.max(safeMin, safeBase, dynamicLength)
+        return Math.max(safeMin, dynamicLength)
     }
 
     /**
