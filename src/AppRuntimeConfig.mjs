@@ -67,6 +67,7 @@ export class AppRuntimeConfig {
                     textBold: false,
                     textItalic: false,
                     textUnderline: false,
+                    textStrikethrough: false,
                     height: 40,
                     xOffset: 4,
                     yOffset: 0,

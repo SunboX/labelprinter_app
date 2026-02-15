@@ -103,10 +103,22 @@ export class PreviewLayoutUtils {
         const safeMediaWidth = Number.isFinite(mediaWidthMm) && mediaWidthMm > 0 ? mediaWidthMm : null
         let labelMmWidth = safeWidthDots / safeDotsPerMmX
         let labelMmHeight = safeHeightDots / safeDotsPerMmY
-        if (safeMediaWidth) {
-            if (isHorizontal) {
+
+        // Keep preview pixel geometry isotropic. Only trust nominal media width if it is
+        // close to the DPI-derived printable size; otherwise we keep the printable size to
+        // avoid non-square rendering (for example stretched QR on wide tapes like W24).
+        const toleranceRatio = 0.1
+        if (safeMediaWidth && isHorizontal) {
+            const dpiDerivedDotsPerMm = safeHeightDots / safeMediaWidth
+            const ratio = dpiDerivedDotsPerMm / safeDotsPerMmY
+            if (Math.abs(1 - ratio) <= toleranceRatio) {
                 labelMmHeight = safeMediaWidth
-            } else {
+            }
+        }
+        if (safeMediaWidth && !isHorizontal) {
+            const dpiDerivedDotsPerMm = safeWidthDots / safeMediaWidth
+            const ratio = dpiDerivedDotsPerMm / safeDotsPerMmX
+            if (Math.abs(1 - ratio) <= toleranceRatio) {
                 labelMmWidth = safeMediaWidth
             }
         }
