@@ -181,4 +181,51 @@ export class ItemsEditorControlSupport {
         field.append(label)
         return { field, input }
     }
+
+    /**
+     * Builds a labeled row of toggle buttons.
+     * @param {{
+     *  labelText: string,
+     *  buttons: Array<{
+     *   id: string,
+     *   label: string,
+     *   title: string,
+     *   className?: string,
+     *   isActive: () => boolean,
+     *   onToggle: () => void
+     *  }>
+     * }} options
+     * @returns {{ field: HTMLDivElement, buttons: Record<string, HTMLButtonElement> }}
+     */
+    static createToggleButtonGroupField({ labelText, buttons }) {
+        const field = document.createElement('div')
+        field.className = 'field text-style-field'
+        const label = document.createElement('label')
+        label.textContent = labelText
+        const group = document.createElement('div')
+        group.className = 'text-style-buttons'
+        const buttonMap = {}
+        ;(Array.isArray(buttons) ? buttons : []).forEach((entry) => {
+            const button = document.createElement('button')
+            button.type = 'button'
+            button.className = `text-style-toggle ${entry.className || ''}`.trim()
+            button.textContent = String(entry.label || '')
+            button.title = String(entry.title || '')
+            button.setAttribute('aria-label', String(entry.title || ''))
+            button.setAttribute('aria-pressed', entry.isActive() ? 'true' : 'false')
+            if (entry.isActive()) {
+                button.classList.add('is-active')
+            }
+            button.addEventListener('click', () => {
+                entry.onToggle()
+                const isActive = entry.isActive()
+                button.classList.toggle('is-active', isActive)
+                button.setAttribute('aria-pressed', isActive ? 'true' : 'false')
+            })
+            group.append(button)
+            if (entry.id) buttonMap[entry.id] = button
+        })
+        field.append(label, group)
+        return { field, buttons: buttonMap }
+    }
 }

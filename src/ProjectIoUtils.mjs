@@ -156,6 +156,7 @@ export class ProjectIoUtils {
                 textBold: false,
                 textItalic: false,
                 textUnderline: false,
+                textStrikethrough: false,
                 height: 40,
                 xOffset: 4,
                 yOffset: 0,
@@ -259,11 +260,22 @@ export class ProjectIoUtils {
                 cleaned.textUnderline ?? cleaned.underline ?? cleaned.underlined ?? (normalizedTextDecoration === 'underline'),
                 defaults.textUnderline
             )
+            normalized.textStrikethrough = ProjectIoUtils.#coerceBoolean(
+                cleaned.textStrikethrough ??
+                    cleaned.strikethrough ??
+                    cleaned.strikeThrough ??
+                    cleaned.strike ??
+                    (normalizedTextDecoration === 'line-through' || normalizedTextDecoration === 'strikethrough'),
+                defaults.textStrikethrough
+            )
             delete normalized.bold
             delete normalized.italic
             delete normalized.kursiv
             delete normalized.underline
             delete normalized.underlined
+            delete normalized.strikethrough
+            delete normalized.strikeThrough
+            delete normalized.strike
             delete normalized.fontWeight
             delete normalized.fontStyle
             delete normalized.textDecoration

@@ -137,11 +137,21 @@ export class ItemsEditor {
      * @param {string[]} itemIds
      */
     setSelectedItemIds(itemIds) {
-        const nextSelectedItemIds = new Set(Array.isArray(itemIds) ? itemIds : [])
+        const orderedItemIds = Array.isArray(itemIds) ? itemIds.map((itemId) => String(itemId || '')).filter(Boolean) : []
+        const nextSelectedItemIds = new Set(orderedItemIds)
         this.#restoreAutoCollapsedItems(nextSelectedItemIds)
         this.#expandSelectedCollapsedItems(nextSelectedItemIds)
         this.selectedItemIds = nextSelectedItemIds
         this.render()
+        const firstSelectedItemId = orderedItemIds.find((itemId) => this.state.items.some((item) => item.id === itemId))
+        if (firstSelectedItemId && this.els.items) {
+            const card = Array.from(this.els.items.querySelectorAll('.item-card')).find(
+                (candidate) => candidate.dataset.itemId === firstSelectedItemId
+            )
+            if (card && typeof card.scrollIntoView === 'function') {
+                card.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+            }
+        }
     }
 
     /**
@@ -157,10 +167,6 @@ export class ItemsEditor {
         this.setSelectedItemIds([normalizedItemId])
         const trigger = this.#findIconPickerTrigger(normalizedItemId)
         if (!trigger) return false
-        const card = trigger.closest('.item-card')
-        if (card && typeof card.scrollIntoView === 'function') {
-            card.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-        }
         trigger.click()
         return true
     }
@@ -312,6 +318,7 @@ export class ItemsEditor {
             textBold: false,
             textItalic: false,
             textUnderline: false,
+            textStrikethrough: false,
             height: 40,
             xOffset: 4,
             rotation: 0
@@ -804,32 +811,54 @@ export class ItemsEditor {
             this.#onChange()
         })
 
-        const boldCtrl = ItemsEditorControlSupport.createCheckboxField({
-            labelText: this.translate('itemsEditor.textBold'),
-            checked: Boolean(item.textBold),
-            onChange: (checked) => {
-                item.textBold = checked
-                this.#onChange()
-            }
-        }).field
-        const italicCtrl = ItemsEditorControlSupport.createCheckboxField({
-            labelText: this.translate('itemsEditor.textItalic'),
-            checked: Boolean(item.textItalic),
-            onChange: (checked) => {
-                item.textItalic = checked
-                this.#onChange()
-            }
-        }).field
-        const underlineCtrl = ItemsEditorControlSupport.createCheckboxField({
-            labelText: this.translate('itemsEditor.textUnderline'),
-            checked: Boolean(item.textUnderline),
-            onChange: (checked) => {
-                item.textUnderline = checked
-                this.#onChange()
-            }
+        const textStyleCtrl = ItemsEditorControlSupport.createToggleButtonGroupField({
+            labelText: this.translate('itemsEditor.textStyle'),
+            buttons: [
+                {
+                    id: 'bold',
+                    label: 'B',
+                    title: this.translate('itemsEditor.textBold'),
+                    isActive: () => Boolean(item.textBold),
+                    onToggle: () => {
+                        item.textBold = !Boolean(item.textBold)
+                        this.#onChange()
+                    }
+                },
+                {
+                    id: 'italic',
+                    label: '/',
+                    title: this.translate('itemsEditor.textItalic'),
+                    isActive: () => Boolean(item.textItalic),
+                    onToggle: () => {
+                        item.textItalic = !Boolean(item.textItalic)
+                        this.#onChange()
+                    }
+                },
+                {
+                    id: 'underline',
+                    label: 'U',
+                    title: this.translate('itemsEditor.textUnderline'),
+                    isActive: () => Boolean(item.textUnderline),
+                    onToggle: () => {
+                        item.textUnderline = !Boolean(item.textUnderline)
+                        this.#onChange()
+                    }
+                },
+                {
+                    id: 'strikethrough',
+                    label: 'S',
+                    title: this.translate('itemsEditor.textStrikethrough'),
+                    className: 'text-style-glyph-strike',
+                    isActive: () => Boolean(item.textStrikethrough),
+                    onToggle: () => {
+                        item.textStrikethrough = !Boolean(item.textStrikethrough)
+                        this.#onChange()
+                    }
+                }
+            ]
         }).field
 
-        controls.append(offsetCtrl, yOffsetCtrl, rotationCtrl, fontCtrl, sizeCtrl, boldCtrl, italicCtrl, underlineCtrl, googleFontCtrl)
+        controls.append(offsetCtrl, yOffsetCtrl, rotationCtrl, fontCtrl, sizeCtrl, textStyleCtrl, googleFontCtrl)
     }
     /**
      * Returns font-family options for the current item.

@@ -40,14 +40,20 @@ describe('computeLabelTagLayout', () => {
 })
 
 describe('computeLabelMmDimensions', () => {
-    it('uses the media width as the tape height when horizontal', () => {
+    it('uses the media width when printable dots are close to nominal media width', () => {
         const dims = PreviewLayoutUtils.computeLabelMmDimensions(64, 64, 7.1, 7.1, 9, true)
         assert.equal(dims.labelMmHeight, 9)
         assert.equal(dims.labelMmWidth, 64 / 7.1)
     })
 
-    it('uses the media width as the tape width when vertical', () => {
-        const dims = PreviewLayoutUtils.computeLabelMmDimensions(64, 128, 7.1, 7.1, 12, false)
+    it('keeps dpi-derived dimensions when media width would distort preview pixels', () => {
+        const dims = PreviewLayoutUtils.computeLabelMmDimensions(240, 128, 7.1, 7.1, 24, true)
+        assert.equal(dims.labelMmHeight, 128 / 7.1)
+        assert.equal(dims.labelMmWidth, 240 / 7.1)
+    })
+
+    it('uses media width for vertical layouts only when close to dpi-derived size', () => {
+        const dims = PreviewLayoutUtils.computeLabelMmDimensions(85, 128, 7.1, 7.1, 12, false)
         assert.equal(dims.labelMmWidth, 12)
         assert.equal(dims.labelMmHeight, 128 / 7.1)
     })
