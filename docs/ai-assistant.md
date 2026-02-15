@@ -77,6 +77,9 @@ Assistant answers are grounded by backend-loaded markdown snippets.
 - Assistant response tuning env vars:
   - `OPENAI_REASONING_EFFORT` (`minimal`, `low`, `medium`, `high`; recommended: `minimal`)
   - `AI_MAX_OUTPUT_TOKENS` (recommended: `2200`)
+- Assistant diagnostics env vars:
+  - `AI_DEBUG_LOGS` (`true` enables backend debug lines)
+  - `AI_DEBUG_FUNCTION_ARGS_PREVIEW_CHARS` (how many tool-argument chars are logged; default `1200`)
 
 Important:
 

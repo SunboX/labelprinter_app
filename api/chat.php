@@ -138,16 +138,20 @@ function logAssistantDebug(bool $enabled, string $event, array $context = []): v
  * Summarizes an OpenAI Responses JSON payload for debug logs.
  *
  * @param string $responseText
+ * @param int $functionArgsPreviewChars
  * @return array{
  *   status: string,
  *   incompleteReason: string,
  *   outputTextLength: int,
  *   functionCalls: int,
  *   functionCallNames: array<int, string>,
+ *   firstFunctionArgumentsLength: int,
+ *   firstFunctionActionCount: int,
+ *   firstFunctionActionNames: array<int, string>,
  *   firstFunctionArgumentsPreview: string
  * }
  */
-function summarizeUpstreamResponse(string $responseText): array
+function summarizeUpstreamResponse(string $responseText, int $functionArgsPreviewChars): array
 {
     $fallback = [
         'status' => 'unknown',
@@ -155,6 +159,9 @@ function summarizeUpstreamResponse(string $responseText): array
         'outputTextLength' => 0,
         'functionCalls' => 0,
         'functionCallNames' => [],
+        'firstFunctionArgumentsLength' => 0,
+        'firstFunctionActionCount' => 0,
+        'firstFunctionActionNames' => [],
         'firstFunctionArgumentsPreview' => ''
     ];
     $parsed = json_decode($responseText, true);
@@ -171,6 +178,9 @@ function summarizeUpstreamResponse(string $responseText): array
     $outputText = isset($parsed['output_text']) && is_string($parsed['output_text']) ? $parsed['output_text'] : '';
     $functionCalls = 0;
     $functionCallNames = [];
+    $firstFunctionArgumentsLength = 0;
+    $firstFunctionActionCount = 0;
+    $firstFunctionActionNames = [];
     $firstFunctionArgumentsPreview = '';
     if (isset($parsed['output']) && is_array($parsed['output'])) {
         foreach ($parsed['output'] as $item) {
@@ -185,8 +195,13 @@ function summarizeUpstreamResponse(string $responseText): array
                 }
                 if ($firstFunctionArgumentsPreview === '') {
                     $rawArguments = isset($item['arguments']) ? (string)$item['arguments'] : '';
+                    $actionSummary = summarizeFunctionArguments($rawArguments);
+                    $firstFunctionArgumentsLength = $actionSummary['firstFunctionArgumentsLength'];
+                    $firstFunctionActionCount = $actionSummary['firstFunctionActionCount'];
+                    $firstFunctionActionNames = $actionSummary['firstFunctionActionNames'];
                     $rawArguments = preg_replace('/\s+/u', ' ', $rawArguments);
-                    $firstFunctionArgumentsPreview = mb_substr((string)$rawArguments, 0, 280);
+                    $previewLength = max(120, min(20000, $functionArgsPreviewChars));
+                    $firstFunctionArgumentsPreview = mb_substr((string)$rawArguments, 0, $previewLength);
                 }
             }
             if (($item['type'] ?? '') !== 'message' || !isset($item['content']) || !is_array($item['content'])) {
@@ -209,8 +224,94 @@ function summarizeUpstreamResponse(string $responseText): array
         'outputTextLength' => mb_strlen($outputText),
         'functionCalls' => $functionCalls,
         'functionCallNames' => $functionCallNames,
+        'firstFunctionArgumentsLength' => $firstFunctionArgumentsLength,
+        'firstFunctionActionCount' => $firstFunctionActionCount,
+        'firstFunctionActionNames' => $firstFunctionActionNames,
         'firstFunctionArgumentsPreview' => $firstFunctionArgumentsPreview
     ];
+}
+
+/**
+ * Summarizes the first function-call argument payload.
+ *
+ * @param string $rawArguments
+ * @return array{
+ *   firstFunctionArgumentsLength: int,
+ *   firstFunctionActionCount: int,
+ *   firstFunctionActionNames: array<int, string>
+ * }
+ */
+function summarizeFunctionArguments(string $rawArguments): array
+{
+    $summary = [
+        'firstFunctionArgumentsLength' => mb_strlen($rawArguments),
+        'firstFunctionActionCount' => 0,
+        'firstFunctionActionNames' => []
+    ];
+    if (trim($rawArguments) === '') {
+        return $summary;
+    }
+    $decoded = json_decode($rawArguments, true);
+    if (!is_array($decoded)) {
+        return $summary;
+    }
+    $actions = extractActionArray($decoded);
+    if (!$actions) {
+        return $summary;
+    }
+    $summary['firstFunctionActionCount'] = count($actions);
+    $actionNames = [];
+    foreach ($actions as $action) {
+        if (!is_array($action)) {
+            continue;
+        }
+        $name = isset($action['action']) && is_string($action['action']) ? trim($action['action']) : '';
+        if ($name === '') {
+            continue;
+        }
+        $actionNames[] = $name;
+        if (count($actionNames) >= 12) {
+            break;
+        }
+    }
+    $summary['firstFunctionActionNames'] = $actionNames;
+    return $summary;
+}
+
+/**
+ * Extracts action objects from known tool argument wrappers.
+ *
+ * @param mixed $payload
+ * @return array<int, array<string, mixed>>
+ */
+function extractActionArray($payload): array
+{
+    if (!is_array($payload)) {
+        return [];
+    }
+    if (array_is_list($payload)) {
+        return array_values(array_filter($payload, static function ($entry): bool {
+            return is_array($entry) && isset($entry['action']) && is_string($entry['action']);
+        }));
+    }
+    if (isset($payload['actions']) && is_array($payload['actions'])) {
+        return array_values(array_filter($payload['actions'], static function ($entry): bool {
+            return is_array($entry) && isset($entry['action']) && is_string($entry['action']);
+        }));
+    }
+    foreach (['payload', 'request', 'input'] as $wrapperKey) {
+        if (!array_key_exists($wrapperKey, $payload)) {
+            continue;
+        }
+        $nested = extractActionArray($payload[$wrapperKey]);
+        if ($nested) {
+            return $nested;
+        }
+    }
+    if (isset($payload['action']) && is_string($payload['action'])) {
+        return [$payload];
+    }
+    return [];
 }
 
 /**
@@ -463,6 +564,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $debugLogsEnabled = parseBoolEnv(getenv('AI_DEBUG_LOGS') ?: null, false);
+$functionArgsPreviewChars = parsePositiveIntEnv(getenv('AI_DEBUG_FUNCTION_ARGS_PREVIEW_CHARS') ?: null, 1200, 120, 20000);
 $requestId = buildAssistantRequestId();
 header('X-AI-Request-Id: ' . $requestId);
 $startedAt = microtime(true);
@@ -564,7 +666,8 @@ $instructions = implode("\n", [
     'If the user says "match the look" for an attached label, proceed immediately with a best-effort reconstruction instead of asking additional clarification questions.',
     'When rebuilding a label from an image/sketch, first call clear_items so old objects are not mixed into the new result.',
     'For visual reconstruction, prefer one multiline text item for the left stacked content plus one QR item on the right, unless the user explicitly requests separate text objects.',
-    'For stacked inventory labels, prefer explicit vertical stacking (separate text items with increasing yOffset) over a single long horizontal row.',
+    'If the user explicitly specifies tape width (for example "24mm" or "W24"), keep that width in set_label settings.media and do not downgrade it.',
+    'Do not generate many separate text items for one stacked inventory block unless the user explicitly asks for editable per-line objects.',
     'Do not duplicate content: each text section should appear exactly once. Never keep a full multiline copy and additional duplicated line items at the same time.',
     'Text items support style flags: textBold, textItalic, textUnderline. Use these instead of creating extra line shapes only for underlines.',
     'When matching a label photo with heading/value rows, explicitly set textBold/textUnderline/textItalic where visible (for example first heading often underlined, value rows often bold).',
@@ -783,7 +886,7 @@ if ($response === false) {
     exit;
 }
 
-$summary = summarizeUpstreamResponse((string)$response);
+$summary = summarizeUpstreamResponse((string)$response, $functionArgsPreviewChars);
 logAssistantDebug($debugLogsEnabled, 'request-complete', [
     'requestId' => $requestId,
     'elapsedMs' => (int)round((microtime(true) - $startedAt) * 1000),

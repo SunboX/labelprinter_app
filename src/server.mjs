@@ -37,7 +37,8 @@ const assistantConfig = {
     reasoningEffort: parseReasoningEffortEnv(process.env.OPENAI_REASONING_EFFORT, 'minimal')
 }
 const assistantDebugConfig = {
-    enabled: parseBooleanEnv(process.env.AI_DEBUG_LOGS, false)
+    enabled: parseBooleanEnv(process.env.AI_DEBUG_LOGS, false),
+    functionArgsPreviewChars: parsePositiveIntEnv(process.env.AI_DEBUG_FUNCTION_ARGS_PREVIEW_CHARS, 1200, 120, 20000)
 }
 
 /** @type {Promise<Array<{ source: string, text: string, search: string }>> | null} */
@@ -156,7 +157,8 @@ function buildAssistantInstructions() {
         'If the user says "match the look" for an attached label, proceed immediately with a best-effort reconstruction instead of asking additional clarification questions.',
         'When rebuilding a label from an image/sketch, first call clear_items so old objects are not mixed into the new result.',
         'For visual reconstruction, prefer one multiline text item for the left stacked content plus one QR item on the right, unless the user explicitly requests separate text objects.',
-        'For stacked inventory labels, prefer explicit vertical stacking (separate text items with increasing yOffset) over a single long horizontal row.',
+        'If the user explicitly specifies tape width (for example "24mm" or "W24"), keep that width in set_label settings.media and do not downgrade it.',
+        'Do not generate many separate text items for one stacked inventory block unless the user explicitly asks for editable per-line objects.',
         'Do not duplicate content: each text section should appear exactly once. Never keep a full multiline copy and additional duplicated line items at the same time.',
         'Text items support style flags: textBold, textItalic, textUnderline. Use these instead of creating extra line shapes only for underlines.',
         'When matching a label photo with heading/value rows, explicitly set textBold/textUnderline/textItalic where visible (for example first heading often underlined, value rows often bold).',
@@ -496,25 +498,35 @@ function resolveClientIp(req) {
 /**
  * Summarizes the upstream Responses API payload for diagnostics.
  * @param {string} responseText
+ * @param {{ functionArgsPreviewChars: number }} options
  * @returns {{
  *   status: string,
  *   incompleteReason: string,
  *   outputTextLength: number,
  *   functionCalls: number,
  *   functionCallNames: string[],
+ *   firstFunctionArgumentsLength: number,
+ *   firstFunctionActionCount: number,
+ *   firstFunctionActionNames: string[],
  *   firstFunctionArgumentsPreview: string
  * }}
  */
-function summarizeUpstreamResponse(responseText) {
+function summarizeUpstreamResponse(responseText, options) {
     const fallback = {
         status: 'unknown',
         incompleteReason: '',
         outputTextLength: 0,
         functionCalls: 0,
         functionCallNames: [],
+        firstFunctionArgumentsLength: 0,
+        firstFunctionActionCount: 0,
+        firstFunctionActionNames: [],
         firstFunctionArgumentsPreview: ''
     }
     try {
+        const previewChars = Number.isFinite(options?.functionArgsPreviewChars)
+            ? Math.max(120, Math.floor(options.functionArgsPreviewChars))
+            : 1200
         const payload = JSON.parse(responseText)
         const status = typeof payload?.status === 'string' ? payload.status : fallback.status
         const incompleteReason =
@@ -527,9 +539,10 @@ function summarizeUpstreamResponse(responseText) {
             .filter(Boolean)
             .slice(0, 6)
         const firstRawArguments = functionCallItems[0]?.arguments
+        const actionSummary = summarizeFunctionArguments(firstRawArguments)
         const firstFunctionArgumentsPreview = String(firstRawArguments || '')
             .replace(/\s+/g, ' ')
-            .slice(0, 280)
+            .slice(0, previewChars)
         const outputText =
             typeof payload?.output_text === 'string'
                 ? payload.output_text
@@ -548,11 +561,65 @@ function summarizeUpstreamResponse(responseText) {
             outputTextLength: outputText.length,
             functionCalls,
             functionCallNames,
+            ...actionSummary,
             firstFunctionArgumentsPreview
         }
     } catch (_error) {
         return fallback
     }
+}
+
+/**
+ * Summarizes the first function-call argument payload.
+ * @param {unknown} rawArguments
+ * @returns {{ firstFunctionArgumentsLength: number, firstFunctionActionCount: number, firstFunctionActionNames: string[] }}
+ */
+function summarizeFunctionArguments(rawArguments) {
+    const rawText = String(rawArguments || '')
+    const summary = {
+        firstFunctionArgumentsLength: rawText.length,
+        firstFunctionActionCount: 0,
+        firstFunctionActionNames: []
+    }
+    if (!rawText.trim()) return summary
+    try {
+        const parsed = JSON.parse(rawText)
+        const actions = extractActionArray(parsed)
+        if (!actions.length) return summary
+        summary.firstFunctionActionCount = actions.length
+        summary.firstFunctionActionNames = actions
+            .map((action) => String(action?.action || '').trim())
+            .filter(Boolean)
+            .slice(0, 12)
+    } catch (_error) {
+        return summary
+    }
+    return summary
+}
+
+/**
+ * Extracts action objects from known function argument wrappers.
+ * @param {unknown} payload
+ * @returns {Array<Record<string, unknown>>}
+ */
+function extractActionArray(payload) {
+    if (Array.isArray(payload)) {
+        return payload.filter(
+            (entry) => entry && typeof entry === 'object' && typeof entry.action === 'string'
+        )
+    }
+    if (!payload || typeof payload !== 'object') return []
+    if (Array.isArray(payload.actions)) {
+        return payload.actions.filter(
+            (entry) => entry && typeof entry === 'object' && typeof entry.action === 'string'
+        )
+    }
+    const wrapperCandidates = [payload.payload, payload.request, payload.input]
+    for (const candidate of wrapperCandidates) {
+        const nested = extractActionArray(candidate)
+        if (nested.length) return nested
+    }
+    return typeof payload.action === 'string' ? [payload] : []
 }
 
 /**
@@ -642,7 +709,7 @@ app.post('/api/chat', async (req, res) => {
         })
         const responseText = await upstreamResponse.text()
         const contentType = upstreamResponse.headers.get('content-type') || 'application/json; charset=utf-8'
-        const summary = summarizeUpstreamResponse(responseText)
+        const summary = summarizeUpstreamResponse(responseText, assistantDebugConfig)
         logAssistantDebug('request-complete', {
             requestId,
             upstreamStatus: upstreamResponse.status,
