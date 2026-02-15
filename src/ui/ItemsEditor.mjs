@@ -6,6 +6,7 @@ import { ItemsEditorImageSupport } from './ItemsEditorImageSupport.mjs'
 import { ItemsEditorIconSupport } from './ItemsEditorIconSupport.mjs'
 import { ItemsEditorBarcodeSupport } from './ItemsEditorBarcodeSupport.mjs'
 import { ItemsEditorGeometrySupport } from './ItemsEditorGeometrySupport.mjs'
+import { ItemsEditorControlSupport } from './ItemsEditorControlSupport.mjs'
 /**
  * Manages the item list UI, including drag reordering and item controls.
  */
@@ -308,6 +309,9 @@ export class ItemsEditor {
             text: this.translate('itemsEditor.newText'),
             fontFamily: this.#resolveDefaultFontFamily(),
             fontSize: 24,
+            textBold: false,
+            textItalic: false,
+            textUnderline: false,
             height: 40,
             xOffset: 4,
             rotation: 0
@@ -686,7 +690,7 @@ export class ItemsEditor {
         if (item.type === 'text') {
             this.#appendTextControls(item, controls)
         } else if (item.type === 'qr') {
-            this.#appendQrControls(item, controls, sizeLabel)
+            this.#appendQrControls(item, controls)
         } else if (item.type === 'barcode') {
             this.#appendBarcodeControls(item, controls, sizeLabel)
         } else if (item.type === 'image') {
@@ -800,7 +804,32 @@ export class ItemsEditor {
             this.#onChange()
         })
 
-        controls.append(offsetCtrl, yOffsetCtrl, rotationCtrl, fontCtrl, sizeCtrl, googleFontCtrl)
+        const boldCtrl = ItemsEditorControlSupport.createCheckboxField({
+            labelText: this.translate('itemsEditor.textBold'),
+            checked: Boolean(item.textBold),
+            onChange: (checked) => {
+                item.textBold = checked
+                this.#onChange()
+            }
+        }).field
+        const italicCtrl = ItemsEditorControlSupport.createCheckboxField({
+            labelText: this.translate('itemsEditor.textItalic'),
+            checked: Boolean(item.textItalic),
+            onChange: (checked) => {
+                item.textItalic = checked
+                this.#onChange()
+            }
+        }).field
+        const underlineCtrl = ItemsEditorControlSupport.createCheckboxField({
+            labelText: this.translate('itemsEditor.textUnderline'),
+            checked: Boolean(item.textUnderline),
+            onChange: (checked) => {
+                item.textUnderline = checked
+                this.#onChange()
+            }
+        }).field
+
+        controls.append(offsetCtrl, yOffsetCtrl, rotationCtrl, fontCtrl, sizeCtrl, boldCtrl, italicCtrl, underlineCtrl, googleFontCtrl)
     }
     /**
      * Returns font-family options for the current item.
@@ -932,13 +961,11 @@ export class ItemsEditor {
      * Appends QR controls to the controls container.
      * @param {object} item
      * @param {HTMLElement} controls
-     * @param {string} sizeLabel
      */
-    #appendQrControls(item, controls, sizeLabel) {
+    #appendQrControls(item, controls) {
         ItemsEditorGeometrySupport.appendQrControls({
             item,
             controls,
-            sizeLabel,
             state: this.state,
             translate: this.translate,
             onChange: this.#onChange,

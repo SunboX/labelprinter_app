@@ -125,6 +125,24 @@ export class ProjectIoUtils {
     }
 
     /**
+     * Coerces a value into a boolean.
+     * Accepts common string variants.
+     * @param {unknown} value
+     * @param {boolean} fallback
+     * @returns {boolean}
+     */
+    static #coerceBoolean(value, fallback) {
+        if (typeof value === 'boolean') return value
+        if (typeof value === 'number') return value !== 0
+        if (typeof value === 'string') {
+            const normalized = value.trim().toLowerCase()
+            if (['true', '1', 'yes', 'y', 'on'].includes(normalized)) return true
+            if (['false', '0', 'no', 'n', 'off'].includes(normalized)) return false
+        }
+        return fallback
+    }
+
+    /**
      * Creates a default item map for normalization.
      * @returns {Record<string, object>}
      */
@@ -135,6 +153,9 @@ export class ProjectIoUtils {
                 text: '',
                 fontFamily: 'Barlow',
                 fontSize: 24,
+                textBold: false,
+                textItalic: false,
+                textUnderline: false,
                 height: 40,
                 xOffset: 4,
                 yOffset: 0,
@@ -144,7 +165,7 @@ export class ProjectIoUtils {
                 type: 'qr',
                 data: '',
                 size: 120,
-                height: 130,
+                height: 120,
                 qrErrorCorrectionLevel: QrCodeUtils.getDefaultErrorCorrectionLevel(),
                 qrVersion: QrCodeUtils.getDefaultVersion(),
                 qrEncodingMode: QrCodeUtils.getDefaultEncodingMode(),
@@ -223,11 +244,35 @@ export class ProjectIoUtils {
             normalized.height = ProjectIoUtils.#coerceNumber(normalized.height, defaults.height)
             normalized.xOffset = ProjectIoUtils.#coerceNumber(normalized.xOffset, defaults.xOffset)
             normalized.yOffset = ProjectIoUtils.#coerceNumber(normalized.yOffset, defaults.yOffset)
+            const normalizedFontWeight = String(cleaned.fontWeight || '').toLowerCase()
+            const normalizedFontStyle = String(cleaned.fontStyle || '').toLowerCase()
+            const normalizedTextDecoration = String(cleaned.textDecoration || '').toLowerCase()
+            normalized.textBold = ProjectIoUtils.#coerceBoolean(
+                cleaned.textBold ?? cleaned.bold ?? (normalizedFontWeight === 'bold'),
+                defaults.textBold
+            )
+            normalized.textItalic = ProjectIoUtils.#coerceBoolean(
+                cleaned.textItalic ?? cleaned.italic ?? cleaned.kursiv ?? (normalizedFontStyle === 'italic'),
+                defaults.textItalic
+            )
+            normalized.textUnderline = ProjectIoUtils.#coerceBoolean(
+                cleaned.textUnderline ?? cleaned.underline ?? cleaned.underlined ?? (normalizedTextDecoration === 'underline'),
+                defaults.textUnderline
+            )
+            delete normalized.bold
+            delete normalized.italic
+            delete normalized.kursiv
+            delete normalized.underline
+            delete normalized.underlined
+            delete normalized.fontWeight
+            delete normalized.fontStyle
+            delete normalized.textDecoration
             normalized.rotation = RotationUtils.normalizeDegrees(normalized.rotation, defaults.rotation)
         }
         if (type === 'qr') {
-            normalized.size = ProjectIoUtils.#coerceNumber(normalized.size, defaults.size)
-            normalized.height = ProjectIoUtils.#coerceNumber(normalized.height, defaults.height)
+            const qrSizeSource = cleaned.size ?? cleaned.width ?? cleaned.height ?? defaults.size
+            normalized.size = Math.max(1, ProjectIoUtils.#coerceNumber(qrSizeSource, defaults.size))
+            normalized.height = normalized.size
             normalized.xOffset = ProjectIoUtils.#coerceNumber(normalized.xOffset, defaults.xOffset)
             normalized.yOffset = ProjectIoUtils.#coerceNumber(normalized.yOffset, defaults.yOffset)
             normalized.rotation = RotationUtils.normalizeDegrees(normalized.rotation, defaults.rotation)
@@ -243,6 +288,7 @@ export class ProjectIoUtils {
             delete normalized.errorCorrectionLevel
             delete normalized.version
             delete normalized.encodingMode
+            delete normalized.width
         }
         if (type === 'shape') {
             normalized.width = ProjectIoUtils.#coerceNumber(normalized.width, defaults.width)

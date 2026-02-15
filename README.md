@@ -41,6 +41,7 @@ The printer protocol and backend implementation are consumed from:
 
 ## Documentation
 
+- `docs/ai-assistant.md`: in-app assistant usage, action automation, and PHP endpoint setup.
 - `docs/getting-started.md`: step-by-step editor guide from setup to print.
 - `docs/objects-and-alignment.md`: object types, properties, editing behavior, and alignment.
 - `docs/parameter-data-formats.md`: parameter file formats and required CSV/spreadsheet structure.
@@ -67,6 +68,8 @@ Make sure your SSH key has access to GitHub before installing.
 
 ```bash
 npm install
+cp .env.example .env
+# set OPENAI_API_KEY in .env if you use the AI assistant
 npm start
 ```
 

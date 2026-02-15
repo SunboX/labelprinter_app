@@ -43,6 +43,23 @@
                                 <circle cx="18" cy="19" r="2"></circle>
                             </svg>
                         </button>
+                        <button
+                            class="ghost assistant-toolbar-btn"
+                            type="button"
+                            data-ai-toggle
+                            aria-label="Open assistant"
+                            title="Open assistant"
+                            data-i18n-aria-label="assistant.toggleAria"
+                            data-i18n-title="assistant.toggleTitle"
+                            aria-expanded="false"
+                        >
+                            <svg class="icon-assistant" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path d="M8.9 2.6 10.4 6l3.4 1.5-3.4 1.4-1.5 3.4-1.4-3.4L4 7.5 7.5 6z"></path>
+                                <path d="m16.4 4.2.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"></path>
+                                <path d="m16.5 11 1.2 2.8 2.8 1.2-2.8 1.2-1.2 2.8-1.2-2.8-2.8-1.2 2.8-1.2z"></path>
+                            </svg>
+                            <span class="assistant-toolbar-label" data-i18n="assistant.toggleLabel">Label AI</span>
+                        </button>
                         <input type="file" accept="application/json" data-load-input hidden />
                     </div>
                     <div class="toolbar-group">
@@ -488,6 +505,51 @@
                     <div class="status" data-status data-i18n="status.ready">Ready. Choose a backend and click print.</div>
                 </div>
             </aside>
+        </div>
+        <div class="assistant-overlay" data-ai-overlay hidden>
+            <section class="assistant-panel" role="dialog" aria-modal="true" aria-label="Assistant" data-i18n-aria-label="assistant.title">
+                <div class="assistant-head">
+                    <div class="section-title" data-i18n="assistant.title">Assistant</div>
+                    <button
+                        class="ghost icon-button assistant-close"
+                        type="button"
+                        data-ai-close
+                        aria-label="Close assistant"
+                        title="Close assistant"
+                        data-i18n-aria-label="assistant.close"
+                        data-i18n-title="assistant.close"
+                    >
+                        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                            <path d="M4 4l8 8"></path>
+                            <path d="M12 4 4 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <p class="muted small assistant-intro" data-i18n="assistant.description">
+                    Ask anything about the editor or tell me what to change on your label.
+                </p>
+                <div class="assistant-messages" data-ai-messages></div>
+                <label for="assistant-input" class="small muted" data-i18n="assistant.promptLabel">Instruction</label>
+                <textarea
+                    id="assistant-input"
+                    class="assistant-input"
+                    data-ai-input
+                    rows="5"
+                    placeholder="Describe what you need. Example: Add a QR code on the right and align everything vertically."
+                    data-i18n-placeholder="assistant.inputPlaceholder"
+                ></textarea>
+                <div class="assistant-attachments" data-ai-attachments hidden></div>
+                <div class="assistant-attachment-actions">
+                    <button class="ghost" type="button" data-ai-attach-sketch data-i18n="assistant.attachSketch">Attach sketch</button>
+                </div>
+                <input type="file" accept="image/*" data-ai-image-input hidden />
+                <div class="assistant-actions">
+                    <div class="assistant-working" data-ai-working hidden aria-live="polite" data-i18n="assistant.working">
+                        AI working...
+                    </div>
+                    <button class="primary" type="button" data-ai-send data-i18n="assistant.send">Send</button>
+                </div>
+            </section>
         </div>
         <footer class="page-footer">
             <div class="footer-card">

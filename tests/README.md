@@ -76,6 +76,12 @@
 - Manual: append `?projectUrl=<url-to-project-json>&parameterDataUrl=<url-to-many-rows-file>&autoPrint=true&skipBatchConfirm=true`.
 - Expected: the “more than 10 labels” confirmation is skipped and the print job starts immediately.
 
+## AI assistant
+- Unit: `tests/assistant-ui.test.mjs` verifies assistant toolbar/panel data hooks are present in `src/index.html`.
+- Unit: `tests/ai-response-utils.test.mjs` verifies assistant response text extraction and tool-action extraction.
+- Manual: run `npm start`, open `http://localhost:3000/`, open assistant from toolbar, ask an editor question, attach one sketch, then request one editor action (for example "add a text item").
+- Expected: assistant replies in panel, actions execute only through allowlisted commands, and endpoint errors are surfaced in chat/status.
+
 ## Workspace zoom
 - Unit: `tests/zoom-utils.test.mjs` validates zoom clamping, stepping, label formatting, and display-aware zoom persistence payload matching.
 - Manual: run `npm start`, open `http://localhost:3000/`, use `-`, `+`, and the zoom slider in the workspace header.

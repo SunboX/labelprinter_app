@@ -122,6 +122,51 @@ export class PreviewRendererBase {
     }
 
     /**
+     * Captures the current rendered label canvas as a PNG attachment payload.
+     * @returns {{name: string, mime_type: string, data_url: string} | null}
+     */
+    getRenderedLabelAttachment() {
+        const sourceCanvas = this.els?.preview
+        if (!sourceCanvas || typeof sourceCanvas.toDataURL !== 'function') {
+            return null
+        }
+        const sourceWidth = Number(sourceCanvas.width || 0)
+        const sourceHeight = Number(sourceCanvas.height || 0)
+        if (sourceWidth <= 0 || sourceHeight <= 0) {
+            return null
+        }
+
+        // Keep payload size bounded for long labels while preserving aspect ratio.
+        const maxEdgePx = 1400
+        const scale = Math.min(1, maxEdgePx / Math.max(sourceWidth, sourceHeight))
+        let outputCanvas = sourceCanvas
+        if (scale < 1 && typeof document !== 'undefined') {
+            const scaledCanvas = document.createElement('canvas')
+            scaledCanvas.width = Math.max(1, Math.round(sourceWidth * scale))
+            scaledCanvas.height = Math.max(1, Math.round(sourceHeight * scale))
+            const scaledContext = scaledCanvas.getContext('2d')
+            if (scaledContext) {
+                scaledContext.drawImage(sourceCanvas, 0, 0, scaledCanvas.width, scaledCanvas.height)
+                outputCanvas = scaledCanvas
+            }
+        }
+
+        try {
+            const dataUrl = outputCanvas.toDataURL('image/png')
+            if (!dataUrl.startsWith('data:image/png')) {
+                return null
+            }
+            return {
+                name: 'rendered-label.png',
+                mime_type: 'image/png',
+                data_url: dataUrl
+            }
+        } catch (_error) {
+            return null
+        }
+    }
+
+    /**
      * Sets template values used during preview rendering.
      * @param {Record<string, string>} values
      */

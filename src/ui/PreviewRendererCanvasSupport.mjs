@@ -6,6 +6,33 @@ import { QrCodeUtils } from '../QrCodeUtils.mjs'
  */
 export class PreviewRendererCanvasSupport {
     /**
+     * Builds a canvas font declaration for text rendering/measurement.
+     * @param {{ size: number, family: string, bold?: boolean, italic?: boolean }} options
+     * @returns {string}
+     */
+    static buildTextFontDeclaration({ size, family, bold = false, italic = false }) {
+        const safeSize = Math.max(1, Math.round(Number(size) || 1))
+        const safeFamily = String(family || 'sans-serif')
+        const style = italic ? 'italic ' : ''
+        const weight = bold ? '700 ' : ''
+        return `${style}${weight}${safeSize}px ${safeFamily}`.trim()
+    }
+
+    /**
+     * Computes underline metrics in canvas units.
+     * @param {number} size
+     * @param {number} [verticalScale=1]
+     * @returns {{ offset: number, thickness: number, extraHeight: number }}
+     */
+    static computeUnderlineMetrics(size, verticalScale = 1) {
+        const safeSize = Math.max(1, Number(size) || 1)
+        const scale = Math.max(0.25, Number(verticalScale) || 1)
+        const offset = Math.max(1, safeSize * 0.08 * scale)
+        const thickness = Math.max(1, safeSize * 0.06 * scale)
+        return { offset, thickness, extraHeight: offset + thickness }
+    }
+
+    /**
      * Returns a cached QR canvas or generates a new one.
      * @param {object} renderer
      * @param {string} data
@@ -193,7 +220,10 @@ export class PreviewRendererCanvasSupport {
      *  text: string,
      *  family: string,
      *  requestedSize: number,
-     *  maxHeight: number
+     *  maxHeight: number,
+     *  bold?: boolean,
+     *  italic?: boolean,
+     *  underline?: boolean
      * }} options
      * @returns {{
      *  size: number,
@@ -203,46 +233,79 @@ export class PreviewRendererCanvasSupport {
      *  descent: number,
      *  inkLeft: number,
      *  inkRight: number,
-     *  inkWidth: number
+     *  inkWidth: number,
+     *  lineGap: number,
+     *  lines: string[],
+     *  lineMetrics: Array<{
+     *   text: string,
+     *   advanceWidth: number,
+     *   ascent: number,
+     *   descent: number,
+     *   inkLeft: number,
+     *   inkRight: number,
+     *   inkWidth: number
+     *  }>,
+     *  totalHeight: number,
+     *  underlineOffset: number,
+     *  underlineThickness: number,
+     *  underlineExtra: number
      * }}
      */
-    static resolveTextMetrics({ ctx, text, family, requestedSize, maxHeight }) {
+    static resolveTextMetrics({ ctx, text, family, requestedSize, maxHeight, bold = false, italic = false, underline = false }) {
         const limit = Math.max(4, maxHeight)
+        const lines = PreviewRendererCanvasSupport.#normalizeTextLines(text)
         let size = Math.min(Math.max(4, requestedSize), limit * 3)
-        let { advanceWidth, height, inkLeft, inkRight, inkWidth } = PreviewRendererCanvasSupport.#measureText(
+        let metrics = PreviewRendererCanvasSupport.#measureTextLines(
             ctx,
-            text,
+            lines,
             size,
-            family
+            family,
+            bold,
+            italic,
+            underline
         )
-        while (height > limit && size > 4) {
+        while (metrics.height > limit && size > 4) {
             size -= 1
-            const nextMetrics = PreviewRendererCanvasSupport.#measureText(ctx, text, size, family)
-            advanceWidth = nextMetrics.advanceWidth
-            height = nextMetrics.height
-            inkLeft = nextMetrics.inkLeft
-            inkRight = nextMetrics.inkRight
-            inkWidth = nextMetrics.inkWidth
+            metrics = PreviewRendererCanvasSupport.#measureTextLines(ctx, lines, size, family, bold, italic, underline)
         }
-        const { ascent, descent } = PreviewRendererCanvasSupport.#measureText(ctx, text, size, family)
         return {
             size,
-            advanceWidth,
-            height: Math.min(height, limit),
-            ascent,
-            descent,
-            inkLeft,
-            inkRight,
-            inkWidth
+            advanceWidth: metrics.advanceWidth,
+            height: Math.min(metrics.height, limit),
+            ascent: metrics.ascent,
+            descent: metrics.descent,
+            inkLeft: metrics.inkLeft,
+            inkRight: metrics.inkRight,
+            inkWidth: metrics.inkWidth,
+            lineGap: metrics.lineGap,
+            lines,
+            lineMetrics: metrics.lineMetrics,
+            totalHeight: metrics.height,
+            underlineOffset: metrics.underlineOffset,
+            underlineThickness: metrics.underlineThickness,
+            underlineExtra: metrics.underlineExtra
         }
     }
 
     /**
-     * Measures text metrics using the provided canvas context.
-     * @param {CanvasRenderingContext2D} ctx
+     * Splits text into drawable lines while preserving blank rows.
      * @param {string} text
+     * @returns {string[]}
+     */
+    static #normalizeTextLines(text) {
+        const lines = String(text || '').replace(/\r/g, '').split('\n')
+        return lines.length ? lines : ['']
+    }
+
+    /**
+     * Measures multiline text metrics using the provided canvas context.
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {string[]} lines
      * @param {number} size
      * @param {string} family
+     * @param {boolean} bold
+     * @param {boolean} italic
+     * @param {boolean} underline
      * @returns {{
      *  advanceWidth: number,
      *  height: number,
@@ -250,20 +313,86 @@ export class PreviewRendererCanvasSupport {
      *  descent: number,
      *  inkLeft: number,
      *  inkRight: number,
-     *  inkWidth: number
+     *  inkWidth: number,
+     *  lineGap: number,
+     *  lineMetrics: Array<{
+     *   text: string,
+     *   advanceWidth: number,
+     *   ascent: number,
+     *   descent: number,
+     *   inkLeft: number,
+     *   inkRight: number,
+     *   inkWidth: number
+     *  }>
+     *  underlineOffset: number,
+     *  underlineThickness: number,
+     *  underlineExtra: number
      * }}
      */
-    static #measureText(ctx, text, size, family) {
-        ctx.font = `${size}px ${family}`
-        const metrics = ctx.measureText(text || '')
-        const ascent = metrics.actualBoundingBoxAscent || size
-        const descent = metrics.actualBoundingBoxDescent || 0
-        const inkLeft = Number.isFinite(metrics.actualBoundingBoxLeft) ? metrics.actualBoundingBoxLeft : 0
-        const inkRight = Number.isFinite(metrics.actualBoundingBoxRight) ? metrics.actualBoundingBoxRight : metrics.width
-        const inkWidth = Math.max(0, inkRight - inkLeft)
-        const advanceWidth = Math.ceil(metrics.width)
-        const height = Math.ceil(ascent + descent)
-        return { advanceWidth, height, ascent, descent, inkLeft, inkRight, inkWidth }
+    static #measureTextLines(ctx, lines, size, family, bold, italic, underline) {
+        ctx.font = PreviewRendererCanvasSupport.buildTextFontDeclaration({ size, family, bold, italic })
+        const safeLines = Array.isArray(lines) && lines.length ? lines : ['']
+        const lineGap = safeLines.length > 1 ? Math.max(1, Math.round(size * 0.22)) : 0
+        const underlineMetrics = PreviewRendererCanvasSupport.computeUnderlineMetrics(size)
+        let advanceWidth = 0
+        let maxAscent = 0
+        let maxDescent = 0
+        let totalHeight = 0
+        let inkLeft = 0
+        let inkRight = 0
+        let hasInkBounds = false
+        const lineMetrics = safeLines.map((lineText) => {
+            const metrics = ctx.measureText(lineText || '')
+            const ascent = metrics.actualBoundingBoxAscent || size
+            const descent = metrics.actualBoundingBoxDescent || 0
+            const localInkLeft = Number.isFinite(metrics.actualBoundingBoxLeft) ? metrics.actualBoundingBoxLeft : 0
+            const localInkRight = Number.isFinite(metrics.actualBoundingBoxRight) ? metrics.actualBoundingBoxRight : metrics.width
+            const localInkWidth = Math.max(0, localInkRight - localInkLeft)
+            const localAdvanceWidth = Math.ceil(metrics.width)
+
+            advanceWidth = Math.max(advanceWidth, localAdvanceWidth)
+            maxAscent = Math.max(maxAscent, ascent)
+            maxDescent = Math.max(maxDescent, descent)
+            const underlineExtra = underline ? underlineMetrics.extraHeight : 0
+            totalHeight += Math.ceil(ascent + descent + underlineExtra)
+            if (hasInkBounds) {
+                inkLeft = Math.min(inkLeft, localInkLeft)
+                inkRight = Math.max(inkRight, localInkRight)
+            } else {
+                inkLeft = localInkLeft
+                inkRight = localInkRight
+                hasInkBounds = true
+            }
+            return {
+                text: lineText || '',
+                advanceWidth: localAdvanceWidth,
+                ascent,
+                descent,
+                inkLeft: localInkLeft,
+                inkRight: localInkRight,
+                inkWidth: localInkWidth,
+                underlineOffset: underlineMetrics.offset,
+                underlineThickness: underlineMetrics.thickness
+            }
+        })
+        if (safeLines.length > 1) {
+            totalHeight += lineGap * (safeLines.length - 1)
+        }
+        const totalInkWidth = Math.max(0, inkRight - inkLeft)
+        return {
+            advanceWidth,
+            height: Math.max(1, totalHeight),
+            ascent: maxAscent || size,
+            descent: maxDescent,
+            inkLeft: hasInkBounds ? inkLeft : 0,
+            inkRight: hasInkBounds ? inkRight : advanceWidth,
+            inkWidth: totalInkWidth,
+            lineGap,
+            lineMetrics,
+            underlineOffset: underlineMetrics.offset,
+            underlineThickness: underlineMetrics.thickness,
+            underlineExtra: underline ? underlineMetrics.extraHeight : 0
+        }
     }
 
     /**
