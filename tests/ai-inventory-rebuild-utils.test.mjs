@@ -72,6 +72,9 @@ describe('ai-inventory-rebuild-utils', () => {
         assert.equal(qrItems.length, 1)
         assert.ok(textItems.some((item) => Number(item.xOffset || 0) < 0))
         assert.ok(textItems.some((item) => Number(item.yOffset || 0) > 0))
+        assert.equal(textItems[1].textUnderline, true)
+        assert.equal(textItems[2].textItalic, false)
+        assert.equal(textItems[4].textItalic, false)
     })
 
     it('retries template positioning when interactive bounds are delayed by one render cycle', async () => {
@@ -120,5 +123,49 @@ describe('ai-inventory-rebuild-utils', () => {
         assert.ok(renderCount >= 3)
         assert.ok(textItems.some((item) => Number(item.xOffset || 0) < 0))
         assert.ok(textItems.some((item) => Number(item.yOffset || 0) > 0))
+    })
+
+    it('falls back to article number when qr input uses placeholder/example URL', async () => {
+        const state = {
+            media: 'W24',
+            resolution: 'LOW',
+            orientation: 'horizontal',
+            mediaLengthMm: null,
+            items: [
+                { id: 't-1', type: 'text', text: 'Artikelname:\nHammermutter Nut 10 M8\nArtikelnummer:\n18123689\nLagerplatz:\nR1-S5-F3' },
+                { id: 'q-1', type: 'qr', data: 'https://example.com/item/18123689', size: 24, width: 24, height: 24 }
+            ]
+        }
+        const interactiveMap = new Map()
+        const previewRenderer = {
+            _interactiveItemsById: interactiveMap,
+            els: {
+                preview: {
+                    width: 240,
+                    height: 128
+                }
+            }
+        }
+        const renderAfterMutation = async () => {
+            await new Promise((resolve) => setTimeout(resolve, 0))
+            populateInteractiveMap(state, interactiveMap)
+        }
+        const applied = await AiInventoryRebuildUtils.tryApplyInventoryTemplate({
+            state,
+            previewRenderer,
+            renderAfterMutation
+        })
+        assert.equal(applied, true)
+        const qr = state.items.find((item) => item.type === 'qr')
+        assert.ok(qr)
+        assert.equal(qr.data, '18123689')
+        const qrBounds = interactiveMap.get(qr.id)?.bounds
+        assert.ok(qrBounds)
+        const textRight = state.items
+            .filter((item) => item.type === 'text')
+            .map((item) => interactiveMap.get(item.id)?.bounds)
+            .filter(Boolean)
+            .reduce((max, bounds) => Math.max(max, Number(bounds.x || 0) + Number(bounds.width || 0)), 0)
+        assert.ok(Number(qrBounds.x || 0) >= textRight)
     })
 })

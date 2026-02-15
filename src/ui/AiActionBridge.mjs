@@ -1065,13 +1065,22 @@ export class AiActionBridge {
      * @returns {boolean}
      */
     #resolveDebugEnabled() {
-        try {
-            const queryValue = new URLSearchParams(globalThis?.window?.location?.search || '').get('aiDebug')
-            const localValue = globalThis?.window?.localStorage?.getItem('AI_DEBUG_LOGS')
-            const raw = String(queryValue || localValue || '')
+        const parseFlag = (value) => {
+            const normalized = String(value || '')
                 .trim()
                 .toLowerCase()
-            return ['1', 'true', 'yes', 'on'].includes(raw)
+            if (!normalized) return null
+            if (['1', 'true', 'yes', 'on'].includes(normalized)) return true
+            if (['0', 'false', 'no', 'off'].includes(normalized)) return false
+            return null
+        }
+        try {
+            const queryFlag = parseFlag(new URLSearchParams(globalThis?.window?.location?.search || '').get('aiDebug'))
+            if (typeof queryFlag === 'boolean') return queryFlag
+            const storageFlag = parseFlag(globalThis?.window?.localStorage?.getItem('AI_DEBUG_LOGS'))
+            if (typeof storageFlag === 'boolean') return storageFlag
+            const host = String(globalThis?.window?.location?.hostname || '').toLowerCase()
+            return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.localhost')
         } catch (_error) {
             return false
         }

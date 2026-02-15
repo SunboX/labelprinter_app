@@ -121,7 +121,26 @@ export class AiInventoryRebuildUtils {
      */
     static #resolveQrData(items, articleNumber) {
         const existingQr = items.find((item) => item?.type === 'qr' && String(item.data || '').trim())
-        return String(existingQr?.data || articleNumber || '').trim()
+        const existingData = String(existingQr?.data || '').trim()
+        const fallbackArticleNumber = String(articleNumber || '').trim()
+        if (!existingData) return fallbackArticleNumber
+        const numericArticleNumber = /^\d{4,}$/.test(fallbackArticleNumber)
+        const existingLooksLikeUrl = /^https?:\/\//i.test(existingData)
+        const existingLooksLikeExample = /example\.com/i.test(existingData)
+        const existingContainsArticleNumber =
+            Boolean(fallbackArticleNumber) && existingData.toLowerCase().includes(fallbackArticleNumber.toLowerCase())
+        if (numericArticleNumber && (existingLooksLikeExample || existingLooksLikeUrl || existingContainsArticleNumber)) {
+            AiInventoryRebuildUtils.#debugLog('template-qr-data-fallback', {
+                reason: existingLooksLikeExample
+                    ? 'example-url'
+                    : existingLooksLikeUrl
+                      ? 'url'
+                      : 'contains-article-number',
+                fallbackArticleNumber
+            })
+            return fallbackArticleNumber
+        }
+        return existingData
     }
 
     /**
@@ -132,17 +151,14 @@ export class AiInventoryRebuildUtils {
      * @returns {Array<Record<string, any>>}
      */
     static #buildTemplateItems(state, fields, qrData) {
-        const qrSize = Math.max(
-            QrSizeUtils.MIN_QR_SIZE_DOTS,
-            Math.round(QrSizeUtils.computeMaxQrSizeDots(state || {}) * 0.62)
-        )
+        const qrSize = Math.max(QrSizeUtils.MIN_QR_SIZE_DOTS, Math.round(QrSizeUtils.computeMaxQrSizeDots(state || {}) * 0.58))
         return [
-            AiInventoryRebuildUtils.#createTextItem('Artikelname:', { fontSize: 12, textUnderline: true }),
-            AiInventoryRebuildUtils.#createTextItem(fields.articleName, { fontSize: 20, textBold: true }),
+            AiInventoryRebuildUtils.#createTextItem('Artikelname:', { fontSize: 11, textUnderline: true }),
+            AiInventoryRebuildUtils.#createTextItem(fields.articleName, { fontSize: 18, textBold: true, textUnderline: true }),
             AiInventoryRebuildUtils.#createTextItem('Artikelnummer:', { fontSize: 11 }),
-            AiInventoryRebuildUtils.#createTextItem(fields.articleNumber, { fontSize: 18, textBold: true }),
+            AiInventoryRebuildUtils.#createTextItem(fields.articleNumber, { fontSize: 17, textBold: true }),
             AiInventoryRebuildUtils.#createTextItem('Lagerplatz:', { fontSize: 11 }),
-            AiInventoryRebuildUtils.#createTextItem(fields.storage, { fontSize: 18, textBold: true }),
+            AiInventoryRebuildUtils.#createTextItem(fields.storage, { fontSize: 17, textBold: true }),
             {
                 id: AiInventoryRebuildUtils.#createItemId('qr'),
                 type: 'qr',
@@ -206,10 +222,10 @@ export class AiInventoryRebuildUtils {
         const x = Math.round(previewHeight * 0.045)
         const yTargets = [
             Math.round(previewHeight * 0.05),
-            Math.round(previewHeight * 0.205),
-            Math.round(previewHeight * 0.41),
+            Math.round(previewHeight * 0.21),
+            Math.round(previewHeight * 0.40),
             Math.round(previewHeight * 0.54),
-            Math.round(previewHeight * 0.71),
+            Math.round(previewHeight * 0.70),
             Math.round(previewHeight * 0.84)
         ]
         let movedCount = 0
@@ -258,17 +274,27 @@ export class AiInventoryRebuildUtils {
             })
             return { applied: false, reason: 'missing-qr-entry' }
         }
-        const previewWidth = Math.max(80, Number(previewRenderer?.els?.preview?.width) || 0)
         const previewHeight = Math.max(64, Number(previewRenderer?.els?.preview?.height) || 128)
         const textEntries = items
             .filter((item) => item.type === 'text')
             .map((item) => entryMap.get(item.id))
             .filter((entry) => entry?.bounds)
         const textRight = textEntries.reduce((max, entry) => Math.max(max, Number(entry.bounds.x) + Number(entry.bounds.width)), 0)
+        const textTop = textEntries.reduce((min, entry) => Math.min(min, Number(entry.bounds.y)), Number.POSITIVE_INFINITY)
+        const textBottom = textEntries.reduce(
+            (max, entry) => Math.max(max, Number(entry.bounds.y) + Number(entry.bounds.height)),
+            Number.NEGATIVE_INFINITY
+        )
         const size = Math.max(1, Number(qrItem.size || qrEntry.bounds.width || 1))
         const gap = Math.max(6, Math.round(previewHeight * 0.03))
-        const targetX = Math.max(textRight + gap, previewWidth - size - gap)
-        const targetY = Math.max(0, Math.round((previewHeight - size) / 2))
+        // Anchor QR to text content, not previous label width, so auto-length can shrink to content.
+        const targetX = Math.max(0, Math.round(textRight + gap))
+        const targetYFromLabelCenter = Math.round((previewHeight - size) / 2)
+        const targetYFromTextCenter =
+            Number.isFinite(textTop) && Number.isFinite(textBottom)
+                ? Math.round((textTop + textBottom - size) / 2)
+                : targetYFromLabelCenter
+        const targetY = Math.max(0, Math.min(previewHeight - size, targetYFromTextCenter))
         AiInventoryRebuildUtils.#shiftTo(qrItem, qrEntry.bounds, targetX, targetY)
         qrItem.size = QrSizeUtils.clampQrSizeToLabel(state || {}, size)
         qrItem.width = qrItem.size
@@ -278,6 +304,9 @@ export class AiInventoryRebuildUtils {
             xOffset: Number(qrItem.xOffset || 0),
             yOffset: Number(qrItem.yOffset || 0),
             size: Number(qrItem.size || 0),
+            textRight,
+            textTop,
+            textBottom,
             targetX,
             targetY
         })
@@ -326,13 +355,22 @@ export class AiInventoryRebuildUtils {
      * @returns {boolean}
      */
     static #isDebugEnabled() {
-        try {
-            const queryValue = new URLSearchParams(globalThis?.window?.location?.search || '').get('aiDebug')
-            const localValue = globalThis?.window?.localStorage?.getItem('AI_DEBUG_LOGS')
-            const raw = String(queryValue || localValue || '')
+        const parseFlag = (value) => {
+            const normalized = String(value || '')
                 .trim()
                 .toLowerCase()
-            return ['1', 'true', 'yes', 'on'].includes(raw)
+            if (!normalized) return null
+            if (['1', 'true', 'yes', 'on'].includes(normalized)) return true
+            if (['0', 'false', 'no', 'off'].includes(normalized)) return false
+            return null
+        }
+        try {
+            const queryFlag = parseFlag(new URLSearchParams(globalThis?.window?.location?.search || '').get('aiDebug'))
+            if (typeof queryFlag === 'boolean') return queryFlag
+            const storageFlag = parseFlag(globalThis?.window?.localStorage?.getItem('AI_DEBUG_LOGS'))
+            if (typeof storageFlag === 'boolean') return storageFlag
+            const host = String(globalThis?.window?.location?.hostname || '').toLowerCase()
+            return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.localhost')
         } catch (_error) {
             return false
         }
