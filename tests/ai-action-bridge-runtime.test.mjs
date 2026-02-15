@@ -198,6 +198,10 @@ describe('ai-action-bridge runtime', () => {
         assert.equal(state.items.filter((item) => item.type === 'qr').length, 1)
         assert.equal(state.items[0].text, 'Artikelname:')
         assert.equal(state.items[0].textUnderline, true)
+        assert.equal(state.items[1].textUnderline, true)
+        assert.equal(state.items[2].textItalic, false)
+        assert.equal(state.items[4].textItalic, false)
+        assert.equal(state.items[6].data, '18123689')
     })
 
     it('maps explicit item refs in select_items for follow-up selected updates', async () => {
@@ -250,6 +254,8 @@ describe('ai-action-bridge runtime', () => {
         assert.equal(state.items[0].textUnderline, true)
         assert.equal(state.items[1].text, 'Hammermutter Nut 10 M8')
         assert.equal(state.items[1].textBold, true)
+        assert.equal(state.items[1].textUnderline, true)
+        assert.equal(state.items[6].data, '18123689')
     })
 
     it('waits for busy preview renders so rebuild template placement does not collapse into one row', async () => {
