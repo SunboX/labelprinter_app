@@ -33,6 +33,20 @@ export class PreviewRendererCanvasSupport {
     }
 
     /**
+     * Computes strikethrough metrics in canvas units.
+     * @param {number} size
+     * @param {number} [verticalScale=1]
+     * @returns {{ offset: number, thickness: number }}
+     */
+    static computeStrikethroughMetrics(size, verticalScale = 1) {
+        const safeSize = Math.max(1, Number(size) || 1)
+        const scale = Math.max(0.25, Number(verticalScale) || 1)
+        const offset = Math.max(1, safeSize * 0.32 * scale)
+        const thickness = Math.max(1, safeSize * 0.055 * scale)
+        return { offset, thickness }
+    }
+
+    /**
      * Returns a cached QR canvas or generates a new one.
      * @param {object} renderer
      * @param {string} data
@@ -223,7 +237,8 @@ export class PreviewRendererCanvasSupport {
      *  maxHeight: number,
      *  bold?: boolean,
      *  italic?: boolean,
-     *  underline?: boolean
+     *  underline?: boolean,
+     *  strikethrough?: boolean
      * }} options
      * @returns {{
      *  size: number,
@@ -248,25 +263,29 @@ export class PreviewRendererCanvasSupport {
      *  totalHeight: number,
      *  underlineOffset: number,
      *  underlineThickness: number,
-     *  underlineExtra: number
+     *  underlineExtra: number,
+     *  strikethroughOffset: number,
+     *  strikethroughThickness: number
      * }}
      */
-    static resolveTextMetrics({ ctx, text, family, requestedSize, maxHeight, bold = false, italic = false, underline = false }) {
+    static resolveTextMetrics({
+        ctx,
+        text,
+        family,
+        requestedSize,
+        maxHeight,
+        bold = false,
+        italic = false,
+        underline = false,
+        strikethrough = false
+    }) {
         const limit = Math.max(4, maxHeight)
         const lines = PreviewRendererCanvasSupport.#normalizeTextLines(text)
         let size = Math.min(Math.max(4, requestedSize), limit * 3)
-        let metrics = PreviewRendererCanvasSupport.#measureTextLines(
-            ctx,
-            lines,
-            size,
-            family,
-            bold,
-            italic,
-            underline
-        )
+        let metrics = PreviewRendererCanvasSupport.#measureTextLines(ctx, lines, size, family, bold, italic, underline, strikethrough)
         while (metrics.height > limit && size > 4) {
             size -= 1
-            metrics = PreviewRendererCanvasSupport.#measureTextLines(ctx, lines, size, family, bold, italic, underline)
+            metrics = PreviewRendererCanvasSupport.#measureTextLines(ctx, lines, size, family, bold, italic, underline, strikethrough)
         }
         return {
             size,
@@ -283,7 +302,9 @@ export class PreviewRendererCanvasSupport {
             totalHeight: metrics.height,
             underlineOffset: metrics.underlineOffset,
             underlineThickness: metrics.underlineThickness,
-            underlineExtra: metrics.underlineExtra
+            underlineExtra: metrics.underlineExtra,
+            strikethroughOffset: metrics.strikethroughOffset,
+            strikethroughThickness: metrics.strikethroughThickness
         }
     }
 
@@ -306,6 +327,7 @@ export class PreviewRendererCanvasSupport {
      * @param {boolean} bold
      * @param {boolean} italic
      * @param {boolean} underline
+     * @param {boolean} strikethrough
      * @returns {{
      *  advanceWidth: number,
      *  height: number,
@@ -326,14 +348,17 @@ export class PreviewRendererCanvasSupport {
      *  }>
      *  underlineOffset: number,
      *  underlineThickness: number,
-     *  underlineExtra: number
+     *  underlineExtra: number,
+     *  strikethroughOffset: number,
+     *  strikethroughThickness: number
      * }}
      */
-    static #measureTextLines(ctx, lines, size, family, bold, italic, underline) {
+    static #measureTextLines(ctx, lines, size, family, bold, italic, underline, strikethrough) {
         ctx.font = PreviewRendererCanvasSupport.buildTextFontDeclaration({ size, family, bold, italic })
         const safeLines = Array.isArray(lines) && lines.length ? lines : ['']
         const lineGap = safeLines.length > 1 ? Math.max(1, Math.round(size * 0.22)) : 0
         const underlineMetrics = PreviewRendererCanvasSupport.computeUnderlineMetrics(size)
+        const strikethroughMetrics = PreviewRendererCanvasSupport.computeStrikethroughMetrics(size)
         let advanceWidth = 0
         let maxAscent = 0
         let maxDescent = 0
@@ -372,7 +397,9 @@ export class PreviewRendererCanvasSupport {
                 inkRight: localInkRight,
                 inkWidth: localInkWidth,
                 underlineOffset: underlineMetrics.offset,
-                underlineThickness: underlineMetrics.thickness
+                underlineThickness: underlineMetrics.thickness,
+                strikethroughOffset: strikethroughMetrics.offset,
+                strikethroughThickness: strikethroughMetrics.thickness
             }
         })
         if (safeLines.length > 1) {
@@ -391,7 +418,9 @@ export class PreviewRendererCanvasSupport {
             lineMetrics,
             underlineOffset: underlineMetrics.offset,
             underlineThickness: underlineMetrics.thickness,
-            underlineExtra: underline ? underlineMetrics.extraHeight : 0
+            underlineExtra: underline ? underlineMetrics.extraHeight : 0,
+            strikethroughOffset: strikethrough ? strikethroughMetrics.offset : 0,
+            strikethroughThickness: strikethrough ? strikethroughMetrics.thickness : 0
         }
     }
 

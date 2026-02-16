@@ -14,8 +14,18 @@ describe('ai-action-bridge', () => {
         assert.match(source, /'clear_items'/)
         assert.match(source, /case 'clear_items':/)
         assert.match(source, /if \(forceRebuild && !normalizedActions\.some\(\(action\) => action\.action === 'clear_items'\)\)/)
-        assert.match(source, /allowCreateIfMissing:\s*forceRebuild \|\| Boolean\(options\.allowCreateIfMissing\)/)
-        assert.match(source, /if \(forceRebuild\) \{\s*await this\.\#postProcessRebuildArtifacts\([^)]*\)/s)
+        assert.match(source, /const rebuildRun = forceRebuild \|\| this\.\#isLikelyRebuildActionPlan\(normalizedActions\)/)
+        assert.match(source, /allowCreateIfMissing:\s*rebuildRun \|\| Boolean\(options\.allowCreateIfMissing\)/)
+        assert.match(source, /if \(rebuildRun\) \{\s*await this\.\#postProcessRebuildArtifacts\([^)]*\)/s)
+    })
+
+    it('drops broad align_selected actions during rebuild when explicit coordinates are present', () => {
+        assert.match(source, /const runnableActions = rebuildRun\s*\?\s*this\.\#sanitizeRebuildActions\(normalizedActions\)\s*:\s*normalizedActions/)
+        assert.match(source, /#isLikelyRebuildActionPlan\(actions\)/)
+        assert.match(source, /#sanitizeRebuildActions\(actions\)/)
+        assert.match(source, /if \(action\?\.action === 'align_selected'\)/)
+        assert.match(source, /#changesContainExplicitPlacement\(changes\)/)
+        assert.match(source, /sanitize-rebuild-actions/)
     })
 
     it('normalizes common AI key aliases to canonical item keys', () => {
@@ -27,6 +37,7 @@ describe('ai-action-bridge', () => {
         assert.match(source, /bold:\s*'textBold'/)
         assert.match(source, /italic:\s*'textItalic'/)
         assert.match(source, /underline:\s*'textUnderline'/)
+        assert.match(source, /strikethrough:\s*'textStrikethrough'/)
         assert.match(source, /fontWeight:\s*'textBold'/)
         assert.match(source, /fontStyle:\s*'textItalic'/)
         assert.match(source, /textDecoration:\s*'textUnderline'/)
@@ -66,6 +77,7 @@ describe('ai-action-bridge', () => {
         assert.match(source, /if \(expanded\.style && typeof expanded\.style === 'object'\)/)
         assert.match(source, /expanded\.textBold = expanded\.style\.textBold \?\? expanded\.style\.bold \?\? expanded\.style\.fontWeight/)
         assert.match(source, /expanded\.textUnderline =\s*expanded\.style\.textUnderline \?\? expanded\.style\.underline \?\? expanded\.style\.textDecoration/)
+        assert.match(source, /expanded\.textStrikethrough =\s*expanded\.style\.textStrikethrough/)
     })
 
     it('supports semantic item target aliases like last and selected', () => {

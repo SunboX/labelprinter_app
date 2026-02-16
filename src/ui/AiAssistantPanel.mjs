@@ -1,5 +1,6 @@
 import { AiResponseUtils } from '../AiResponseUtils.mjs'
 import { AssistantErrorUtils } from '../AssistantErrorUtils.mjs'
+import { AssistantToolChoiceUtils } from '../AssistantToolChoiceUtils.mjs'
 import { MediaIntentUtils } from '../MediaIntentUtils.mjs'
 
 /**
@@ -14,6 +15,7 @@ export class AiAssistantPanel {
     #messages = []
     #attachments = []
     #previousResponseId = null
+    #pendingRebuildContext = null
     #busy = false
     #bound = false
     #endpoint = ''
@@ -374,6 +376,7 @@ export class AiAssistantPanel {
                         )
                     }
                 }
+                this.#pendingRebuildContext = null
             }
             if (!assistantText && !actions.length) {
                 const functionCallCount = AiResponseUtils.countFunctionCalls(response)
@@ -411,8 +414,24 @@ export class AiAssistantPanel {
     #buildActionRunContext(options) {
         const userText = String(options?.userText || '')
         const hasUserAttachments = Boolean(options?.hasUserAttachments)
-        const forceRebuild = this.#isRebuildIntent(userText, hasUserAttachments)
-        const preferredMedia = this.#resolvePreferredMediaFromText(userText)
+        const directRebuildIntent = this.#isRebuildIntent(userText, hasUserAttachments)
+        const confirmationFollowUp =
+            !directRebuildIntent &&
+            !hasUserAttachments &&
+            Boolean(this.#pendingRebuildContext) &&
+            this.#isRebuildConfirmationReply(userText)
+        const forceRebuild = directRebuildIntent || confirmationFollowUp
+        let preferredMedia = this.#resolvePreferredMediaFromText(userText)
+        if (!preferredMedia && confirmationFollowUp) {
+            preferredMedia = String(this.#pendingRebuildContext?.preferredMedia || '')
+        }
+        if (directRebuildIntent) {
+            this.#pendingRebuildContext = {
+                preferredMedia: preferredMedia || String(this.#pendingRebuildContext?.preferredMedia || '')
+            }
+        } else if (!confirmationFollowUp && String(userText || '').trim()) {
+            this.#pendingRebuildContext = null
+        }
         return {
             forceRebuild,
             allowCreateIfMissing: forceRebuild,
@@ -465,11 +484,18 @@ export class AiAssistantPanel {
      */
     #isRebuildIntent(userText, hasUserAttachments) {
         if (!hasUserAttachments) return false
-        const normalizedText = String(userText || '').toLowerCase()
-        if (!normalizedText) return true
-        return /(?:create|recreate|rebuild|match|copy|like this|such kind|from (?:photo|image|sketch)|nachbau|nachbild|erstell|neu aufbauen|wie auf dem bild)/.test(
-            normalizedText
-        )
+        const normalizedText = String(userText || '')
+        if (!normalizedText.trim()) return true
+        return AssistantToolChoiceUtils.isLikelyRebuildIntentMessage(normalizedText)
+    }
+
+    /**
+     * Detects short confirmation replies that should continue a pending rebuild.
+     * @param {string} userText
+     * @returns {boolean}
+     */
+    #isRebuildConfirmationReply(userText) {
+        return AssistantToolChoiceUtils.isShortConfirmation(userText)
     }
 
     /**

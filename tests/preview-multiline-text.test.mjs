@@ -13,6 +13,9 @@ describe('preview multiline text rendering', () => {
         assert.match(buildSource, /block\.textTotalHeight/)
 
         assert.match(supportSource, /#normalizeTextLines\(text\)/)
-        assert.match(supportSource, /#measureTextLines\(ctx, lines, size, family, bold, italic, underline\)/)
+        assert.match(
+            supportSource,
+            /#measureTextLines\(ctx, lines, size, family, bold, italic, underline, strikethrough\)/
+        )
     })
 })

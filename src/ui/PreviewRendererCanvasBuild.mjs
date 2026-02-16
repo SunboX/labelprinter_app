@@ -75,7 +75,9 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     lines: textLines,
                     lineMetrics,
                     underlineOffset,
-                    underlineThickness
+                    underlineThickness,
+                    strikethroughOffset,
+                    strikethroughThickness
                 } = PreviewRendererCanvasSupport.resolveTextMetrics({
                     ctx: measureCtx,
                     text: resolvedText,
@@ -84,7 +86,8 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     maxHeight: maxFontDots,
                     bold: Boolean(item.textBold),
                     italic: Boolean(item.textItalic),
-                    underline: Boolean(item.textUnderline)
+                    underline: Boolean(item.textUnderline),
+                    strikethrough: Boolean(item.textStrikethrough)
                 })
                 const scaledAscent = ascent * textVerticalScale
                 const scaledDescent = descent * textVerticalScale
@@ -111,7 +114,9 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     textLineMetrics: lineMetrics,
                     textTotalHeight: scaledTextHeight,
                     textUnderlineOffset: underlineOffset,
-                    textUnderlineThickness: underlineThickness
+                    textUnderlineThickness: underlineThickness,
+                    textStrikethroughOffset: strikethroughOffset,
+                    textStrikethroughThickness: strikethroughThickness
                 })
                 continue
             }
@@ -344,6 +349,11 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         const underlineMetrics = PreviewRendererCanvasSupport.computeUnderlineMetrics(resolvedSize, 1)
         const underlineOffset = Math.max(1, Number(block.textUnderlineOffset || underlineMetrics.offset)) * verticalScale
         const underlineThickness = Math.max(1, Number(block.textUnderlineThickness || underlineMetrics.thickness)) * verticalScale
+        const strikethroughMetrics = PreviewRendererCanvasSupport.computeStrikethroughMetrics(resolvedSize, 1)
+        const strikethroughOffset =
+            Math.max(1, Number(block.textStrikethroughOffset || strikethroughMetrics.offset)) * verticalScale
+        const strikethroughThickness =
+            Math.max(1, Number(block.textStrikethroughThickness || strikethroughMetrics.thickness)) * verticalScale
         const textLines = Array.isArray(block.textLines) && block.textLines.length ? block.textLines : [block.resolvedText || '']
         const lineMetrics = Array.isArray(block.textLineMetrics) ? block.textLineMetrics : []
         const scaledLineGap = Math.max(0, Number(block.textLineGap || 0) * verticalScale)
@@ -399,6 +409,17 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     ctx.stroke()
                     ctx.restore()
                 }
+                if (item.textStrikethrough) {
+                    const strikethroughY = baselineY - strikethroughOffset
+                    ctx.save()
+                    ctx.beginPath()
+                    ctx.lineWidth = strikethroughThickness
+                    ctx.strokeStyle = '#000'
+                    ctx.moveTo(drawX + clampedInkLeft, strikethroughY)
+                    ctx.lineTo(drawX + clampedInkLeft + inkWidth, strikethroughY)
+                    ctx.stroke()
+                    ctx.restore()
+                }
             })
             layoutItems.push({
                 id: item.id,
@@ -451,6 +472,17 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     ctx.strokeStyle = '#000'
                     ctx.moveTo(drawX + localInkLeft, underlineY)
                     ctx.lineTo(drawX + localInkLeft + localInkWidth, underlineY)
+                    ctx.stroke()
+                    ctx.restore()
+                }
+                if (item.textStrikethrough) {
+                    const strikethroughY = baselineY - strikethroughOffset
+                    ctx.save()
+                    ctx.beginPath()
+                    ctx.lineWidth = strikethroughThickness
+                    ctx.strokeStyle = '#000'
+                    ctx.moveTo(drawX + localInkLeft, strikethroughY)
+                    ctx.lineTo(drawX + localInkLeft + localInkWidth, strikethroughY)
                     ctx.stroke()
                     ctx.restore()
                 }
