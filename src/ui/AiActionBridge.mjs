@@ -1,5 +1,6 @@
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { RotationUtils } from '../RotationUtils.mjs'
+import { AiBarcodeRebuildUtils } from './AiBarcodeRebuildUtils.mjs'
 import { AiInventoryRebuildUtils } from './AiInventoryRebuildUtils.mjs'
 import { AiRebuildPostProcessUtils } from './AiRebuildPostProcessUtils.mjs'
 /** Allowlisted action runtime used by the in-app assistant. */
@@ -1170,11 +1171,23 @@ export class AiActionBridge {
             previewRenderer: this.previewRenderer,
             renderAfterMutation: () => this.#renderAfterMutationAsync()
         })
+        const appliedBarcodeTemplate = appliedInventoryTemplate
+            ? false
+            : await AiBarcodeRebuildUtils.tryApplyBarcodeTemplate({
+                  state: this.state,
+                  previewRenderer: this.previewRenderer,
+                  renderAfterMutation: () => this.#renderAfterMutationAsync()
+              })
         this.#debugLog('postprocess:template', {
             appliedInventoryTemplate,
+            appliedBarcodeTemplate,
             itemCountAfterTemplate: Array.isArray(this.state.items) ? this.state.items.length : 0
         })
-        if (appliedInventoryTemplate) {
+        if (appliedInventoryTemplate || appliedBarcodeTemplate) {
+            const clearedMediaLength = this.#clearMediaLengthOverride()
+            if (clearedMediaLength) {
+                await this.#renderAfterMutationAsync()
+            }
             return
         }
         const aggregateTextItem = AiRebuildPostProcessUtils.findDuplicatedAggregateTextItem(this.state.items)
@@ -1215,6 +1228,25 @@ export class AiActionBridge {
             didMutate,
             itemCountAfter: Array.isArray(this.state.items) ? this.state.items.length : 0
         })
+    }
+    /**
+     * Clears a forced media length override so rebuilt layouts auto-fit content length.
+     * @returns {boolean}
+     */
+    #clearMediaLengthOverride() {
+        const hasOverride = this.state.mediaLengthMm !== null && this.state.mediaLengthMm !== ''
+        if (!hasOverride) return false
+        this.state.mediaLengthMm = null
+        if (this.els?.mediaLength) {
+            if (this.els.mediaLength.value !== '') {
+                this.els.mediaLength.value = ''
+            }
+            this.els.mediaLength.dispatchEvent(new Event('input', { bubbles: true }))
+        }
+        this.#debugLog('postprocess:media-length-reset', {
+            reason: 'template-applied'
+        })
+        return true
     }
     /**
      * Resolves whether assistant debug logs are enabled.
