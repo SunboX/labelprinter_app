@@ -64,7 +64,8 @@ export class AiActionBridge {
             dataPreview: typeof item.data === 'string' ? item.data.slice(0, 120) : undefined,
             textBold: Boolean(item.textBold),
             textItalic: Boolean(item.textItalic),
-            textUnderline: Boolean(item.textUnderline)
+            textUnderline: Boolean(item.textUnderline),
+            textStrikethrough: Boolean(item.textStrikethrough)
         }))
         return {
             backend: this.state.backend,
@@ -102,7 +103,18 @@ export class AiActionBridge {
             alignModes: ['left', 'center', 'right', 'top', 'middle', 'bottom'],
             alignReferences: ['selection', 'largest', 'smallest', 'label'],
             itemProperties: {
-                text: ['text', 'fontFamily', 'fontSize', 'textBold', 'textItalic', 'textUnderline', 'xOffset', 'yOffset', 'rotation'],
+                text: [
+                    'text',
+                    'fontFamily',
+                    'fontSize',
+                    'textBold',
+                    'textItalic',
+                    'textUnderline',
+                    'textStrikethrough',
+                    'xOffset',
+                    'yOffset',
+                    'rotation'
+                ],
                 qr: ['data', 'size', 'xOffset', 'yOffset', 'rotation', 'qrErrorCorrectionLevel', 'qrVersion', 'qrEncodingMode'],
                 barcode: [
                     'data',
@@ -121,7 +133,7 @@ export class AiActionBridge {
                 shape: ['shapeType', 'width', 'height', 'strokeWidth', 'cornerRadius', 'sides', 'xOffset', 'yOffset', 'rotation']
             },
             notes: [
-                'Text styling supports textBold, textItalic, textUnderline.',
+                'Text styling supports textBold, textItalic, textUnderline, textStrikethrough.',
                 'QR codes are always square. Use the size property. Width/height map to size for QR items.'
             ]
         }
@@ -148,13 +160,22 @@ export class AiActionBridge {
         if (forceRebuild && !normalizedActions.some((action) => action.action === 'clear_items')) {
             normalizedActions.unshift({ action: 'clear_items' })
         }
+        const rebuildRun = forceRebuild || this.#isLikelyRebuildActionPlan(normalizedActions)
+        if (rebuildRun && !forceRebuild) {
+            this.#debugLog('rebuild-inferred-from-actions', {
+                actionCount: normalizedActions.length
+            })
+        }
+        const runnableActions = rebuildRun
+            ? this.#sanitizeRebuildActions(normalizedActions)
+            : normalizedActions
         const runContext = {
             touchedItemIds: new Set(),
-            allowCreateIfMissing: forceRebuild || Boolean(options.allowCreateIfMissing),
+            allowCreateIfMissing: rebuildRun || Boolean(options.allowCreateIfMissing),
             itemRefs: new Map(),
             itemCounter: 0
         }
-        for (const action of normalizedActions) {
+        for (const action of runnableActions) {
             try {
                 const summary = await this.#runAction(action, runContext)
                 if (summary) executed.push(summary)
@@ -162,10 +183,79 @@ export class AiActionBridge {
                 errors.push(error?.message || this.translate('assistant.actionUnknownError'))
             }
         }
-        if (forceRebuild) {
+        if (rebuildRun) {
             await this.#postProcessRebuildArtifacts(options)
         }
         return { executed, errors }
+    }
+
+    /**
+     * Returns true when an action plan looks like a full rebuild (clear + add flow).
+     * This keeps rebuild safeguards active even if the caller did not set forceRebuild.
+     * @param {Array<{ action?: string }>} actions
+     * @returns {boolean}
+     */
+    #isLikelyRebuildActionPlan(actions) {
+        const safeActions = Array.isArray(actions) ? actions : []
+        if (!safeActions.length) return false
+        const hasClearItems = safeActions.some((action) => action?.action === 'clear_items')
+        if (!hasClearItems) return false
+        return safeActions.some((action) => action?.action === 'add_item')
+    }
+
+    /**
+     * Sanitizes rebuild action plans by dropping global align calls when explicit coordinates are already provided.
+     * This avoids flattening reconstructed sketch layouts.
+     * @param {Array<{ action: string, [key: string]: any }>} actions
+     * @returns {Array<{ action: string, [key: string]: any }>}
+     */
+    #sanitizeRebuildActions(actions) {
+        const safeActions = Array.isArray(actions) ? actions : []
+        const hasExplicitPlacement = safeActions.some((action) => {
+            if (action?.action !== 'update_item') return false
+            const changes = this.#extractItemChangesPayload(action)
+            return this.#changesContainExplicitPlacement(changes)
+        })
+        if (!hasExplicitPlacement) return safeActions
+        const sanitized = []
+        let droppedAlignCount = 0
+        let droppedSelectCount = 0
+        for (let index = 0; index < safeActions.length; index += 1) {
+            const action = safeActions[index]
+            const nextAction = safeActions[index + 1]
+            if (action?.action === 'align_selected') {
+                droppedAlignCount += 1
+                continue
+            }
+            if (action?.action === 'select_items' && nextAction?.action === 'align_selected') {
+                droppedSelectCount += 1
+                continue
+            }
+            sanitized.push(action)
+        }
+        if (droppedAlignCount || droppedSelectCount) {
+            this.#debugLog('sanitize-rebuild-actions', {
+                droppedAlignCount,
+                droppedSelectCount,
+                originalCount: safeActions.length,
+                sanitizedCount: sanitized.length
+            })
+        }
+        return sanitized
+    }
+
+    /**
+     * Returns true when a change payload contains explicit spatial placement.
+     * @param {Record<string, any> | null} changes
+     * @returns {boolean}
+     */
+    #changesContainExplicitPlacement(changes) {
+        if (!changes || typeof changes !== 'object') return false
+        const expandedChanges = this.#expandStructuredChanges(changes)
+        const normalizedChanges = this.#normalizeChanges(expandedChanges)
+        return ['xOffset', 'yOffset', 'rotation'].some((key) =>
+            Object.prototype.hasOwnProperty.call(normalizedChanges, key)
+        )
     }
     /**
      * Normalizes one action payload.
@@ -724,11 +814,27 @@ export class AiActionBridge {
                     changedKeys.push(key)
                     return
                 }
-                case 'textBold':
-                case 'textItalic':
+                case 'textBold': {
+                    if (item.type !== 'text') return
+                    item.textBold = this.#coerceBoolean(value)
+                    changedKeys.push(key)
+                    return
+                }
+                case 'textItalic': {
+                    if (item.type !== 'text') return
+                    item.textItalic = this.#coerceBoolean(value)
+                    changedKeys.push(key)
+                    return
+                }
                 case 'textUnderline': {
                     if (item.type !== 'text') return
-                    item[key] = this.#coerceBoolean(value)
+                    item.textUnderline = this.#coerceTextUnderline(value)
+                    changedKeys.push(key)
+                    return
+                }
+                case 'textStrikethrough': {
+                    if (item.type !== 'text') return
+                    item.textStrikethrough = this.#coerceTextStrikethrough(value)
                     changedKeys.push(key)
                     return
                 }
@@ -756,6 +862,13 @@ export class AiActionBridge {
                 expanded.textUnderline =
                     expanded.style.textUnderline ?? expanded.style.underline ?? expanded.style.textDecoration
             }
+            if (!Object.prototype.hasOwnProperty.call(expanded, 'textStrikethrough')) {
+                expanded.textStrikethrough =
+                    expanded.style.textStrikethrough ??
+                    expanded.style.strikethrough ??
+                    expanded.style.strikeThrough ??
+                    expanded.style.strike
+            }
         }
         if (!Object.prototype.hasOwnProperty.call(expanded, 'textBold') && Object.prototype.hasOwnProperty.call(expanded, 'fontWeight')) {
             expanded.textBold = expanded.fontWeight
@@ -765,6 +878,14 @@ export class AiActionBridge {
         }
         if (!Object.prototype.hasOwnProperty.call(expanded, 'textUnderline') && Object.prototype.hasOwnProperty.call(expanded, 'textDecoration')) {
             expanded.textUnderline = expanded.textDecoration
+        }
+        if (!Object.prototype.hasOwnProperty.call(expanded, 'textStrikethrough')) {
+            const textDecoration = Object.prototype.hasOwnProperty.call(expanded, 'textDecoration')
+                ? String(expanded.textDecoration || '').trim().toLowerCase()
+                : ''
+            if (textDecoration === 'line-through' || textDecoration === 'strikethrough') {
+                expanded.textStrikethrough = expanded.textDecoration
+            }
         }
         if (expanded.position && typeof expanded.position === 'object') {
             if (!Object.prototype.hasOwnProperty.call(expanded, 'xOffset')) expanded.xOffset = expanded.position.x
@@ -796,6 +917,10 @@ export class AiActionBridge {
             italic: 'textItalic',
             underline: 'textUnderline',
             underlined: 'textUnderline',
+            strikethrough: 'textStrikethrough',
+            strikeThrough: 'textStrikethrough',
+            strike: 'textStrikethrough',
+            through: 'textStrikethrough',
             kursiv: 'textItalic',
             fett: 'textBold',
             icon: 'iconId',
@@ -808,13 +933,18 @@ export class AiActionBridge {
             text_bold: 'textBold',
             text_italic: 'textItalic',
             text_underline: 'textUnderline',
+            text_strikethrough: 'textStrikethrough',
+            text_strike: 'textStrikethrough',
             textUnderlin: 'textUnderline',
+            textStrikeThrough: 'textStrikethrough',
             fontWeight: 'textBold',
             fontStyle: 'textItalic',
             textDecoration: 'textUnderline',
             font_weight: 'textBold',
             font_style: 'textItalic',
             text_decoration: 'textUnderline',
+            strike_through: 'textStrikethrough',
+            line_through: 'textStrikethrough',
             shape_type: 'shapeType',
             stroke_width: 'strokeWidth',
             corner_radius: 'cornerRadius',
@@ -849,10 +979,36 @@ export class AiActionBridge {
             const normalized = value.trim().toLowerCase()
             if (['true', '1', 'yes', 'y', 'on'].includes(normalized)) return true
             if (['false', '0', 'no', 'n', 'off'].includes(normalized)) return false
-            if (['bold', 'italic', 'underline', 'underlined'].includes(normalized)) return true
+            if (['bold', 'italic', 'underline', 'underlined', 'strikethrough', 'line-through'].includes(normalized)) return true
             if (['normal', 'none'].includes(normalized)) return false
         }
         return Boolean(value)
+    }
+    /**
+     * Coerces text underline values while treating line-through as false.
+     * @param {unknown} value
+     * @returns {boolean}
+     */
+    #coerceTextUnderline(value) {
+        if (typeof value === 'string') {
+            const normalized = value.trim().toLowerCase()
+            if (['underline', 'underlined'].includes(normalized)) return true
+            if (['line-through', 'strikethrough', 'strike', 'none', 'normal'].includes(normalized)) return false
+        }
+        return this.#coerceBoolean(value)
+    }
+    /**
+     * Coerces text strikethrough values while treating underline as false.
+     * @param {unknown} value
+     * @returns {boolean}
+     */
+    #coerceTextStrikethrough(value) {
+        if (typeof value === 'string') {
+            const normalized = value.trim().toLowerCase()
+            if (['line-through', 'strikethrough', 'strike', 'strike-through'].includes(normalized)) return true
+            if (['underline', 'underlined', 'none', 'normal'].includes(normalized)) return false
+        }
+        return this.#coerceBoolean(value)
     }
     /**
      * Extracts property changes from multiple supported action payload shapes.

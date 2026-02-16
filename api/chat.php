@@ -101,6 +101,67 @@ function parseReasoningEffortEnv(?string $rawValue, string $fallback = 'minimal'
 }
 
 /**
+ * Detects short confirmation replies.
+ *
+ * @param string $message
+ * @return bool
+ */
+function isShortConfirmation(string $message): bool
+{
+    $normalized = strtolower(trim($message));
+    if ($normalized === '') {
+        return false;
+    }
+    return (bool)preg_match(
+        '/^(?:y|yes|yeah|yep|ok|okay|sure|go|go ahead|proceed|continue|do it|ja|jep|klar|mach|weiter|passt)$/u',
+        $normalized
+    );
+}
+
+/**
+ * Returns true when assistant output should be forced to editor_action tool usage.
+ *
+ * @param string $message
+ * @param array<int, mixed> $attachments
+ * @param string $previousResponseId
+ * @return bool
+ */
+function shouldForceEditorToolChoice(string $message, array $attachments, string $previousResponseId): bool
+{
+    $normalized = strtolower(trim($message));
+    if (isShortConfirmation($normalized) && $previousResponseId !== '') {
+        return true;
+    }
+
+    $hasImageAttachment = false;
+    foreach ($attachments as $attachment) {
+        if (!is_array($attachment)) {
+            continue;
+        }
+        $dataUrl = trim((string)($attachment['data_url'] ?? ''));
+        if (str_starts_with($dataUrl, 'data:image/')) {
+            $hasImageAttachment = true;
+            break;
+        }
+    }
+    if (!$hasImageAttachment) {
+        return false;
+    }
+    if ($normalized === '') {
+        return true;
+    }
+
+    $looksLikeRebuildIntent = (bool)preg_match(
+        '/(?:create|recreate|rebuild|match|copy|like this|such kind|from (?:photo|image|sketch)|nachbau|nachbild|erstell|neu aufbauen|wie auf dem bild)/u',
+        $normalized
+    );
+    if ($looksLikeRebuildIntent) {
+        return true;
+    }
+    return !str_ends_with($normalized, '?');
+}
+
+/**
  * Builds a short assistant request id for log correlation.
  *
  * @return string
@@ -664,13 +725,16 @@ $instructions = implode("\n", [
     'Do not emit placeholder actions with only {"action":"..."} and no actionable payload.',
     'For labels copied from a photo/sketch, preserve text structure exactly: keep explicit line breaks and stacked sections instead of flattening everything into one long line.',
     'If the user says "match the look" for an attached label, proceed immediately with a best-effort reconstruction instead of asking additional clarification questions.',
+    'If the user asks to create/recreate a label from an attached image/sketch, call editor_action in the first response and do not wait for extra confirmation.',
+    'If the previous turn asked for confirmation and the user replies with a short confirmation (for example: "yes", "ok", "go"), continue with editor_action immediately.',
     'When rebuilding a label from an image/sketch, first call clear_items so old objects are not mixed into the new result.',
     'For visual reconstruction, prefer one multiline text item for the left stacked content plus one QR item on the right, unless the user explicitly requests separate text objects.',
+    'For sketch/photo reconstruction, avoid align_selected unless the user explicitly asks for alignment; use explicit xOffset/yOffset values instead.',
     'If the user explicitly specifies tape width (for example "24mm" or "W24"), keep that width in set_label settings.media and do not downgrade it.',
     'Do not generate many separate text items for one stacked inventory block unless the user explicitly asks for editable per-line objects.',
     'Do not duplicate content: each text section should appear exactly once. Never keep a full multiline copy and additional duplicated line items at the same time.',
-    'Text items support style flags: textBold, textItalic, textUnderline. Use these instead of creating extra line shapes only for underlines.',
-    'When matching a label photo with heading/value rows, explicitly set textBold/textUnderline/textItalic where visible (for example first heading often underlined, value rows often bold).',
+    'Text items support style flags: textBold, textItalic, textUnderline, textStrikethrough. Use these instead of creating extra line shapes only for underlines.',
+    'When matching a label photo with heading/value rows, explicitly set textBold/textUnderline/textItalic/textStrikethrough where visible (for example first heading often underlined, value rows often bold).',
     'QR items are always square. For QR changes, set size (not independent width/height), and choose a size that is visually prominent (roughly half to two-thirds of label height) unless told otherwise.',
     'Prefer the smallest valid action plan (for example update existing text/QR first, then add only missing items).',
     'Before returning tool arguments, self-validate that every action object is complete and executable.',
@@ -738,7 +802,7 @@ $tools = [[
                                 'shapeType' => ['type' => 'string'],
                                 'properties' => [
                                     'type' => 'object',
-                                    'description' => 'Initial item properties. Text supports textBold/textItalic/textUnderline. QR uses size for square dimensions.'
+                                    'description' => 'Initial item properties. Text supports textBold/textItalic/textUnderline/textStrikethrough. QR uses size for square dimensions.'
                                 ]
                             ],
                             'required' => ['action', 'itemType']
@@ -753,7 +817,7 @@ $tools = [[
                                 'changes' => [
                                     'type' => 'object',
                                     'minProperties' => 1,
-                                    'description' => 'Property patch. Text styling keys: textBold, textItalic, textUnderline. QR should be resized with size.'
+                                    'description' => 'Property patch. Text styling keys: textBold, textItalic, textUnderline, textStrikethrough. QR should be resized with size.'
                                 ]
                             ],
                             'required' => ['action', 'changes']
@@ -857,6 +921,16 @@ $payload = [
 if (isset($body['previous_response_id']) && is_string($body['previous_response_id']) && $body['previous_response_id'] !== '') {
     $payload['previous_response_id'] = $body['previous_response_id'];
 }
+$previousResponseId = isset($body['previous_response_id']) && is_string($body['previous_response_id'])
+    ? trim($body['previous_response_id'])
+    : '';
+$forceEditorTool = shouldForceEditorToolChoice($message, $attachments, $previousResponseId);
+if ($forceEditorTool) {
+    $payload['tool_choice'] = [
+        'type' => 'function',
+        'name' => 'editor_action'
+    ];
+}
 
 $ch = curl_init('https://api.openai.com/v1/responses');
 curl_setopt_array($ch, [
@@ -892,6 +966,7 @@ logAssistantDebug($debugLogsEnabled, 'request-complete', [
     'elapsedMs' => (int)round((microtime(true) - $startedAt) * 1000),
     'upstreamStatus' => $status,
     'model' => $model,
+    'forcedToolChoice' => $forceEditorTool ? 'editor_action' : '',
     'status' => $summary['status'],
     'incompleteReason' => $summary['incompleteReason'],
     'outputTextLength' => $summary['outputTextLength'],

@@ -75,6 +75,22 @@ function createRuntimeHarness() {
                 qrEncodingMode: 'auto'
             })
         },
+        addBarcodeItem() {
+            state.items.push({
+                id: `generated-${nextId++}`,
+                type: 'barcode',
+                data: '',
+                width: 220,
+                height: 64,
+                xOffset: 0,
+                yOffset: 0,
+                rotation: 0,
+                barcodeFormat: 'code128',
+                barcodeShowText: true,
+                barcodeModuleWidth: 2,
+                barcodeMargin: 8
+            })
+        },
         setSelectedItemIds(ids) {
             selectedIds.splice(0, selectedIds.length, ...(Array.isArray(ids) ? ids : []))
         },
@@ -127,6 +143,51 @@ describe('ai-action-bridge runtime', () => {
         assert.equal(state.items.length, 1)
         assert.equal(state.items[0].text, 'Artikelname:')
         assert.equal(state.items[0].textUnderline, true)
+    })
+
+    it('ignores broad align actions in rebuild mode when item positions are already explicit', async () => {
+        const { bridge, state } = createRuntimeHarness()
+        const result = await bridge.runActions(
+            [
+                { action: 'clear_items' },
+                { action: 'add_item', itemType: 'text' },
+                { action: 'update_item', itemId: 'last', changes: { text: 'R', xOffset: 2, yOffset: 2 } },
+                { action: 'add_item', itemType: 'barcode' },
+                { action: 'update_item', itemId: 'last', changes: { data: 'RW605920024DE', xOffset: 64, yOffset: 18, width: 120, height: 22 } },
+                { action: 'select_items', itemIds: ['item-1', 'item-2'] },
+                { action: 'align_selected', mode: 'middle', reference: 'label' }
+            ],
+            { forceRebuild: true }
+        )
+        assert.deepEqual(result.errors, [])
+        assert.equal(state.items.length, 2)
+        const textItem = state.items.find((item) => item.type === 'text')
+        const barcodeItem = state.items.find((item) => item.type === 'barcode')
+        assert.equal(Number(textItem?.xOffset || 0), 2)
+        assert.equal(Number(textItem?.yOffset || 0), 2)
+        assert.equal(Number(barcodeItem?.xOffset || 0), 64)
+        assert.equal(Number(barcodeItem?.yOffset || 0), 18)
+    })
+
+    it('infers rebuild mode from clear+add plans and still ignores broad align drift', async () => {
+        const { bridge, state } = createRuntimeHarness()
+        const result = await bridge.runActions([
+            { action: 'clear_items' },
+            { action: 'add_item', itemType: 'text' },
+            { action: 'update_item', itemId: 'last', changes: { text: 'R', xOffset: 2, yOffset: 2 } },
+            { action: 'add_item', itemType: 'barcode' },
+            { action: 'update_item', itemId: 'last', changes: { data: 'RW605920024DE', xOffset: 64, yOffset: 18, width: 120, height: 22 } },
+            { action: 'select_items', itemIds: ['item-1', 'item-2'] },
+            { action: 'align_selected', mode: 'middle', reference: 'label' }
+        ])
+        assert.deepEqual(result.errors, [])
+        assert.equal(state.items.length, 2)
+        const textItem = state.items.find((item) => item.type === 'text')
+        const barcodeItem = state.items.find((item) => item.type === 'barcode')
+        assert.equal(Number(textItem?.xOffset || 0), 2)
+        assert.equal(Number(textItem?.yOffset || 0), 2)
+        assert.equal(Number(barcodeItem?.xOffset || 0), 64)
+        assert.equal(Number(barcodeItem?.yOffset || 0), 18)
     })
 
     it('creates a missing explicit target during rebuild mode instead of failing', async () => {

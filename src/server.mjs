@@ -3,6 +3,7 @@ import { readFile } from 'fs/promises'
 import { dirname, isAbsolute, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { config as loadDotEnv } from 'dotenv'
+import { AssistantToolChoiceUtils } from './AssistantToolChoiceUtils.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const projectRoot = join(__dirname, '..')
@@ -155,13 +156,16 @@ function buildAssistantInstructions() {
         'Do not emit placeholder actions with only {"action":"..."} and no actionable payload.',
         'For labels copied from a photo/sketch, preserve text structure exactly: keep explicit line breaks and stacked sections instead of flattening everything into one long line.',
         'If the user says "match the look" for an attached label, proceed immediately with a best-effort reconstruction instead of asking additional clarification questions.',
+        'If the user asks to create/recreate a label from an attached image/sketch, call editor_action in the first response and do not wait for extra confirmation.',
+        'If the previous turn asked for confirmation and the user replies with a short confirmation (for example: "yes", "ok", "go"), continue with editor_action immediately.',
         'When rebuilding a label from an image/sketch, first call clear_items so old objects are not mixed into the new result.',
         'For visual reconstruction, prefer one multiline text item for the left stacked content plus one QR item on the right, unless the user explicitly requests separate text objects.',
+        'For sketch/photo reconstruction, avoid align_selected unless the user explicitly asks for alignment; use explicit xOffset/yOffset values instead.',
         'If the user explicitly specifies tape width (for example "24mm" or "W24"), keep that width in set_label settings.media and do not downgrade it.',
         'Do not generate many separate text items for one stacked inventory block unless the user explicitly asks for editable per-line objects.',
         'Do not duplicate content: each text section should appear exactly once. Never keep a full multiline copy and additional duplicated line items at the same time.',
-        'Text items support style flags: textBold, textItalic, textUnderline. Use these instead of creating extra line shapes only for underlines.',
-        'When matching a label photo with heading/value rows, explicitly set textBold/textUnderline/textItalic where visible (for example first heading often underlined, value rows often bold).',
+        'Text items support style flags: textBold, textItalic, textUnderline, textStrikethrough. Use these instead of creating extra line shapes only for underlines.',
+        'When matching a label photo with heading/value rows, explicitly set textBold/textUnderline/textItalic/textStrikethrough where visible (for example first heading often underlined, value rows often bold).',
         'QR items are always square. For QR changes, set size (not independent width/height), and choose a size that is visually prominent (roughly half to two-thirds of label height) unless told otherwise.',
         'Prefer the smallest valid action plan (for example update existing text/QR first, then add only missing items).',
         'Before returning tool arguments, self-validate that every action object is complete and executable.',
@@ -200,7 +204,7 @@ function buildTools() {
                                         properties: {
                                             type: 'object',
                                             description:
-                                                'Initial item properties. Text supports textBold/textItalic/textUnderline. QR uses size for square dimensions.'
+                                                'Initial item properties. Text supports textBold/textItalic/textUnderline/textStrikethrough. QR uses size for square dimensions.'
                                         }
                                     },
                                     required: ['action', 'itemType']
@@ -216,7 +220,7 @@ function buildTools() {
                                             type: 'object',
                                             minProperties: 1,
                                             description:
-                                                'Property patch. Text styling keys: textBold, textItalic, textUnderline. QR should be resized with size.'
+                                                'Property patch. Text styling keys: textBold, textItalic, textUnderline, textStrikethrough. QR should be resized with size.'
                                         }
                                     },
                                     required: ['action', 'changes']
@@ -697,6 +701,14 @@ app.post('/api/chat', async (req, res) => {
     if (previousResponseId) {
         payload.previous_response_id = previousResponseId
     }
+    const forceEditorTool = AssistantToolChoiceUtils.shouldForceEditorToolChoice({
+        message: rawMessage,
+        attachments,
+        previousResponseId
+    })
+    if (forceEditorTool) {
+        payload.tool_choice = { type: 'function', name: 'editor_action' }
+    }
 
     try {
         const upstreamResponse = await fetch('https://api.openai.com/v1/responses', {
@@ -715,6 +727,7 @@ app.post('/api/chat', async (req, res) => {
             upstreamStatus: upstreamResponse.status,
             elapsedMs: Date.now() - startedAt,
             model,
+            forcedToolChoice: forceEditorTool ? 'editor_action' : '',
             ...summary
         })
         res.status(upstreamResponse.status).setHeader('Content-Type', contentType).send(responseText)

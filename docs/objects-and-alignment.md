@@ -50,6 +50,7 @@ Properties:
 - `textBold`: bold style toggle.
 - `textItalic`: italic style toggle.
 - `textUnderline`: underline style toggle.
+- `textStrikethrough`: strikethrough style toggle.
 - `xOffset`: horizontal offset.
 - `yOffset`: vertical offset.
 - `rotation`: rotation in degrees.

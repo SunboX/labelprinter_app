@@ -171,6 +171,7 @@ describe('project-io-utils', () => {
         assert.equal(textItem?.textBold, false)
         assert.equal(textItem?.textItalic, false)
         assert.equal(textItem?.textUnderline, false)
+        assert.equal(textItem?.textStrikethrough, false)
         assert.equal(textItem?.rotation, 0)
         const shapeItem = state.items.find((item) => item.type === 'shape')
         assert.equal(shapeItem?.rotation, 0)
@@ -186,7 +187,8 @@ describe('project-io-utils', () => {
                     text: 'Styled',
                     bold: 'true',
                     kursiv: '1',
-                    underline: 'yes'
+                    underline: 'yes',
+                    textDecoration: 'line-through'
                 },
                 {
                     id: 'item-2',
@@ -202,6 +204,7 @@ describe('project-io-utils', () => {
         assert.equal(textItem?.textBold, true)
         assert.equal(textItem?.textItalic, true)
         assert.equal(textItem?.textUnderline, true)
+        assert.equal(textItem?.textStrikethrough, true)
         const qrItem = state.items.find((item) => item.id === 'item-2')
         assert.equal(qrItem?.size, 98)
         assert.equal(qrItem?.height, 98)
