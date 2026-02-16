@@ -735,6 +735,8 @@ $instructions = implode("\n", [
     'Do not duplicate content: each text section should appear exactly once. Never keep a full multiline copy and additional duplicated line items at the same time.',
     'Text items support style flags: textBold, textItalic, textUnderline, textStrikethrough. Use these instead of creating extra line shapes only for underlines.',
     'When matching a label photo with heading/value rows, explicitly set textBold/textUnderline/textItalic/textStrikethrough where visible (for example first heading often underlined, value rows often bold).',
+    'When recreating barcode-style labels from photos, keep all visible text snippets. Do not omit short rotated side text near the left edge when it is visible.',
+    'Barcode-photo layout preference: rotated side text on the far left, large single letter next to it, code text above barcode, barcode below code.',
     'QR items are always square. For QR changes, set size (not independent width/height), and choose a size that is visually prominent (roughly half to two-thirds of label height) unless told otherwise.',
     'Prefer the smallest valid action plan (for example update existing text/QR first, then add only missing items).',
     'Before returning tool arguments, self-validate that every action object is complete and executable.',

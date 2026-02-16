@@ -11,11 +11,23 @@ function populateInteractiveMap(state, map) {
     map.clear()
     let cursor = 0
     state.items.forEach((item) => {
-        const width =
-            item.type === 'qr'
-                ? Math.max(1, Number(item.size || item.width || 16))
-                : Math.max(12, Math.round(String(item.text || '').length * 1.8))
-        const height = item.type === 'qr' ? width : Math.max(10, Number(item.fontSize || 12))
+        const rotation = Math.abs(Number(item.rotation || 0)) % 180
+        const isQuarterTurn = Math.abs(rotation - 90) <= 12
+        const textLength = Math.max(1, String(item.text || '').length)
+        let width = 12
+        let height = 12
+        if (item.type === 'qr') {
+            width = Math.max(1, Number(item.size || item.width || 16))
+            height = width
+        } else if (item.type === 'barcode') {
+            width = Math.max(24, Number(item.width || 120))
+            height = Math.max(12, Number(item.height || 24))
+        } else {
+            const baseWidth = Math.max(12, Math.round(textLength * Math.max(8, Number(item.fontSize || 12)) * 0.58))
+            const baseHeight = Math.max(10, Math.round(Math.max(8, Number(item.fontSize || 12)) * 1.08))
+            width = isQuarterTurn ? baseHeight : baseWidth
+            height = isQuarterTurn ? baseWidth : baseHeight
+        }
         const x = cursor + Number(item.xOffset || 0)
         const y = Number(item.yOffset || 0)
         map.set(item.id, {
@@ -89,6 +101,19 @@ function createRuntimeHarness() {
                 barcodeShowText: true,
                 barcodeModuleWidth: 2,
                 barcodeMargin: 8
+            })
+        },
+        addShapeItem(shapeType = 'line') {
+            state.items.push({
+                id: `generated-${nextId++}`,
+                type: 'shape',
+                shapeType,
+                width: 80,
+                height: 1,
+                xOffset: 0,
+                yOffset: 0,
+                rotation: 0,
+                strokeWidth: 1
             })
         },
         setSelectedItemIds(ids) {
@@ -326,7 +351,7 @@ describe('ai-action-bridge runtime', () => {
             media: 'W24',
             resolution: 'LOW',
             orientation: 'horizontal',
-            mediaLengthMm: null,
+            mediaLengthMm: 130,
             items: [],
             parameters: [],
             parameterDataRows: []
@@ -440,5 +465,358 @@ describe('ai-action-bridge runtime', () => {
         assert.equal(textItems.length, 6)
         assert.ok(textItems.some((item) => Number(item.xOffset || 0) < -10))
         assert.ok(textItems.some((item) => Number(item.yOffset || 0) > 10))
+    })
+
+    it('applies deterministic barcode template for side-text + big-letter barcode labels', async () => {
+        const state = {
+            backend: 'usb',
+            printer: 'P700',
+            media: 'W24',
+            resolution: 'LOW',
+            orientation: 'horizontal',
+            mediaLengthMm: null,
+            items: [],
+            parameters: [],
+            parameterDataRows: []
+        }
+        const selectedIds = []
+        let nextId = 1
+        const interactiveMap = new Map()
+        const itemsEditor = {
+            addTextItem() {
+                state.items.push({
+                    id: `generated-${nextId++}`,
+                    type: 'text',
+                    text: 'New text',
+                    xOffset: 0,
+                    yOffset: 0,
+                    fontFamily: 'Barlow',
+                    fontSize: 16,
+                    textBold: false,
+                    textItalic: false,
+                    textUnderline: false,
+                    rotation: 0
+                })
+            },
+            addBarcodeItem() {
+                state.items.push({
+                    id: `generated-${nextId++}`,
+                    type: 'barcode',
+                    data: '',
+                    width: 220,
+                    height: 64,
+                    xOffset: 0,
+                    yOffset: 0,
+                    rotation: 0,
+                    barcodeFormat: 'code128',
+                    barcodeShowText: false,
+                    barcodeModuleWidth: 2,
+                    barcodeMargin: 0
+                })
+            },
+            addQrItem() {},
+            addImageItem() {},
+            addIconItem() {},
+            addShapeItem() {},
+            setSelectedItemIds(ids) {
+                selectedIds.splice(0, selectedIds.length, ...(Array.isArray(ids) ? ids : []))
+            },
+            render() {}
+        }
+        const previewRenderer = {
+            _previewBusy: false,
+            _previewQueued: false,
+            _interactiveItemsById: interactiveMap,
+            els: {
+                preview: {
+                    width: 240,
+                    height: 128
+                }
+            },
+            setSelectedItemIds(ids) {
+                selectedIds.splice(0, selectedIds.length, ...(Array.isArray(ids) ? ids : []))
+            },
+            getSelectedItemIds() {
+                return [...selectedIds]
+            },
+            alignSelectedItems() {
+                return { changed: true, reason: '', count: selectedIds.length || 1 }
+            },
+            render() {
+                populateInteractiveMap(state, interactiveMap)
+            }
+        }
+        const bridge = new AiActionBridge({
+            els: {},
+            state,
+            itemsEditor,
+            parameterPanel: { handleItemTemplatesChanged() {}, hasBlockingErrors() { return false }, buildPrintParameterValueMaps() { return [{}] } },
+            previewRenderer,
+            printController: { async print() {} },
+            translate: (key) => key,
+            shapeTypes: [{ id: 'rect' }]
+        })
+        const result = await bridge.runActions(
+            [
+                { action: 'clear_items' },
+                { action: 'add_item', itemType: 'text' },
+                {
+                    action: 'update_item',
+                    itemId: 'item-1',
+                    changes: {
+                        text: 'RW 60 592 002 4DE',
+                        fontSize: 18,
+                        textBold: true,
+                        xOffset: 60,
+                        yOffset: 2
+                    }
+                },
+                { action: 'add_item', itemType: 'barcode' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        data: 'RW605920024DE',
+                        barcodeFormat: 'CODE128',
+                        width: 200,
+                        height: 28,
+                        xOffset: 60,
+                        yOffset: 22,
+                        barcodeShowText: false
+                    }
+                },
+                { action: 'add_item', itemType: 'text' },
+                { action: 'update_item', itemId: 'last', changes: { text: 'R', fontSize: 36, textBold: true, xOffset: 8, yOffset: 0 } },
+                { action: 'add_item', itemType: 'text' },
+                { action: 'update_item', itemId: 'last', changes: { text: 'ET 912-657-800', fontSize: 10, rotation: -90, xOffset: 0, yOffset: 2 } }
+            ],
+            { forceRebuild: true, preferredMedia: 'W24' }
+        )
+
+        assert.deepEqual(result.errors, [])
+        assert.equal(state.items.length, 4)
+
+        const textItems = state.items.filter((item) => item.type === 'text')
+        const barcodeItem = state.items.find((item) => item.type === 'barcode')
+        const bigLetterItem = textItems.find((item) => String(item.text || '').trim() === 'R')
+        const sideTextItem = textItems.find((item) => String(item.text || '').includes('ET'))
+        const codeTextItem = textItems.find((item) => String(item.text || '').includes('RW 60 592 002 4DE'))
+
+        assert.ok(bigLetterItem)
+        assert.ok(sideTextItem)
+        assert.ok(codeTextItem)
+        assert.ok(barcodeItem)
+        assert.equal(Boolean(codeTextItem?.textUnderline), true)
+        assert.equal(Boolean(bigLetterItem?.textBold), true)
+        assert.equal(Math.abs(Number(sideTextItem?.rotation || 0)), 90)
+        assert.ok(Number(barcodeItem?.width || 0) > Number(barcodeItem?.height || 0))
+        assert.equal(state.mediaLengthMm, null)
+
+        populateInteractiveMap(state, interactiveMap)
+        const sideBounds = interactiveMap.get(sideTextItem.id)?.bounds
+        const bigBounds = interactiveMap.get(bigLetterItem.id)?.bounds
+        const codeBounds = interactiveMap.get(codeTextItem.id)?.bounds
+        const barcodeBounds = interactiveMap.get(barcodeItem.id)?.bounds
+        assert.ok(sideBounds && bigBounds && codeBounds && barcodeBounds)
+        assert.ok(sideBounds.y >= 0)
+        assert.ok(sideBounds.y + sideBounds.height <= 128)
+        assert.ok(sideBounds.x <= bigBounds.x)
+        assert.ok(bigBounds.x < codeBounds.x)
+        assert.ok(codeBounds.x - (bigBounds.x + bigBounds.width) >= 24)
+        assert.ok(codeBounds.y < barcodeBounds.y)
+        assert.ok(bigBounds.y + bigBounds.height >= 96)
+        assert.ok(barcodeBounds.y + barcodeBounds.height <= 124)
+        assert.ok(barcodeBounds.width >= codeBounds.width * 0.85)
+    })
+
+    it('applies barcode template when AI returns one multiline text item plus barcode and helper line shape', async () => {
+        const { bridge, state } = createRuntimeHarness()
+        const result = await bridge.runActions(
+            [
+                { action: 'clear_items' },
+                { action: 'add_item', itemType: 'text' },
+                {
+                    action: 'update_item',
+                    itemId: 'item-1',
+                    changes: {
+                        text: 'ET 912-657-800\n\nR\n\nRW 60 592 002 4DE',
+                        xOffset: 2,
+                        yOffset: 2,
+                        fontSize: 24,
+                        textBold: true
+                    }
+                },
+                { action: 'add_item', itemType: 'barcode' },
+                {
+                    action: 'update_item',
+                    target: 'last',
+                    changes: {
+                        data: 'RW605920024DE',
+                        barcodeFormat: 'CODE128',
+                        barcodeShowText: false,
+                        width: 90,
+                        height: 22,
+                        xOffset: 34,
+                        yOffset: 20
+                    }
+                },
+                { action: 'add_item', itemType: 'shape', shapeType: 'line' },
+                { action: 'update_item', target: 'last', changes: { width: 110, height: 1, xOffset: 0, yOffset: 46 } }
+            ],
+            { forceRebuild: true, preferredMedia: 'W24' }
+        )
+
+        assert.deepEqual(result.errors, [])
+        assert.equal(state.items.filter((item) => item.type === 'shape').length, 0)
+        assert.equal(state.items.filter((item) => item.type === 'barcode').length, 1)
+        assert.equal(state.items.filter((item) => item.type === 'text').length, 3)
+
+        const sideText = state.items.find((item) => item.type === 'text' && String(item.text || '').includes('ET 912-657-800'))
+        const bigLetter = state.items.find((item) => item.type === 'text' && String(item.text || '').trim() === 'R')
+        const codeText = state.items.find((item) => item.type === 'text' && String(item.text || '').includes('RW 60 592 002 4DE'))
+        const barcode = state.items.find((item) => item.type === 'barcode')
+
+        assert.ok(sideText)
+        assert.ok(bigLetter)
+        assert.ok(codeText)
+        assert.ok(barcode)
+        assert.equal(Math.abs(Number(sideText?.rotation || 0)), 90)
+        assert.equal(Boolean(codeText?.textUnderline), true)
+        assert.equal(Boolean(bigLetter?.textBold), true)
+    })
+
+    it('applies barcode template without side text and keeps big-letter block on the left', async () => {
+        const state = {
+            backend: 'usb',
+            printer: 'P700',
+            media: 'W24',
+            resolution: 'LOW',
+            orientation: 'horizontal',
+            mediaLengthMm: null,
+            items: [],
+            parameters: [],
+            parameterDataRows: []
+        }
+        const selectedIds = []
+        let nextId = 1
+        const interactiveMap = new Map()
+        const itemsEditor = {
+            addTextItem() {
+                state.items.push({
+                    id: `generated-${nextId++}`,
+                    type: 'text',
+                    text: 'New text',
+                    xOffset: 0,
+                    yOffset: 0,
+                    fontFamily: 'Barlow',
+                    fontSize: 16,
+                    textBold: false,
+                    textItalic: false,
+                    textUnderline: false,
+                    rotation: 0
+                })
+            },
+            addBarcodeItem() {
+                state.items.push({
+                    id: `generated-${nextId++}`,
+                    type: 'barcode',
+                    data: '',
+                    width: 200,
+                    height: 28,
+                    xOffset: 0,
+                    yOffset: 0,
+                    rotation: 0,
+                    barcodeFormat: 'code128',
+                    barcodeShowText: false,
+                    barcodeModuleWidth: 1,
+                    barcodeMargin: 0
+                })
+            },
+            addQrItem() {},
+            addImageItem() {},
+            addIconItem() {},
+            addShapeItem() {},
+            setSelectedItemIds(ids) {
+                selectedIds.splice(0, selectedIds.length, ...(Array.isArray(ids) ? ids : []))
+            },
+            render() {}
+        }
+        const previewRenderer = {
+            _previewBusy: false,
+            _previewQueued: false,
+            _interactiveItemsById: interactiveMap,
+            els: {
+                preview: {
+                    width: 240,
+                    height: 128
+                }
+            },
+            setSelectedItemIds(ids) {
+                selectedIds.splice(0, selectedIds.length, ...(Array.isArray(ids) ? ids : []))
+            },
+            getSelectedItemIds() {
+                return [...selectedIds]
+            },
+            alignSelectedItems() {
+                return { changed: true, reason: '', count: selectedIds.length || 1 }
+            },
+            render() {
+                populateInteractiveMap(state, interactiveMap)
+            }
+        }
+        const bridge = new AiActionBridge({
+            els: {},
+            state,
+            itemsEditor,
+            parameterPanel: { handleItemTemplatesChanged() {}, hasBlockingErrors() { return false }, buildPrintParameterValueMaps() { return [{}] } },
+            previewRenderer,
+            printController: { async print() {} },
+            translate: (key) => key,
+            shapeTypes: [{ id: 'rect' }]
+        })
+        const result = await bridge.runActions(
+            [
+                { action: 'clear_items' },
+                { action: 'add_item', itemType: 'text' },
+                { action: 'update_item', itemId: 'last', changes: { text: 'RW 60 592 002 4DE', fontSize: 18, textBold: true } },
+                { action: 'add_item', itemType: 'barcode' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        data: 'RW605920024DE',
+                        barcodeFormat: 'CODE128',
+                        width: 200,
+                        height: 28,
+                        barcodeShowText: false
+                    }
+                },
+                { action: 'add_item', itemType: 'text' },
+                { action: 'update_item', itemId: 'last', changes: { text: 'R', fontSize: 40, textBold: true } }
+            ],
+            { forceRebuild: true, preferredMedia: 'W24' }
+        )
+
+        assert.deepEqual(result.errors, [])
+        assert.equal(state.items.length, 3)
+        const textItems = state.items.filter((item) => item.type === 'text')
+        const bigLetterItem = textItems.find((item) => String(item.text || '').trim() === 'R')
+        const codeTextItem = textItems.find((item) => String(item.text || '').includes('RW 60 592 002 4DE'))
+        const barcodeItem = state.items.find((item) => item.type === 'barcode')
+        assert.ok(bigLetterItem)
+        assert.ok(codeTextItem)
+        assert.ok(barcodeItem)
+
+        populateInteractiveMap(state, interactiveMap)
+        const bigBounds = interactiveMap.get(bigLetterItem.id)?.bounds
+        const codeBounds = interactiveMap.get(codeTextItem.id)?.bounds
+        const barcodeBounds = interactiveMap.get(barcodeItem.id)?.bounds
+        assert.ok(bigBounds && codeBounds && barcodeBounds)
+        assert.ok(bigBounds.x <= 8)
+        assert.ok(codeBounds.x - (bigBounds.x + bigBounds.width) >= 24)
+        assert.ok(barcodeBounds.x >= bigBounds.x + bigBounds.width)
+        assert.ok(codeBounds.y < barcodeBounds.y)
+        assert.ok(bigBounds.y + bigBounds.height >= 96)
+        assert.ok(barcodeBounds.y + barcodeBounds.height <= 124)
     })
 })
