@@ -2,6 +2,8 @@
 
 Web-based label editor application built on top of `labelprinterkit`.
 
+Live app: [https://labelprinter.app/](https://labelprinter.app/)
+
 ## Overview
 
 This repository now contains the application layer only:
