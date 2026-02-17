@@ -99,6 +99,7 @@ Required server config:
 3. Configure docs grounding path:
    - set `AI_DOCS_DIR` and `AI_DOCS_FILES`
 4. Keep API keys out of frontend code.
+5. Ensure the PHP runtime user can read the `.env` file.
 
 Deployment layout example:
 
@@ -108,9 +109,20 @@ Deployment layout example:
   - deployed to `/docs` and `AI_DOCS_DIR=docs`, or
   - stored in a private folder and `AI_DOCS_DIR=/absolute/private/path/to/docs`
 
+Important deployment note:
+
+- The FTP workflow deploys `src/`, `api/`, and `docs/` but intentionally excludes `.env` files.
+- Upload/provision `/.env` on the host separately (or set host-level env vars).
+
 Optional:
 
 - Set `APP_ENV_FILE=/absolute/path/to/.env` if your `.env` is outside default lookup.
+- Set `OPENAI_API_KEY_FILE=/absolute/path/to/openai_key.txt` to read the key from a private file path.
+
+Quick live checks:
+
+- `GET /api/chat.php` should return `405` with `{"error":"Method not allowed"}`.
+- `POST /api/chat.php` should not return `500 {"error":"Server not configured"}` once key loading is correct.
 
 ## Security Notes
 
