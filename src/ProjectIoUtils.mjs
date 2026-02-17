@@ -143,6 +143,18 @@ export class ProjectIoUtils {
     }
 
     /**
+     * Normalizes persisted item position mode values.
+     * @param {unknown} value
+     * @returns {'flow' | 'absolute'}
+     */
+    static #normalizePositionMode(value) {
+        const normalized = String(value || '')
+            .trim()
+            .toLowerCase()
+        return normalized === 'absolute' ? 'absolute' : 'flow'
+    }
+
+    /**
      * Creates a default item map for normalization.
      * @returns {Record<string, object>}
      */
@@ -150,6 +162,7 @@ export class ProjectIoUtils {
         return {
             text: {
                 type: 'text',
+                positionMode: 'flow',
                 text: '',
                 fontFamily: 'Barlow',
                 fontSize: 24,
@@ -164,6 +177,7 @@ export class ProjectIoUtils {
             },
             qr: {
                 type: 'qr',
+                positionMode: 'flow',
                 data: '',
                 size: 120,
                 height: 120,
@@ -176,6 +190,7 @@ export class ProjectIoUtils {
             },
             shape: {
                 type: 'shape',
+                positionMode: 'flow',
                 shapeType: 'rect',
                 width: 180,
                 height: 36,
@@ -188,6 +203,7 @@ export class ProjectIoUtils {
             },
             image: {
                 type: 'image',
+                positionMode: 'flow',
                 imageData: '',
                 imageName: '',
                 imageDither: 'floyd-steinberg',
@@ -202,6 +218,7 @@ export class ProjectIoUtils {
             },
             icon: {
                 type: 'icon',
+                positionMode: 'flow',
                 iconId: IconLibraryUtils.getDefaultIconId(),
                 width: 72,
                 height: 72,
@@ -211,6 +228,7 @@ export class ProjectIoUtils {
             },
             barcode: {
                 type: 'barcode',
+                positionMode: 'flow',
                 data: '1234567890',
                 width: 220,
                 height: 64,
@@ -239,6 +257,7 @@ export class ProjectIoUtils {
         const defaults = ProjectIoUtils.#buildItemDefaults()[type]
         const normalized = { ...defaults, ...cleaned }
         normalized.id = normalized.id || fallbackId
+        normalized.positionMode = ProjectIoUtils.#normalizePositionMode(cleaned.positionMode ?? defaults.positionMode)
 
         if (type === 'text') {
             normalized.fontSize = ProjectIoUtils.#coerceNumber(normalized.fontSize, defaults.fontSize)

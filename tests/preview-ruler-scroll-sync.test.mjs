@@ -5,7 +5,7 @@ import { describe, it } from 'node:test'
 
 const mainSource = fs.readFileSync(path.join(process.cwd(), 'src/main.mjs'), 'utf8')
 const renderSource = fs.readFileSync(path.join(process.cwd(), 'src/ui/PreviewRendererRender.mjs'), 'utf8')
-const canvasBuildSource = fs.readFileSync(path.join(process.cwd(), 'src/ui/PreviewRendererCanvasBuild.mjs'), 'utf8')
+const rulerCanvasUtilsSource = fs.readFileSync(path.join(process.cwd(), 'src/ui/RulerCanvasUtils.mjs'), 'utf8')
 
 describe('preview ruler scroll sync', () => {
     it('binds canvas-wrap scroll to viewport sync scheduling', () => {
@@ -23,8 +23,8 @@ describe('preview ruler scroll sync', () => {
     })
 
     it('supports viewport shift while drawing ruler axes', () => {
-        assert.match(canvasBuildSource, /viewportShiftPx/)
-        assert.match(canvasBuildSource, /safeViewportShiftPx/)
-        assert.match(canvasBuildSource, /highlightStartPx - safeViewportShiftPx/)
+        assert.match(rulerCanvasUtilsSource, /viewportShiftPx/)
+        assert.match(rulerCanvasUtilsSource, /safeViewportShiftPx/)
+        assert.match(rulerCanvasUtilsSource, /highlightStartPx - safeViewportShiftPx/)
     })
 })

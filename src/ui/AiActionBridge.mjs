@@ -1,8 +1,7 @@
-import { QrSizeUtils } from '../QrSizeUtils.mjs'
-import { RotationUtils } from '../RotationUtils.mjs'
-import { AiBarcodeRebuildUtils } from './AiBarcodeRebuildUtils.mjs'
-import { AiInventoryRebuildUtils } from './AiInventoryRebuildUtils.mjs'
+import { AiItemChangeUtils } from './AiItemChangeUtils.mjs'
 import { AiRebuildPostProcessUtils } from './AiRebuildPostProcessUtils.mjs'
+import { AiUniversalRebuildNormalizer } from './AiUniversalRebuildNormalizer.mjs'
+import { QrSizeUtils } from '../QrSizeUtils.mjs'
 /** Allowlisted action runtime used by the in-app assistant. */
 export class AiActionBridge {
     #translate = (key) => key
@@ -56,6 +55,7 @@ export class AiActionBridge {
             index,
             id: item.id,
             type: item.type,
+            positionMode: String(item.positionMode || 'flow'),
             xOffset: Number(item.xOffset || 0),
             yOffset: Number(item.yOffset || 0),
             rotation: Number(item.rotation || 0),
@@ -112,15 +112,27 @@ export class AiActionBridge {
                     'textItalic',
                     'textUnderline',
                     'textStrikethrough',
+                    'positionMode',
                     'xOffset',
                     'yOffset',
                     'rotation'
                 ],
-                qr: ['data', 'size', 'xOffset', 'yOffset', 'rotation', 'qrErrorCorrectionLevel', 'qrVersion', 'qrEncodingMode'],
+                qr: [
+                    'data',
+                    'size',
+                    'positionMode',
+                    'xOffset',
+                    'yOffset',
+                    'rotation',
+                    'qrErrorCorrectionLevel',
+                    'qrVersion',
+                    'qrEncodingMode'
+                ],
                 barcode: [
                     'data',
                     'width',
                     'height',
+                    'positionMode',
                     'xOffset',
                     'yOffset',
                     'rotation',
@@ -129,13 +141,39 @@ export class AiActionBridge {
                     'barcodeModuleWidth',
                     'barcodeMargin'
                 ],
-                image: ['imageData', 'imageName', 'width', 'height', 'xOffset', 'yOffset', 'rotation', 'imageDither', 'imageThreshold', 'imageSmoothing', 'imageInvert'],
-                icon: ['iconId', 'width', 'height', 'xOffset', 'yOffset', 'rotation'],
-                shape: ['shapeType', 'width', 'height', 'strokeWidth', 'cornerRadius', 'sides', 'xOffset', 'yOffset', 'rotation']
+                image: [
+                    'imageData',
+                    'imageName',
+                    'width',
+                    'height',
+                    'positionMode',
+                    'xOffset',
+                    'yOffset',
+                    'rotation',
+                    'imageDither',
+                    'imageThreshold',
+                    'imageSmoothing',
+                    'imageInvert'
+                ],
+                icon: ['iconId', 'width', 'height', 'positionMode', 'xOffset', 'yOffset', 'rotation'],
+                shape: [
+                    'shapeType',
+                    'width',
+                    'height',
+                    'strokeWidth',
+                    'cornerRadius',
+                    'sides',
+                    'positionMode',
+                    'xOffset',
+                    'yOffset',
+                    'rotation'
+                ]
             },
             notes: [
                 'Text styling supports textBold, textItalic, textUnderline, textStrikethrough.',
-                'QR codes are always square. Use the size property. Width/height map to size for QR items.'
+                'QR codes are always square. Use the size property. Width/height map to size for QR items.',
+                'positionMode supports flow and absolute. Sketch/photo reconstructions should use absolute.',
+                'Horizontal labels are center-anchored on yOffset: negative moves up, positive moves down.'
             ]
         }
     }
@@ -143,11 +181,12 @@ export class AiActionBridge {
      * Executes a list of model-requested editor actions.
      * @param {Array<Record<string, any>>} actions
      * @param {{ forceRebuild?: boolean, allowCreateIfMissing?: boolean, preferredMedia?: string }} [options]
-     * @returns {Promise<{ executed: string[], errors: string[] }>}
+     * @returns {Promise<{ executed: string[], errors: string[], warnings: string[] }>}
      */
     async runActions(actions, options = {}) {
         const executed = []
         const errors = []
+        const warnings = []
         const normalizedActions = []
         const safeActions = Array.isArray(actions) ? actions : []
         for (const rawAction of safeActions) {
@@ -172,10 +211,12 @@ export class AiActionBridge {
             : normalizedActions
         const runContext = {
             touchedItemIds: new Set(),
+            selectedItemIds: [],
             allowCreateIfMissing: rebuildRun || Boolean(options.allowCreateIfMissing),
             itemRefs: new Map(),
             itemCounter: 0
         }
+        this.#rememberSelectedItems(runContext, this.previewRenderer.getSelectedItemIds())
         for (const action of runnableActions) {
             try {
                 const summary = await this.#runAction(action, runContext)
@@ -185,9 +226,9 @@ export class AiActionBridge {
             }
         }
         if (rebuildRun) {
-            await this.#postProcessRebuildArtifacts(options)
+            await this.#postProcessRebuildArtifacts(options, warnings)
         }
-        return { executed, errors }
+        return { executed, errors, warnings }
     }
 
     /**
@@ -214,7 +255,7 @@ export class AiActionBridge {
         const safeActions = Array.isArray(actions) ? actions : []
         const hasExplicitPlacement = safeActions.some((action) => {
             if (action?.action !== 'update_item') return false
-            const changes = this.#extractItemChangesPayload(action)
+            const changes = AiItemChangeUtils.extractItemChangesPayload(action)
             return this.#changesContainExplicitPlacement(changes)
         })
         if (!hasExplicitPlacement) return safeActions
@@ -251,12 +292,7 @@ export class AiActionBridge {
      * @returns {boolean}
      */
     #changesContainExplicitPlacement(changes) {
-        if (!changes || typeof changes !== 'object') return false
-        const expandedChanges = this.#expandStructuredChanges(changes)
-        const normalizedChanges = this.#normalizeChanges(expandedChanges)
-        return ['xOffset', 'yOffset', 'rotation'].some((key) =>
-            Object.prototype.hasOwnProperty.call(normalizedChanges, key)
-        )
+        return AiItemChangeUtils.changesContainExplicitPlacement(changes)
     }
     /**
      * Normalizes one action payload.
@@ -283,7 +319,7 @@ export class AiActionBridge {
     /**
      * Routes one normalized action to the corresponding allowlisted handler.
      * @param {{ action: string, [key: string]: any }} action
-     * @param {{ touchedItemIds: Set<string>, allowCreateIfMissing: boolean }} runContext
+     * @param {{ touchedItemIds: Set<string>, selectedItemIds: string[], allowCreateIfMissing: boolean, itemRefs: Map<string, string>, itemCounter: number }} runContext
      * @returns {Promise<string>}
      */
     async #runAction(action, runContext) {
@@ -293,9 +329,9 @@ export class AiActionBridge {
             case 'update_item':
                 return this.#updateItem(action, runContext)
             case 'remove_item':
-                return this.#removeItem(action)
+                return this.#removeItem(action, runContext)
             case 'clear_items':
-                return this.#clearItems()
+                return this.#clearItems(runContext)
             case 'set_label':
                 return this.#setLabel(action)
             case 'select_items':
@@ -315,7 +351,7 @@ export class AiActionBridge {
     /**
      * Adds a new item using existing editor add flows.
      * @param {{ itemType?: string, type?: string, shapeType?: string, properties?: Record<string, any> }} action
-     * @param {{ touchedItemIds: Set<string> }} runContext
+     * @param {{ touchedItemIds: Set<string>, selectedItemIds: string[] }} runContext
      * @returns {string}
      */
     #addItem(action, runContext) {
@@ -336,9 +372,14 @@ export class AiActionBridge {
         if (!createdItem) {
             throw new Error(this.translate('assistant.actionAddFailed'))
         }
-        const changes = this.#extractItemChangesPayload(action)
+        const changes = AiItemChangeUtils.extractItemChangesPayload(action)
         if (changes && typeof changes === 'object') {
-            this.#applyItemChanges(createdItem, changes)
+            AiItemChangeUtils.applyItemChanges({
+                item: createdItem,
+                rawChanges: changes,
+                state: this.state,
+                shapeTypeIds: this.#shapeTypeIds
+            })
         }
         if (runContext?.itemRefs instanceof Map) {
             const nextIndex = Number(runContext.itemCounter || 0) + 1
@@ -354,13 +395,14 @@ export class AiActionBridge {
         this.#rememberTouchedItem(runContext, createdItem.id)
         this.previewRenderer.setSelectedItemIds([createdItem.id])
         this.itemsEditor.setSelectedItemIds([createdItem.id])
+        this.#rememberSelectedItems(runContext, [createdItem.id])
         this.#renderAfterMutation()
         return this.translate('assistant.actionAddedItem', { type: createdItem.type, id: createdItem.id })
     }
     /**
      * Updates properties of one item.
      * @param {{ itemId?: string, itemIndex?: number, target?: string, changes?: Record<string, any>, properties?: Record<string, any>, itemType?: string, type?: string, shapeType?: string }} action
-     * @param {{ touchedItemIds: Set<string>, allowCreateIfMissing: boolean }} runContext
+     * @param {{ touchedItemIds: Set<string>, selectedItemIds: string[], allowCreateIfMissing: boolean, itemRefs: Map<string, string>, itemCounter: number }} runContext
      * @returns {string}
      */
     #updateItem(action, runContext) {
@@ -377,11 +419,11 @@ export class AiActionBridge {
                 workingAction.itemId = mappedId
             }
         }
-        const changes = this.#extractItemChangesPayload(action)
+        const changes = AiItemChangeUtils.extractItemChangesPayload(action)
         if (!changes || typeof changes !== 'object') {
             throw new Error(this.translate('assistant.actionNoChanges'))
         }
-        const item = this.#resolveTargetItem(workingAction)
+        const item = this.#resolveTargetItem(workingAction, runContext)
         if (!item) {
             const hasExplicitPointer = this.#hasExplicitItemPointer(workingAction)
             const pointerToken = String(workingAction.target || workingAction.itemId || '')
@@ -389,7 +431,7 @@ export class AiActionBridge {
                 .toLowerCase()
             const isSelectionPointer = pointerToken === 'selected' || pointerToken === 'current'
             if (runContext?.allowCreateIfMissing && (!hasExplicitPointer || !isSelectionPointer)) {
-                const fallbackType = this.#inferItemTypeForMissingUpdate(workingAction, changes)
+                const fallbackType = AiItemChangeUtils.inferItemTypeForMissingUpdate(workingAction, changes)
                 const summary = this.#addItem(
                     {
                         action: 'add_item',
@@ -410,33 +452,40 @@ export class AiActionBridge {
         if (explicitItemId && !isSemanticPointer && runContext?.itemRefs instanceof Map) {
             runContext.itemRefs.set(explicitItemId, item.id)
         }
-        const changedKeys = this.#applyItemChanges(item, changes)
+        const changedKeys = AiItemChangeUtils.applyItemChanges({
+            item,
+            rawChanges: changes,
+            state: this.state,
+            shapeTypeIds: this.#shapeTypeIds
+        })
         if (!changedKeys.length) {
             throw new Error(this.translate('assistant.actionNoApplicableChanges'))
         }
         this.#rememberTouchedItem(runContext, item.id)
         this.previewRenderer.setSelectedItemIds([item.id])
         this.itemsEditor.setSelectedItemIds([item.id])
+        this.#rememberSelectedItems(runContext, [item.id])
         this.#renderAfterMutation()
         return this.translate('assistant.actionUpdatedItem', { id: item.id, keys: changedKeys.join(', ') })
     }
     /**
      * Removes one or multiple items.
      * @param {{ itemId?: string, itemIds?: string[], itemIndex?: number, target?: string }} action
+     * @param {{ selectedItemIds: string[] }} runContext
      * @returns {string}
      */
-    #removeItem(action) {
+    #removeItem(action, runContext) {
         const ids = new Set()
         if (Array.isArray(action.itemIds)) {
             action.itemIds.forEach((rawId) => {
                 const normalized = String(rawId || '').trim()
                 if (!normalized) return
-                const aliasedItem = this.#resolveTargetAlias(normalized)
+                const aliasedItem = this.#resolveTargetAlias(normalized, runContext)
                 ids.add(aliasedItem ? aliasedItem.id : normalized)
             })
         }
         if (!ids.size) {
-            const item = this.#resolveTargetItem(action)
+            const item = this.#resolveTargetItem(action, runContext)
             if (item) ids.add(item.id)
         }
         if (!ids.size) {
@@ -452,18 +501,21 @@ export class AiActionBridge {
         const nextSelectedIds = this.previewRenderer.getSelectedItemIds().filter((id) => !ids.has(id))
         this.previewRenderer.setSelectedItemIds(nextSelectedIds)
         this.itemsEditor.setSelectedItemIds(nextSelectedIds)
+        this.#rememberSelectedItems(runContext, nextSelectedIds)
         this.#renderAfterMutation()
         return this.translate('assistant.actionRemovedItems', { count: removedCount })
     }
     /**
      * Removes all current items and clears selection.
+     * @param {{ selectedItemIds: string[] }} runContext
      * @returns {string}
      */
-    #clearItems() {
+    #clearItems(runContext) {
         const removedCount = this.state.items.length
         this.state.items.splice(0, this.state.items.length)
         this.previewRenderer.setSelectedItemIds([])
         this.itemsEditor.setSelectedItemIds([])
+        this.#rememberSelectedItems(runContext, [])
         this.#renderAfterMutation()
         return this.translate('assistant.actionRemovedItems', { count: removedCount })
     }
@@ -498,7 +550,7 @@ export class AiActionBridge {
     /**
      * Selects items by id.
      * @param {{ itemIds?: string[] }} action
-     * @param {{ touchedItemIds: Set<string> }} runContext
+     * @param {{ touchedItemIds: Set<string>, selectedItemIds: string[], itemRefs: Map<string, string> }} runContext
      * @returns {string}
      */
     #selectItems(action, runContext) {
@@ -510,7 +562,7 @@ export class AiActionBridge {
             if (runContext?.itemRefs instanceof Map && runContext.itemRefs.has(lowered)) {
                 return String(runContext.itemRefs.get(lowered) || '')
             }
-            return this.#resolveTargetAlias(id)?.id || id
+            return this.#resolveTargetAlias(id, runContext)?.id || id
         })
         const validIds = ids
             .map((_, index) => resolvedIds[index])
@@ -518,13 +570,14 @@ export class AiActionBridge {
             .filter((id) => this.state.items.some((item) => item.id === id))
         this.previewRenderer.setSelectedItemIds(validIds)
         this.itemsEditor.setSelectedItemIds(validIds)
+        this.#rememberSelectedItems(runContext, validIds)
         validIds.forEach((id) => this.#rememberTouchedItem(runContext, id))
         return this.translate('assistant.actionSelectedItems', { count: validIds.length })
     }
     /**
      * Aligns currently selected items.
      * @param {{ mode?: string, reference?: string }} action
-     * @param {{ touchedItemIds: Set<string> }} runContext
+     * @param {{ touchedItemIds: Set<string>, selectedItemIds: string[], itemRefs: Map<string, string> }} runContext
      * @returns {string}
      */
     #alignSelected(action, runContext) {
@@ -537,12 +590,13 @@ export class AiActionBridge {
                 if (runContext?.itemRefs instanceof Map && runContext.itemRefs.has(lowered)) {
                     return String(runContext.itemRefs.get(lowered) || '')
                 }
-                return this.#resolveTargetAlias(id)?.id || id
+                return this.#resolveTargetAlias(id, runContext)?.id || id
             })
             .filter((id) => this.state.items.some((item) => item.id === id))
         if (validExplicitIds.length) {
             this.previewRenderer.setSelectedItemIds(validExplicitIds)
             this.itemsEditor.setSelectedItemIds(validExplicitIds)
+            this.#rememberSelectedItems(runContext, validExplicitIds)
         } else if (!explicitIds.length && !this.previewRenderer.getSelectedItemIds().length) {
             const touchedIds = Array.from(runContext.touchedItemIds).filter((id) =>
                 this.state.items.some((item) => item.id === id)
@@ -550,6 +604,7 @@ export class AiActionBridge {
             if (touchedIds.length >= 2) {
                 this.previewRenderer.setSelectedItemIds(touchedIds)
                 this.itemsEditor.setSelectedItemIds(touchedIds)
+                this.#rememberSelectedItems(runContext, touchedIds)
             }
         }
         const mode = String(action.mode || '').trim()
@@ -565,7 +620,9 @@ export class AiActionBridge {
             throw new Error(this.translate('messages.nothingToAlign'))
         }
         this.#renderAfterMutation()
-        this.previewRenderer.getSelectedItemIds().forEach((id) => this.#rememberTouchedItem(runContext, id))
+        const selectedIdsAfterAlign = this.previewRenderer.getSelectedItemIds()
+        this.#rememberSelectedItems(runContext, selectedIdsAfterAlign)
+        selectedIdsAfterAlign.forEach((id) => this.#rememberTouchedItem(runContext, id))
         return this.translate('assistant.actionAlignedItems', { count: result.count, mode, reference })
     }
     /**
@@ -613,13 +670,14 @@ export class AiActionBridge {
     /**
      * Returns one target item resolved from id/index/selection shortcuts.
      * @param {{ itemId?: string, itemIndex?: number, target?: string }} action
+     * @param {{ selectedItemIds?: string[] }} [runContext]
      * @returns {Record<string, any> | null}
      */
-    #resolveTargetItem(action) {
+    #resolveTargetItem(action, runContext = null) {
         if (!Array.isArray(this.state.items) || !this.state.items.length) return null
         const byId = String(action.itemId || '').trim()
         if (byId) {
-            const aliasedItem = this.#resolveTargetAlias(byId)
+            const aliasedItem = this.#resolveTargetAlias(byId, runContext)
             if (aliasedItem) return aliasedItem
             if (/^\d+$/.test(byId)) {
                 const index = Number(byId)
@@ -636,22 +694,31 @@ export class AiActionBridge {
             }
         }
         const target = String(action.target || 'selected').trim()
-        const targetItem = this.#resolveTargetAlias(target)
+        const targetItem = this.#resolveTargetAlias(target, runContext)
         if (targetItem) return targetItem
         return null
     }
     /**
      * Resolves semantic target aliases to concrete items.
      * @param {string} rawToken
+     * @param {{ selectedItemIds?: string[] }} [runContext]
      * @returns {Record<string, any> | null}
      */
-    #resolveTargetAlias(rawToken) {
+    #resolveTargetAlias(rawToken, runContext = null) {
         const token = String(rawToken || '').trim().toLowerCase()
         if (!token) return null
         if (token === 'selected' || token === 'current') {
             const selectedId = this.previewRenderer.getSelectedItemIds()[0]
-            if (!selectedId) return null
-            return this.state.items.find((item) => item.id === selectedId) || null
+            if (selectedId) {
+                const selectedItem = this.state.items.find((item) => item.id === selectedId)
+                if (selectedItem) return selectedItem
+            }
+            const contextualSelection = Array.isArray(runContext?.selectedItemIds) ? runContext.selectedItemIds : []
+            for (const candidateId of contextualSelection) {
+                const candidate = this.state.items.find((item) => item.id === candidateId)
+                if (candidate) return candidate
+            }
+            return null
         }
         if (token === 'first') {
             return this.state.items[0] || null
@@ -673,410 +740,6 @@ export class AiActionBridge {
         return false
     }
     /**
-     * Applies property changes to one item and returns changed keys.
-     * @param {Record<string, any>} item
-     * @param {Record<string, any>} rawChanges
-     * @returns {string[]}
-     */
-    #applyItemChanges(item, rawChanges) {
-        const expandedChanges = this.#expandStructuredChanges(rawChanges)
-        const normalizedChanges = this.#normalizeChanges(expandedChanges)
-        if (item.type === 'qr') {
-            const qrSizeCandidates = [normalizedChanges.size, normalizedChanges.width, normalizedChanges.height]
-                .map((entry) => Number(entry))
-                .filter((entry) => Number.isFinite(entry))
-            if (qrSizeCandidates.length) {
-                normalizedChanges.size = Math.max(...qrSizeCandidates)
-            }
-            delete normalizedChanges.width
-            delete normalizedChanges.height
-        }
-        const changedKeys = []
-        Object.entries(normalizedChanges).forEach(([key, value]) => {
-            switch (key) {
-                case 'text':
-                case 'fontFamily':
-                case 'iconId':
-                case 'barcodeFormat':
-                case 'qrErrorCorrectionLevel':
-                case 'qrEncodingMode':
-                case 'imageDither':
-                case 'imageSmoothing': {
-                    if (typeof value !== 'string') return
-                    item[key] = value
-                    changedKeys.push(key)
-                    return
-                }
-                case 'data': {
-                    if (!['qr', 'barcode'].includes(item.type)) return
-                    if (typeof value !== 'string') return
-                    item.data = value
-                    changedKeys.push(key)
-                    return
-                }
-                case 'shapeType': {
-                    const shapeType = String(value || '')
-                    if (!this.#shapeTypeIds.includes(shapeType)) return
-                    item.shapeType = shapeType
-                    changedKeys.push(key)
-                    return
-                }
-                case 'xOffset':
-                case 'yOffset': {
-                    const numberValue = Number(value)
-                    if (!Number.isFinite(numberValue)) return
-                    item[key] = Math.round(numberValue)
-                    changedKeys.push(key)
-                    return
-                }
-                case 'width':
-                case 'height': {
-                    const numberValue = Number(value)
-                    if (!Number.isFinite(numberValue)) return
-                    item[key] = Math.max(1, Math.round(numberValue))
-                    changedKeys.push(key)
-                    return
-                }
-                case 'fontSize': {
-                    const numberValue = Number(value)
-                    if (!Number.isFinite(numberValue)) return
-                    item.fontSize = Math.max(6, Math.round(numberValue))
-                    changedKeys.push(key)
-                    return
-                }
-                case 'barcodeModuleWidth': {
-                    const numberValue = Number(value)
-                    if (!Number.isFinite(numberValue)) return
-                    item.barcodeModuleWidth = Math.max(1, Math.round(numberValue))
-                    changedKeys.push(key)
-                    return
-                }
-                case 'barcodeMargin': {
-                    const numberValue = Number(value)
-                    if (!Number.isFinite(numberValue)) return
-                    item.barcodeMargin = Math.max(0, Math.round(numberValue))
-                    changedKeys.push(key)
-                    return
-                }
-                case 'imageThreshold': {
-                    const numberValue = Number(value)
-                    if (!Number.isFinite(numberValue)) return
-                    item.imageThreshold = Math.max(0, Math.min(255, Math.round(numberValue)))
-                    changedKeys.push(key)
-                    return
-                }
-                case 'strokeWidth': {
-                    const numberValue = Number(value)
-                    if (!Number.isFinite(numberValue)) return
-                    item.strokeWidth = Math.max(1, Math.round(numberValue))
-                    changedKeys.push(key)
-                    return
-                }
-                case 'cornerRadius': {
-                    const numberValue = Number(value)
-                    if (!Number.isFinite(numberValue)) return
-                    item.cornerRadius = Math.max(0, Math.round(numberValue))
-                    changedKeys.push(key)
-                    return
-                }
-                case 'sides': {
-                    const numberValue = Number(value)
-                    if (!Number.isFinite(numberValue)) return
-                    item.sides = Math.max(3, Math.min(12, Math.round(numberValue)))
-                    changedKeys.push(key)
-                    return
-                }
-                case 'rotation': {
-                    const numberValue = Number(value)
-                    if (!Number.isFinite(numberValue)) return
-                    item.rotation = RotationUtils.normalizeDegrees(numberValue)
-                    changedKeys.push(key)
-                    return
-                }
-                case 'size': {
-                    if (item.type !== 'qr') return
-                    const numberValue = Number(value)
-                    if (!Number.isFinite(numberValue)) return
-                    item.size = QrSizeUtils.clampQrSizeToLabel(this.state, Math.round(numberValue))
-                    item.height = item.size
-                    changedKeys.push(key)
-                    return
-                }
-                case 'qrVersion': {
-                    const numberValue = Number(value)
-                    if (!Number.isFinite(numberValue)) return
-                    item.qrVersion = Math.max(0, Math.min(40, Math.round(numberValue)))
-                    changedKeys.push(key)
-                    return
-                }
-                case 'barcodeShowText':
-                case 'imageInvert': {
-                    item[key] = this.#coerceBoolean(value)
-                    changedKeys.push(key)
-                    return
-                }
-                case 'textBold': {
-                    if (item.type !== 'text') return
-                    item.textBold = this.#coerceBoolean(value)
-                    changedKeys.push(key)
-                    return
-                }
-                case 'textItalic': {
-                    if (item.type !== 'text') return
-                    item.textItalic = this.#coerceBoolean(value)
-                    changedKeys.push(key)
-                    return
-                }
-                case 'textUnderline': {
-                    if (item.type !== 'text') return
-                    item.textUnderline = this.#coerceTextUnderline(value)
-                    changedKeys.push(key)
-                    return
-                }
-                case 'textStrikethrough': {
-                    if (item.type !== 'text') return
-                    item.textStrikethrough = this.#coerceTextStrikethrough(value)
-                    changedKeys.push(key)
-                    return
-                }
-                default:
-                    return
-            }
-        })
-        return changedKeys
-    }
-    /**
-     * Expands nested structures into flat item properties.
-     * @param {Record<string, any>} rawChanges
-     * @returns {Record<string, any>}
-     */
-    #expandStructuredChanges(rawChanges) {
-        const expanded = { ...(rawChanges || {}) }
-        if (expanded.style && typeof expanded.style === 'object') {
-            if (!Object.prototype.hasOwnProperty.call(expanded, 'textBold')) {
-                expanded.textBold = expanded.style.textBold ?? expanded.style.bold ?? expanded.style.fontWeight
-            }
-            if (!Object.prototype.hasOwnProperty.call(expanded, 'textItalic')) {
-                expanded.textItalic = expanded.style.textItalic ?? expanded.style.italic ?? expanded.style.fontStyle
-            }
-            if (!Object.prototype.hasOwnProperty.call(expanded, 'textUnderline')) {
-                expanded.textUnderline =
-                    expanded.style.textUnderline ?? expanded.style.underline ?? expanded.style.textDecoration
-            }
-            if (!Object.prototype.hasOwnProperty.call(expanded, 'textStrikethrough')) {
-                expanded.textStrikethrough =
-                    expanded.style.textStrikethrough ??
-                    expanded.style.strikethrough ??
-                    expanded.style.strikeThrough ??
-                    expanded.style.strike
-            }
-        }
-        if (!Object.prototype.hasOwnProperty.call(expanded, 'textBold') && Object.prototype.hasOwnProperty.call(expanded, 'fontWeight')) {
-            expanded.textBold = expanded.fontWeight
-        }
-        if (!Object.prototype.hasOwnProperty.call(expanded, 'textItalic') && Object.prototype.hasOwnProperty.call(expanded, 'fontStyle')) {
-            expanded.textItalic = expanded.fontStyle
-        }
-        if (!Object.prototype.hasOwnProperty.call(expanded, 'textUnderline') && Object.prototype.hasOwnProperty.call(expanded, 'textDecoration')) {
-            expanded.textUnderline = expanded.textDecoration
-        }
-        if (!Object.prototype.hasOwnProperty.call(expanded, 'textStrikethrough')) {
-            const textDecoration = Object.prototype.hasOwnProperty.call(expanded, 'textDecoration')
-                ? String(expanded.textDecoration || '').trim().toLowerCase()
-                : ''
-            if (textDecoration === 'line-through' || textDecoration === 'strikethrough') {
-                expanded.textStrikethrough = expanded.textDecoration
-            }
-        }
-        if (expanded.position && typeof expanded.position === 'object') {
-            if (!Object.prototype.hasOwnProperty.call(expanded, 'xOffset')) expanded.xOffset = expanded.position.x
-            if (!Object.prototype.hasOwnProperty.call(expanded, 'yOffset')) expanded.yOffset = expanded.position.y
-        }
-        if (expanded.size && typeof expanded.size === 'object') {
-            if (!Object.prototype.hasOwnProperty.call(expanded, 'width')) expanded.width = expanded.size.width
-            if (!Object.prototype.hasOwnProperty.call(expanded, 'height')) expanded.height = expanded.size.height
-        }
-        if (expanded.dimensions && typeof expanded.dimensions === 'object') {
-            if (!Object.prototype.hasOwnProperty.call(expanded, 'width')) expanded.width = expanded.dimensions.width
-            if (!Object.prototype.hasOwnProperty.call(expanded, 'height')) expanded.height = expanded.dimensions.height
-        }
-        return expanded
-    }
-    /**
-     * Normalizes common model key aliases to canonical editor item keys.
-     * @param {Record<string, any>} rawChanges
-     * @returns {Record<string, any>}
-     */
-    #normalizeChanges(rawChanges) {
-        const aliasMap = {
-            content: 'text',
-            value: 'data',
-            qrData: 'data',
-            qrContent: 'data',
-            barcodeData: 'data',
-            bold: 'textBold',
-            italic: 'textItalic',
-            underline: 'textUnderline',
-            underlined: 'textUnderline',
-            strikethrough: 'textStrikethrough',
-            strikeThrough: 'textStrikethrough',
-            strike: 'textStrikethrough',
-            through: 'textStrikethrough',
-            kursiv: 'textItalic',
-            fett: 'textBold',
-            icon: 'iconId',
-            x: 'xOffset',
-            y: 'yOffset',
-            x_offset: 'xOffset',
-            y_offset: 'yOffset',
-            font_size: 'fontSize',
-            font_family: 'fontFamily',
-            text_bold: 'textBold',
-            text_italic: 'textItalic',
-            text_underline: 'textUnderline',
-            text_strikethrough: 'textStrikethrough',
-            text_strike: 'textStrikethrough',
-            textUnderlin: 'textUnderline',
-            textStrikeThrough: 'textStrikethrough',
-            fontWeight: 'textBold',
-            fontStyle: 'textItalic',
-            textDecoration: 'textUnderline',
-            font_weight: 'textBold',
-            font_style: 'textItalic',
-            text_decoration: 'textUnderline',
-            strike_through: 'textStrikethrough',
-            line_through: 'textStrikethrough',
-            shape_type: 'shapeType',
-            stroke_width: 'strokeWidth',
-            corner_radius: 'cornerRadius',
-            qr_size: 'size',
-            qr_error_correction_level: 'qrErrorCorrectionLevel',
-            qr_encoding_mode: 'qrEncodingMode',
-            qr_version: 'qrVersion',
-            barcode_show_text: 'barcodeShowText',
-            barcode_module_width: 'barcodeModuleWidth',
-            barcode_margin: 'barcodeMargin',
-            image_dither: 'imageDither',
-            image_threshold: 'imageThreshold',
-            image_smoothing: 'imageSmoothing',
-            image_invert: 'imageInvert'
-        }
-        const normalized = {}
-        Object.entries(rawChanges || {}).forEach(([key, value]) => {
-            const mappedKey = aliasMap[key] || key
-            normalized[mappedKey] = value
-        })
-        return normalized
-    }
-    /**
-     * Coerces common truthy/falsy values to booleans.
-     * @param {unknown} value
-     * @returns {boolean}
-     */
-    #coerceBoolean(value) {
-        if (typeof value === 'boolean') return value
-        if (typeof value === 'number') return value !== 0
-        if (typeof value === 'string') {
-            const normalized = value.trim().toLowerCase()
-            if (['true', '1', 'yes', 'y', 'on'].includes(normalized)) return true
-            if (['false', '0', 'no', 'n', 'off'].includes(normalized)) return false
-            if (['bold', 'italic', 'underline', 'underlined', 'strikethrough', 'line-through'].includes(normalized)) return true
-            if (['normal', 'none'].includes(normalized)) return false
-        }
-        return Boolean(value)
-    }
-    /**
-     * Coerces text underline values while treating line-through as false.
-     * @param {unknown} value
-     * @returns {boolean}
-     */
-    #coerceTextUnderline(value) {
-        if (typeof value === 'string') {
-            const normalized = value.trim().toLowerCase()
-            if (['underline', 'underlined'].includes(normalized)) return true
-            if (['line-through', 'strikethrough', 'strike', 'none', 'normal'].includes(normalized)) return false
-        }
-        return this.#coerceBoolean(value)
-    }
-    /**
-     * Coerces text strikethrough values while treating underline as false.
-     * @param {unknown} value
-     * @returns {boolean}
-     */
-    #coerceTextStrikethrough(value) {
-        if (typeof value === 'string') {
-            const normalized = value.trim().toLowerCase()
-            if (['line-through', 'strikethrough', 'strike', 'strike-through'].includes(normalized)) return true
-            if (['underline', 'underlined', 'none', 'normal'].includes(normalized)) return false
-        }
-        return this.#coerceBoolean(value)
-    }
-    /**
-     * Extracts property changes from multiple supported action payload shapes.
-     * @param {Record<string, any>} action
-     * @returns {Record<string, any> | null}
-     */
-    #extractItemChangesPayload(action) {
-        const directCandidates = [action.changes, action.properties, action.item, action.values]
-        for (const candidate of directCandidates) {
-            if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
-                return { ...candidate }
-            }
-        }
-        const reservedKeys = new Set([
-            'action',
-            'itemType',
-            'type',
-            'shapeType',
-            'itemId',
-            'itemIndex',
-            'itemIds',
-            'target',
-            'settings',
-            'mode',
-            'reference',
-            'skipBatchConfirm'
-        ])
-        const inferredChanges = {}
-        Object.entries(action).forEach(([key, value]) => {
-            if (reservedKeys.has(key)) return
-            inferredChanges[key] = value
-        })
-        return Object.keys(inferredChanges).length ? inferredChanges : null
-    }
-    /**
-     * Infers a best-effort item type when an update target is missing in rebuild mode.
-     * @param {{ itemType?: string, type?: string, shapeType?: string }} action
-     * @param {Record<string, any>} changes
-     * @returns {'text' | 'qr' | 'barcode' | 'image' | 'icon' | 'shape'}
-     */
-    #inferItemTypeForMissingUpdate(action, changes) {
-        const explicitType = String(action.itemType || action.type || '').trim().toLowerCase()
-        if (['text', 'qr', 'barcode', 'image', 'icon', 'shape'].includes(explicitType)) {
-            return explicitType
-        }
-        const keys = new Set(Object.keys(changes || {}))
-        if (keys.has('barcodeFormat') || keys.has('barcodeModuleWidth') || keys.has('barcodeMargin') || keys.has('barcodeShowText')) {
-            return 'barcode'
-        }
-        if (keys.has('imageData') || keys.has('imageName') || keys.has('imageDither') || keys.has('imageThreshold') || keys.has('imageSmoothing') || keys.has('imageInvert')) {
-            return 'image'
-        }
-        if (keys.has('iconId')) {
-            return 'icon'
-        }
-        if (keys.has('shapeType') || keys.has('strokeWidth') || keys.has('cornerRadius') || keys.has('sides')) {
-            return 'shape'
-        }
-        if (keys.has('qrErrorCorrectionLevel') || keys.has('qrVersion') || keys.has('qrEncodingMode') || keys.has('size')) {
-            return 'qr'
-        }
-        if (keys.has('data') && !keys.has('text')) {
-            return 'qr'
-        }
-        return 'text'
-    }
-    /**
      * Adds an item id to this action-run context.
      * @param {{ touchedItemIds: Set<string> }} runContext
      * @param {string} itemId
@@ -1086,6 +749,25 @@ export class AiActionBridge {
         const normalizedId = String(itemId || '').trim()
         if (!normalizedId) return
         runContext.touchedItemIds.add(normalizedId)
+    }
+    /**
+     * Persists the current item selection in run context for robust semantic targeting.
+     * This guards action chains against temporary preview-selection desync during async renders.
+     * @param {{ selectedItemIds?: string[] } | null | undefined} runContext
+     * @param {string[] | null | undefined} itemIds
+     */
+    #rememberSelectedItems(runContext, itemIds) {
+        if (!runContext) return
+        const safeIds = Array.isArray(itemIds) ? itemIds : []
+        const deduped = []
+        safeIds.forEach((rawId) => {
+            const normalizedId = String(rawId || '').trim()
+            if (!normalizedId) return
+            if (deduped.includes(normalizedId)) return
+            if (!this.state.items.some((item) => item.id === normalizedId)) return
+            deduped.push(normalizedId)
+        })
+        runContext.selectedItemIds = deduped
     }
     /**
      * Sets a select value when the option exists and dispatches an event.
@@ -1152,9 +834,10 @@ export class AiActionBridge {
      * Applies deterministic cleanup for sketch-rebuild runs.
      * Removes duplicated aggregate text blocks and enforces a visible QR size floor.
      * @param {{ preferredMedia?: string }} [options]
+     * @param {string[]} [warnings]
      * @returns {Promise<void>}
      */
-    async #postProcessRebuildArtifacts(options = {}) {
+    async #postProcessRebuildArtifacts(options = {}, warnings = []) {
         this.#debugLog('postprocess:start', {
             itemCountBefore: Array.isArray(this.state.items) ? this.state.items.length : 0,
             preferredMedia: String(options.preferredMedia || '').trim()
@@ -1166,41 +849,38 @@ export class AiActionBridge {
                 await this.#renderAfterMutationAsync()
             }
         }
-        const appliedInventoryTemplate = await AiInventoryRebuildUtils.tryApplyInventoryTemplate({
+        const normalizationResult = await AiUniversalRebuildNormalizer.normalize({
             state: this.state,
             previewRenderer: this.previewRenderer,
-            renderAfterMutation: () => this.#renderAfterMutationAsync()
+            renderAfterMutation: () => this.#renderAfterMutationAsync(),
+            onWarning: ({ key, params } = {}) => this.#appendWarningMessage(warnings, key, params)
         })
-        const appliedBarcodeTemplate = appliedInventoryTemplate
-            ? false
-            : await AiBarcodeRebuildUtils.tryApplyBarcodeTemplate({
-                  state: this.state,
-                  previewRenderer: this.previewRenderer,
-                  renderAfterMutation: () => this.#renderAfterMutationAsync()
-              })
-        this.#debugLog('postprocess:template', {
-            appliedInventoryTemplate,
-            appliedBarcodeTemplate,
-            itemCountAfterTemplate: Array.isArray(this.state.items) ? this.state.items.length : 0
+        const appliedNormalization = Boolean(normalizationResult?.applied)
+        this.#debugLog('postprocess:normalize', {
+            appliedNormalization,
+            confidence: Number(normalizationResult?.confidence || 0),
+            reason: String(normalizationResult?.reason || ''),
+            placementResolved: Boolean(normalizationResult?.placementResolved),
+            itemCountAfterNormalize: Array.isArray(this.state.items) ? this.state.items.length : 0
         })
-        if (appliedInventoryTemplate || appliedBarcodeTemplate) {
+        let didMutate = false
+        if (appliedNormalization) {
             const clearedMediaLength = this.#clearMediaLengthOverride()
             if (clearedMediaLength) {
-                await this.#renderAfterMutationAsync()
-            }
-            return
-        }
-        const aggregateTextItem = AiRebuildPostProcessUtils.findDuplicatedAggregateTextItem(this.state.items)
-        let didMutate = false
-        if (aggregateTextItem) {
-            const aggregateId = aggregateTextItem.id
-            const filteredItems = this.state.items.filter((item) => item.id !== aggregateId)
-            if (filteredItems.length !== this.state.items.length) {
-                this.state.items.splice(0, this.state.items.length, ...filteredItems)
-                const selectedIds = this.previewRenderer.getSelectedItemIds().filter((id) => id !== aggregateId)
-                this.previewRenderer.setSelectedItemIds(selectedIds)
-                this.itemsEditor.setSelectedItemIds(selectedIds)
                 didMutate = true
+            }
+        } else {
+            const aggregateTextItem = AiRebuildPostProcessUtils.findDuplicatedAggregateTextItem(this.state.items)
+            if (aggregateTextItem) {
+                const aggregateId = aggregateTextItem.id
+                const filteredItems = this.state.items.filter((item) => item.id !== aggregateId)
+                if (filteredItems.length !== this.state.items.length) {
+                    this.state.items.splice(0, this.state.items.length, ...filteredItems)
+                    const selectedIds = this.previewRenderer.getSelectedItemIds().filter((id) => id !== aggregateId)
+                    this.previewRenderer.setSelectedItemIds(selectedIds)
+                    this.itemsEditor.setSelectedItemIds(selectedIds)
+                    didMutate = true
+                }
             }
         }
 
@@ -1244,9 +924,25 @@ export class AiActionBridge {
             this.els.mediaLength.dispatchEvent(new Event('input', { bubbles: true }))
         }
         this.#debugLog('postprocess:media-length-reset', {
-            reason: 'template-applied'
+            reason: 'normalization-applied'
         })
         return true
+    }
+
+    /**
+     * Resolves and appends a localized warning message only once.
+     * @param {string[]} warnings
+     * @param {string} key
+     * @param {Record<string, string | number>} [params]
+     */
+    #appendWarningMessage(warnings, key, params = {}) {
+        if (!Array.isArray(warnings)) return
+        const warningKey = String(key || '').trim()
+        if (!warningKey) return
+        const translated = String(this.translate(warningKey, params) || '').trim()
+        const message = translated || warningKey
+        if (!message || warnings.includes(message)) return
+        warnings.push(message)
     }
     /**
      * Resolves whether assistant debug logs are enabled.

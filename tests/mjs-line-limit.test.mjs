@@ -31,7 +31,7 @@ describe('mjs line limits', () => {
 
         for (const sourceFile of sourceFiles) {
             const source = await readFile(sourceFile, 'utf8')
-            const lineCount = source.split('\\n').length
+            const lineCount = source.split('\n').length
             if (lineCount >= LINE_LIMIT) {
                 oversizedFiles.push(`${sourceFile} (${lineCount} lines)`)
             }
@@ -40,7 +40,7 @@ describe('mjs line limits', () => {
         assert.deepEqual(
             oversizedFiles,
             [],
-            `Found source modules at or above ${LINE_LIMIT} lines:\\n${oversizedFiles.join('\\n')}`
+            `Found source modules at or above ${LINE_LIMIT} lines:\n${oversizedFiles.join('\n')}`
         )
     })
 })

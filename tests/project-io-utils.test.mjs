@@ -41,6 +41,7 @@ describe('project-io-utils', () => {
                 {
                     id: 'item-1',
                     type: 'qr',
+                    positionMode: 'absolute',
                     data: 'https://example.com',
                     size: 120,
                     height: 130,
@@ -55,6 +56,7 @@ describe('project-io-utils', () => {
         const payload = ProjectIoUtils.buildProjectPayload(state)
         assert.equal(payload.items[0]._qrCache, undefined)
         assert.equal(payload.items[0].type, 'qr')
+        assert.equal(payload.items[0].positionMode, 'absolute')
         assert.equal(payload.items[0].qrErrorCorrectionLevel, 'H')
         assert.equal(payload.items[0].qrVersion, 7)
         assert.equal(payload.items[0].qrEncodingMode, 'numeric')
@@ -175,6 +177,8 @@ describe('project-io-utils', () => {
         assert.equal(textItem?.rotation, 0)
         const shapeItem = state.items.find((item) => item.type === 'shape')
         assert.equal(shapeItem?.rotation, 0)
+        assert.equal(textItem?.positionMode, 'flow')
+        assert.equal(shapeItem?.positionMode, 'flow')
         assert.ok(nextIdCounter > ProjectIoUtils.deriveNextIdCounter([{ id: 'item-2' }]))
     })
 
@@ -209,5 +213,23 @@ describe('project-io-utils', () => {
         assert.equal(qrItem?.size, 98)
         assert.equal(qrItem?.height, 98)
         assert.equal(Object.prototype.hasOwnProperty.call(qrItem || {}, 'width'), false)
+    })
+
+    it('normalizes position mode to flow when missing or invalid', () => {
+        const raw = {
+            items: [
+                { id: 'item-1', type: 'text', text: 'Default flow' },
+                { id: 'item-2', type: 'shape', positionMode: 'ABSOLUTE', width: 20, height: 20 },
+                { id: 'item-3', type: 'barcode', positionMode: 'floating', data: '1234' }
+            ]
+        }
+
+        const { state } = ProjectIoUtils.normalizeProjectState(raw, defaultState)
+        const textItem = state.items.find((item) => item.id === 'item-1')
+        const shapeItem = state.items.find((item) => item.id === 'item-2')
+        const barcodeItem = state.items.find((item) => item.id === 'item-3')
+        assert.equal(textItem?.positionMode, 'flow')
+        assert.equal(shapeItem?.positionMode, 'absolute')
+        assert.equal(barcodeItem?.positionMode, 'flow')
     })
 })

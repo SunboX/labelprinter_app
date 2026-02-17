@@ -8,7 +8,7 @@ import { MediaIntentUtils } from '../MediaIntentUtils.mjs'
  */
 export class AiAssistantPanel {
     #translate = (key) => key
-    #onRunActions = async () => ({ executed: [], errors: [] })
+    #onRunActions = async () => ({ executed: [], errors: [], warnings: [] })
     #getUiState = () => ({})
     #getActionCapabilities = () => ({})
     #getRenderedLabelAttachment = async () => null
@@ -60,10 +60,11 @@ export class AiAssistantPanel {
 
     /**
      * Sets action execution callback.
-     * @param {(actions: Array<Record<string, any>>) => Promise<{ executed: string[], errors: string[] }>} callback
+     * @param {(actions: Array<Record<string, any>>) => Promise<{ executed: string[], errors: string[], warnings?: string[] }>} callback
      */
     set onRunActions(callback) {
-        this.#onRunActions = typeof callback === 'function' ? callback : async () => ({ executed: [], errors: [] })
+        this.#onRunActions =
+            typeof callback === 'function' ? callback : async () => ({ executed: [], errors: [], warnings: [] })
     }
 
     /**
@@ -302,13 +303,17 @@ export class AiAssistantPanel {
             mime_type: attachment.mimeType,
             data_url: attachment.dataUrl
         }))
-        const renderedLabelAttachment = await this.#resolveRenderedLabelAttachment()
-        if (renderedLabelAttachment) {
-            outgoingAttachments.unshift(renderedLabelAttachment)
+        const skipRenderedLabelForRebuild = actionContext.forceRebuild && userAttachmentCount > 0
+        if (!skipRenderedLabelForRebuild) {
+            const renderedLabelAttachment = await this.#resolveRenderedLabelAttachment()
+            if (renderedLabelAttachment) {
+                outgoingAttachments.unshift(renderedLabelAttachment)
+            }
         }
         this.#debugLog('request-attachments', {
             outgoingAttachmentCount: outgoingAttachments.length,
-            outgoingAttachmentNames: outgoingAttachments.map((attachment) => String(attachment?.name || 'unnamed'))
+            outgoingAttachmentNames: outgoingAttachments.map((attachment) => String(attachment?.name || 'unnamed')),
+            skippedRenderedLabelForRebuild: skipRenderedLabelForRebuild
         })
         this.#attachments = []
         this.#renderAttachments()
@@ -341,15 +346,18 @@ export class AiAssistantPanel {
             if (actions.length) {
                 const uiStateBeforeActions = this.#summarizeUiStateForDebug(this.#getUiState())
                 const actionResult = await this.#onRunActions(actions, actionContext)
+                const warnings = Array.isArray(actionResult?.warnings) ? actionResult.warnings : []
                 const uiStateAfterActions = this.#summarizeUiStateForDebug(this.#getUiState())
                 this.#debugLog('action-run-complete', {
                     requestId: String(response?._requestId || ''),
                     executedCount: actionResult.executed.length,
                     errorCount: actionResult.errors.length,
+                    warningCount: warnings.length,
                     forceRebuild: actionContext.forceRebuild,
                     preferredMedia: String(actionContext.preferredMedia || ''),
                     executed: actionResult.executed,
                     errors: actionResult.errors,
+                    warnings,
                     uiStateBeforeActions,
                     uiStateAfterActions
                 })
@@ -373,6 +381,23 @@ export class AiAssistantPanel {
                         this.#appendMessage(
                             'system',
                             this.translate('assistant.actionsFailedDetails', { details: detailPreview })
+                        )
+                    }
+                }
+                if (warnings.length) {
+                    this.#appendMessage(
+                        'system',
+                        this.translate('assistant.actionsWarnings', { count: warnings.length })
+                    )
+                    const warningPreview = warnings
+                        .slice(0, 3)
+                        .map((entry) => String(entry || '').trim())
+                        .filter(Boolean)
+                        .join(' | ')
+                    if (warningPreview) {
+                        this.#appendMessage(
+                            'system',
+                            this.translate('assistant.actionsWarningsDetails', { details: warningPreview })
                         )
                     }
                 }

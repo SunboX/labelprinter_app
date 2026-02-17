@@ -11,6 +11,7 @@ import { FontFamilyUtils } from './FontFamilyUtils.mjs'
 import { I18n } from './I18n.mjs'
 import { AppElements } from './AppElements.mjs'
 import { AppRuntimeConfig } from './AppRuntimeConfig.mjs'
+import { AppRuntimeNoiseGuards } from './AppRuntimeNoiseGuards.mjs'
 import { AiActionBridge } from './ui/AiActionBridge.mjs'
 import { AiAssistantPanel } from './ui/AiAssistantPanel.mjs'
 import { Media, Resolution } from 'labelprinterkit-web/src/index.mjs'
@@ -30,46 +31,7 @@ function nextId() {
 const defaultState = AppRuntimeConfig.createDefaultState(nextId)
 
 let state = JSON.parse(JSON.stringify(defaultState))
-const EXTENSION_ASYNC_CHANNEL_CLOSED_MESSAGE =
-    'A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received'
-
-/**
- * Extracts a normalized message string from unknown error-like values.
- * @param {unknown} errorLike
- * @returns {string}
- */
-function extractErrorLikeMessage(errorLike) {
-    if (!errorLike || typeof errorLike !== 'object') {
-        return String(errorLike || '').trim()
-    }
-    if ('message' in errorLike) {
-        return String(/** @type {{ message?: unknown }} */ (errorLike).message || '').trim()
-    }
-    return String(errorLike).trim()
-}
-
-/**
- * Returns true when the message is the known browser-extension message-channel noise.
- * @param {string} message
- * @returns {boolean}
- */
-function isExtensionMessageChannelNoise(message) {
-    return String(message || '').includes(EXTENSION_ASYNC_CHANNEL_CLOSED_MESSAGE)
-}
-
-/**
- * Installs a narrow unhandled-rejection filter for browser-extension runtime noise.
- * This prevents extension-originated promise rejections from surfacing as app errors.
- */
-function installRuntimeNoiseGuards() {
-    window.addEventListener('unhandledrejection', (event) => {
-        const message = extractErrorLikeMessage(event?.reason)
-        if (!isExtensionMessageChannelNoise(message)) return
-        event.preventDefault()
-        console.info('Ignored browser-extension runtime message-channel rejection:', message)
-    })
-}
-installRuntimeNoiseGuards()
+AppRuntimeNoiseGuards.install()
 
 /**
  * Updates the status banner.

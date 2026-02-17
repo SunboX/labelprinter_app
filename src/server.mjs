@@ -153,13 +153,22 @@ function buildAssistantInstructions() {
         'If a request is out of scope, refuse briefly and ask for a label-editor task.',
         'When the user requests a label/editor change, call the tool editor_action with allowlisted actions only.',
         'When calling editor_action, always include required fields for each action (for example: add_item needs itemType, update_item needs changes, set_label needs settings, align_selected needs mode).',
+        'When using add_item + update_item in the same action plan, prefer update_item itemId "last" (or explicit item refs) instead of "selected/current".',
         'Do not emit placeholder actions with only {"action":"..."} and no actionable payload.',
         'For labels copied from a photo/sketch, preserve text structure exactly: keep explicit line breaks and stacked sections instead of flattening everything into one long line.',
         'If the user says "match the look" for an attached label, proceed immediately with a best-effort reconstruction instead of asking additional clarification questions.',
         'If the user asks to create/recreate a label from an attached image/sketch, call editor_action in the first response and do not wait for extra confirmation.',
         'If the previous turn asked for confirmation and the user replies with a short confirmation (for example: "yes", "ok", "go"), continue with editor_action immediately.',
         'When rebuilding a label from an image/sketch, first call clear_items so old objects are not mixed into the new result.',
-        'For visual reconstruction, prefer one multiline text item for the left stacked content plus one QR item on the right, unless the user explicitly requests separate text objects.',
+        'When rebuilding from image/sketch, set positionMode to "absolute" for explicitly placed objects unless the user requests flow sequencing.',
+        'Coordinate hint: in horizontal labels yOffset is center-relative (0 is centered, negative moves up, positive moves down). Use negative yOffset for top-aligned rows.',
+        'For visual reconstruction, prefer one multiline text item only when the left stacked content is stylistically uniform; when markers/checkboxes or mixed styles are visible, split into separate text items.',
+        'For checkbox labels, use separate heading text and option text when styles differ.',
+        'For checkbox markers, use a basic square form (shapeType rect, cornerRadius 0) and keep it clearly visible instead of tiny boxes.',
+        'For form-style labels, keep the content block near the top with a small top margin; avoid large empty space above the heading.',
+        'For checkbox rows, keep a visible horizontal gap between the square marker and the option text, preserve small outer margins on all sides, and leave a clearly visible left-side empty strip before the first object (target at least 10 units of xOffset from the left edge), similar to the reference sample.',
+        'If you add a square marker shape, remove marker glyphs (☐/□) from option text.',
+        'Prefer known font families (Barlow or sans-serif) over ambiguous font names.',
         'For sketch/photo reconstruction, avoid align_selected unless the user explicitly asks for alignment; use explicit xOffset/yOffset values instead.',
         'If the user explicitly specifies tape width (for example "24mm" or "W24"), keep that width in set_label settings.media and do not downgrade it.',
         'Do not generate many separate text items for one stacked inventory block unless the user explicitly asks for editable per-line objects.',
@@ -168,6 +177,16 @@ function buildAssistantInstructions() {
         'When matching a label photo with heading/value rows, explicitly set textBold/textUnderline/textItalic/textStrikethrough where visible (for example first heading often underlined, value rows often bold).',
         'When recreating barcode-style labels from photos, keep all visible text snippets. Do not omit short rotated side text near the left edge when it is visible.',
         'Barcode-photo layout preference: rotated side text on the far left, large single letter next to it, code text above barcode, barcode below code.',
+        'For barcode-photo reconstructions with explicit absolute coordinates, preserve the provided layout as closely as possible and avoid large automatic repositioning.',
+        'For this style pattern (rotated side text + single-letter token + code + barcode), keep the single-letter token visibly dominant and the barcode slightly larger to match reference prominence.',
+        'W24 prominence hint for this style: target single-letter fontSize about 58-64 and barcode about 240-280 width with 40-46 height, unless the image clearly indicates smaller.',
+        'Keep rotated side text inside a left gutter and left of the large-letter/token column with a visible gap (target at least 6).',
+        'When overlap adjustments are needed in barcode-photo layouts, move compact left-side tokens (for example single-letter markers) before shifting the code text/barcode rows downward.',
+        'Keep barcode-photo code text and barcode in the same visual column with a small vertical gap (target about 8-22 dots, ideal near 12).',
+        'For heading/value inventory labels with a right-side QR (for example Artikelname/Artikelnummer/Lagerplatz), build a two-column layout: left stacked text rows and a right QR block.',
+        'Keep left text rows in strict top-to-bottom order with visible gaps; avoid row overlap and avoid clipping the last row.',
+        'If space is tight in this style, reduce QR size first before shrinking text, while keeping all text content unchanged.',
+        'For heading/value inventory labels with a right-side QR, if the top heading row is underlined, keep its immediate value row underlined as well (for example Artikelname: and its value).',
         'QR items are always square. For QR changes, set size (not independent width/height), and choose a size that is visually prominent (roughly half to two-thirds of label height) unless told otherwise.',
         'Prefer the smallest valid action plan (for example update existing text/QR first, then add only missing items).',
         'Before returning tool arguments, self-validate that every action object is complete and executable.',
@@ -206,7 +225,7 @@ function buildTools() {
                                         properties: {
                                             type: 'object',
                                             description:
-                                                'Initial item properties. Text supports textBold/textItalic/textUnderline/textStrikethrough. QR uses size for square dimensions.'
+                                                'Initial item properties. Supports positionMode ("flow" or "absolute"), xOffset/yOffset/rotation, text style flags, and QR size.'
                                         }
                                     },
                                     required: ['action', 'itemType']
@@ -222,7 +241,7 @@ function buildTools() {
                                             type: 'object',
                                             minProperties: 1,
                                             description:
-                                                'Property patch. Text styling keys: textBold, textItalic, textUnderline, textStrikethrough. QR should be resized with size.'
+                                                'Property patch. Supports positionMode ("flow" or "absolute"), xOffset/yOffset/rotation, text styling keys, and QR size.'
                                         }
                                     },
                                     required: ['action', 'changes']

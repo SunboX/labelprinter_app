@@ -7,6 +7,7 @@ import { ItemsEditorIconSupport } from './ItemsEditorIconSupport.mjs'
 import { ItemsEditorBarcodeSupport } from './ItemsEditorBarcodeSupport.mjs'
 import { ItemsEditorGeometrySupport } from './ItemsEditorGeometrySupport.mjs'
 import { ItemsEditorControlSupport } from './ItemsEditorControlSupport.mjs'
+import { ItemsScrollIndicatorUtils } from './ItemsScrollIndicatorUtils.mjs'
 /**
  * Manages the item list UI, including drag reordering and item controls.
  */
@@ -267,42 +268,17 @@ export class ItemsEditor {
         if (this.#itemsScrollIndicatorsBound) return
         if (!this.els.items) return
         this.#itemsScrollIndicatorsBound = true
-        this.els.items.addEventListener(
-            'scroll',
-            () => {
-                this.#updateItemsScrollIndicators()
-            },
-            { passive: true }
-        )
-        window.addEventListener('resize', () => this.#updateItemsScrollIndicators())
+        ItemsScrollIndicatorUtils.bind(this.els.items, () => this.#updateItemsScrollIndicators())
     }
     /**
      * Updates scroll indicator attributes for the objects-panel list.
      */
     #updateItemsScrollIndicators() {
-        if (!this.els.items) return
-        const overflowThreshold = 2
-        const hasOverflow = this.els.items.scrollHeight - this.els.items.clientHeight > overflowThreshold
-        const hasHiddenTop = hasOverflow && this.els.items.scrollTop > 1
-        const hasHiddenBottom =
-            hasOverflow &&
-            this.els.items.scrollTop + this.els.items.clientHeight < this.els.items.scrollHeight - 1
-        this.els.items.dataset.overflow = hasOverflow ? 'true' : 'false'
-        this.els.items.dataset.scrollTop = hasHiddenTop ? 'true' : 'false'
-        this.els.items.dataset.scrollBottom = hasHiddenBottom ? 'true' : 'false'
-        if (!this.els.objectsScrollIndicator) return
-        const indicatorDirection =
-            hasHiddenTop && hasHiddenBottom ? 'both' : hasHiddenTop ? 'up' : hasHiddenBottom ? 'down' : 'down'
-        this.els.objectsScrollIndicator.dataset.direction = indicatorDirection
-        this.els.objectsScrollIndicator.hidden = !hasOverflow
-        if (!hasOverflow) return
-        const hintKey =
-            hasHiddenTop && hasHiddenBottom
-                ? 'objects.scrollHintBoth'
-                : hasHiddenTop
-                  ? 'objects.scrollHintUp'
-                  : 'objects.scrollHintDown'
-        this.els.objectsScrollIndicator.textContent = this.translate(hintKey)
+        ItemsScrollIndicatorUtils.update(
+            this.els.items,
+            this.els.objectsScrollIndicator,
+            (key) => this.translate(key)
+        )
     }
     /**
      * Adds a new text item.
