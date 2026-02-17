@@ -349,7 +349,7 @@ describe('ai-action-bridge runtime', () => {
         assert.equal(String(optionItem?.text || '').includes('☐'), false)
         assert.equal(String(optionItem?.text || '').includes('□'), false)
 
-        populateInteractiveMap(state, previewRenderer._interactiveItemsById)
+        populateInteractiveMapCenteredRotated(state, previewRenderer._interactiveItemsById, previewRenderer.els.preview)
         const headingBounds = previewRenderer._interactiveItemsById.get(headingItem.id)?.bounds
         const optionBounds = previewRenderer._interactiveItemsById.get(optionItem.id)?.bounds
         const checkboxBounds = previewRenderer._interactiveItemsById.get(checkboxItem.id)?.bounds
@@ -555,6 +555,361 @@ describe('ai-action-bridge runtime', () => {
         assert.ok(state.items.some((item) => item.type === 'barcode'))
         assert.ok(state.items.some((item) => item.type === 'text'))
         assert.ok(state.items.length >= 2)
+    })
+
+    it('reconstructs boxed barcode references with frame and divider geometry', async () => {
+        const { bridge, state, previewRenderer } = createRuntimeHarness({
+            mapPopulator: populateInteractiveMapCenteredRotated
+        })
+        const result = await bridge.runActions(
+            [
+                { action: 'clear_items' },
+                { action: 'add_item', itemType: 'text' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        positionMode: 'absolute',
+                        text: 'RW 60 592 002 4DE',
+                        fontFamily: 'Barlow',
+                        fontSize: 18,
+                        xOffset: -90,
+                        yOffset: -52,
+                        textBold: false
+                    }
+                },
+                { action: 'add_item', itemType: 'shape', shapeType: 'line' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        positionMode: 'absolute',
+                        width: 360,
+                        height: 2,
+                        xOffset: 0,
+                        yOffset: -34,
+                        strokeWidth: 2,
+                        rotation: 0
+                    }
+                },
+                { action: 'add_item', itemType: 'text' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        positionMode: 'absolute',
+                        text: 'RW 60 592 002 4DE',
+                        fontFamily: 'Barlow',
+                        fontSize: 18,
+                        xOffset: 0,
+                        yOffset: -52,
+                        textBold: false
+                    }
+                },
+                { action: 'add_item', itemType: 'text' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        positionMode: 'absolute',
+                        text: 'RW 60 592 002 4DE',
+                        fontFamily: 'Barlow',
+                        fontSize: 20,
+                        xOffset: 0,
+                        yOffset: -6,
+                        textBold: false
+                    }
+                },
+                { action: 'add_item', itemType: 'shape', shapeType: 'line' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        positionMode: 'absolute',
+                        width: 220,
+                        height: 2,
+                        xOffset: 0,
+                        yOffset: 6,
+                        strokeWidth: 2
+                    }
+                },
+                { action: 'add_item', itemType: 'barcode' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        positionMode: 'absolute',
+                        data: 'RW605920024DE',
+                        barcodeFormat: 'CODE128',
+                        barcodeShowText: false,
+                        width: 260,
+                        height: 44,
+                        xOffset: 0,
+                        yOffset: 38,
+                        barcodeModuleWidth: 2,
+                        barcodeMargin: 2
+                    }
+                }
+            ],
+            { forceRebuild: true, preferredMedia: 'W24' }
+        )
+
+        assert.deepEqual(result.errors, [])
+        const codeTextItems = state.items.filter(
+            (item) => item.type === 'text' && String(item.text || '').includes('RW 60 592 002 4DE')
+        )
+        const barcodeItem = state.items.find((item) => item.type === 'barcode')
+        const rectShapes = state.items.filter(
+            (item) =>
+                item.type === 'shape' &&
+                String(item.shapeType || '')
+                    .trim()
+                    .toLowerCase() === 'rect'
+        )
+        const lineShapes = state.items.filter(
+            (item) =>
+                item.type === 'shape' &&
+                String(item.shapeType || '')
+                    .trim()
+                    .toLowerCase() === 'line'
+        )
+        assert.ok(barcodeItem)
+        assert.ok(codeTextItems.length >= 3)
+        assert.ok(rectShapes.length >= 1, 'guard should ensure an outer frame rectangle')
+        assert.ok(lineShapes.length >= 3, 'guard should ensure divider/separator line geometry')
+
+        const verticalDivider = lineShapes.find((item) => Math.abs((Math.abs(Number(item.rotation || 0)) % 180) - 90) <= 20)
+        const horizontalLines = lineShapes.filter(
+            (item) => Math.abs((Math.abs(Number(item.rotation || 0)) % 180) - 90) > 20
+        )
+        assert.ok(verticalDivider, 'guard should ensure one vertical top-row divider')
+        assert.ok(horizontalLines.length >= 2, 'guard should keep at least two horizontal separator lines')
+
+        const orderedTextRows = [...codeTextItems].sort((left, right) => Number(left.yOffset || 0) - Number(right.yOffset || 0))
+        const topRowLeft = orderedTextRows[0]
+        const topRowRight = orderedTextRows[1]
+        const middleRow = orderedTextRows[orderedTextRows.length - 1]
+        assert.ok(Math.abs(Number(topRowLeft?.yOffset || 0) - Number(topRowRight?.yOffset || 0)) <= 2)
+        assert.equal(Boolean(topRowLeft?.textUnderline), false)
+        assert.equal(Boolean(topRowRight?.textUnderline), false)
+        assert.equal(Boolean(middleRow?.textUnderline), false)
+
+        populateInteractiveMap(state, previewRenderer._interactiveItemsById)
+        const barcodeBounds = previewRenderer._interactiveItemsById.get(barcodeItem.id)?.bounds
+        const topLeftBounds = previewRenderer._interactiveItemsById.get(topRowLeft.id)?.bounds
+        const topRightBounds = previewRenderer._interactiveItemsById.get(topRowRight.id)?.bounds
+        const horizontalBounds = horizontalLines
+            .map((item) => previewRenderer._interactiveItemsById.get(item.id)?.bounds || null)
+            .filter(Boolean)
+        assert.ok(barcodeBounds)
+        assert.ok(topLeftBounds)
+        assert.ok(topRightBounds)
+        assert.ok(horizontalBounds.length >= 2)
+        const topBoundsOrdered = [topLeftBounds, topRightBounds].sort(
+            (left, right) => Number(left.x || 0) - Number(right.x || 0)
+        )
+        const topGap =
+            Number(topBoundsOrdered[1].x || 0) -
+            (Number(topBoundsOrdered[0].x || 0) + Number(topBoundsOrdered[0].width || 0))
+        assert.ok(topGap >= 4, 'top header text cells should not overlap')
+        const middleSeparatorY = Math.max(...horizontalBounds.map((bounds) => Number(bounds.y || 0)))
+        assert.ok(
+            Number(barcodeBounds.y || 0) >= middleSeparatorY - 1,
+            'barcode should remain below the middle horizontal separator'
+        )
+    })
+
+    it('stabilizes boxed barcode geometry from zero-length divider payloads', async () => {
+        const { bridge, state, previewRenderer } = createRuntimeHarness({
+            mapPopulator: populateInteractiveMapCenteredRotated
+        })
+        const result = await bridge.runActions(
+            [
+                { action: 'clear_items' },
+                { action: 'add_item', itemType: 'shape', shapeType: 'rect' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        positionMode: 'absolute',
+                        xOffset: 2,
+                        yOffset: 0,
+                        width: 718,
+                        height: 280,
+                        strokeWidth: 2
+                    }
+                },
+                { action: 'add_item', itemType: 'shape', shapeType: 'line' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        positionMode: 'absolute',
+                        xOffset: 2,
+                        yOffset: -92,
+                        width: 718,
+                        height: 0,
+                        strokeWidth: 2
+                    }
+                },
+                { action: 'add_item', itemType: 'shape', shapeType: 'line' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        positionMode: 'absolute',
+                        xOffset: 360,
+                        yOffset: -132,
+                        width: 0,
+                        height: 80,
+                        strokeWidth: 2
+                    }
+                },
+                { action: 'add_item', itemType: 'text' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        text: 'RW 60 592 002 4DE',
+                        fontFamily: 'Barlow',
+                        fontSize: 20,
+                        textBold: false,
+                        positionMode: 'absolute',
+                        xOffset: 24,
+                        yOffset: -132
+                    }
+                },
+                { action: 'add_item', itemType: 'text' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        text: 'RW 60 592 002 4DE',
+                        fontFamily: 'Barlow',
+                        fontSize: 20,
+                        positionMode: 'absolute',
+                        xOffset: 404,
+                        yOffset: -132
+                    }
+                },
+                { action: 'add_item', itemType: 'text' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        text: 'RW 60 592 002 4DE',
+                        fontFamily: 'Barlow',
+                        fontSize: 20,
+                        positionMode: 'absolute',
+                        xOffset: 210,
+                        yOffset: -12
+                    }
+                },
+                { action: 'add_item', itemType: 'shape', shapeType: 'line' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        positionMode: 'absolute',
+                        xOffset: 210,
+                        yOffset: 20,
+                        width: 300,
+                        height: 0,
+                        strokeWidth: 2
+                    }
+                },
+                { action: 'add_item', itemType: 'barcode' },
+                {
+                    action: 'update_item',
+                    itemId: 'last',
+                    changes: {
+                        data: 'RW605920024DE',
+                        barcodeFormat: 'CODE128',
+                        barcodeShowText: false,
+                        positionMode: 'absolute',
+                        xOffset: 210,
+                        yOffset: 76,
+                        width: 260,
+                        height: 44,
+                        barcodeModuleWidth: 2,
+                        barcodeMargin: 0
+                    }
+                }
+            ],
+            { forceRebuild: true, preferredMedia: 'W24' }
+        )
+
+        assert.deepEqual(result.errors, [])
+        const codeRows = state.items.filter(
+            (item) => item.type === 'text' && String(item.text || '').includes('RW 60 592 002 4DE')
+        )
+        const barcode = state.items.find((item) => item.type === 'barcode')
+        const rectShapes = state.items.filter(
+            (item) => item.type === 'shape' && String(item.shapeType || '').toLowerCase() === 'rect'
+        )
+        const lineShapes = state.items.filter(
+            (item) => item.type === 'shape' && String(item.shapeType || '').toLowerCase() === 'line'
+        )
+        assert.ok(barcode)
+        assert.ok(codeRows.length >= 3)
+        assert.ok(rectShapes.length >= 1)
+        assert.ok(lineShapes.length >= 3)
+        assert.equal(codeRows.every((item) => !Boolean(item.textUnderline)), true)
+
+        const verticalDivider = lineShapes.find((item) => Math.abs((Math.abs(Number(item.rotation || 0)) % 180) - 90) <= 20)
+        const horizontalLines = lineShapes.filter(
+            (item) => Math.abs((Math.abs(Number(item.rotation || 0)) % 180) - 90) > 20
+        )
+        assert.ok(verticalDivider)
+        assert.ok(horizontalLines.length >= 2)
+
+        populateInteractiveMapCenteredRotated(state, previewRenderer._interactiveItemsById, previewRenderer.els.preview)
+        const frameBounds =
+            [...rectShapes]
+                .map((shape) => previewRenderer._interactiveItemsById.get(shape.id)?.bounds || null)
+                .filter(Boolean)
+                .sort(
+                    (left, right) =>
+                        Number(right.width || 0) * Number(right.height || 0) -
+                        Number(left.width || 0) * Number(left.height || 0)
+                )[0] || null
+        const barcodeBounds = previewRenderer._interactiveItemsById.get(barcode.id)?.bounds || null
+        const textBounds = codeRows
+            .map((item) => previewRenderer._interactiveItemsById.get(item.id)?.bounds || null)
+            .filter(Boolean)
+            .sort((left, right) => Number(left.y || 0) - Number(right.y || 0))
+        const horizontalBounds = horizontalLines
+            .map((item) => previewRenderer._interactiveItemsById.get(item.id)?.bounds || null)
+            .filter(Boolean)
+            .sort((left, right) => Number(left.y || 0) - Number(right.y || 0))
+        const dividerBounds = previewRenderer._interactiveItemsById.get(verticalDivider.id)?.bounds || null
+
+        assert.ok(frameBounds)
+        assert.ok(barcodeBounds)
+        assert.ok(textBounds.length >= 3)
+        assert.ok(horizontalBounds.length >= 2)
+        assert.ok(dividerBounds)
+
+        assert.ok(Number(textBounds[0].x || 0) >= Number(frameBounds.x || 0) - 1)
+        const frameRight = Number(frameBounds.x || 0) + Number(frameBounds.width || 0)
+        const barcodeCenterX = Number(barcodeBounds.x || 0) + Number(barcodeBounds.width || 0) / 2
+        assert.ok(barcodeCenterX >= Number(frameBounds.x || 0) - 2)
+        assert.ok(barcodeCenterX <= frameRight + 2)
+        assert.ok(Math.abs(Number(textBounds[0].y || 0) - Number(textBounds[1].y || 0)) <= 3)
+
+        const middleTextBounds = textBounds[textBounds.length - 1]
+        const middleTextCenterY = Number(middleTextBounds.y || 0) + Number(middleTextBounds.height || 0) / 2
+        const barcodeTop = Number(barcodeBounds.y || 0)
+        const barcodeCenterY = Number(barcodeBounds.y || 0) + Number(barcodeBounds.height || 0) / 2
+        const middleSeparatorY = Math.max(...horizontalBounds.map((bounds) => Number(bounds.y || 0)))
+        assert.ok(middleTextCenterY + 4 <= barcodeCenterY, 'middle text row should remain above barcode')
+        assert.ok(barcodeTop >= middleSeparatorY + 2, 'barcode should stay below the middle separator')
+
+        const topSeparatorY = Number(horizontalBounds[0].y || 0)
+        const dividerTop = Number(dividerBounds.y || 0)
+        const dividerBottom = dividerTop + Number(dividerBounds.height || 0)
+        assert.ok(dividerTop <= topSeparatorY + 2, 'vertical divider should start in top-row band')
+        assert.ok(dividerBottom >= topSeparatorY - 12, 'vertical divider should extend down toward the top separator')
     })
 
     it('stabilizes absolute barcode-photo rebuild layouts from sketch actions', async () => {

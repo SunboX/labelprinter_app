@@ -42,6 +42,7 @@
         "errorQuota": "AI API quota exceeded or credits are missing. Please check your API billing/limits.",
         "errorAuth": "AI API authentication failed. Please check your server API key configuration.",
         "errorModel": "The configured AI model is not available for this API project. Please check OPENAI_MODEL.",
+        "errorMissingToolOutput": "This assistant session got out of sync after an action call. Please send your last instruction again.",
         "errorServer": "The assistant service is temporarily unavailable. Please try again shortly.",
         "errorHttp": "Assistant request failed (HTTP {{status}}).",
         "errorWithDetails": "{{message}}",

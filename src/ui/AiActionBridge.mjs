@@ -1,6 +1,7 @@
 import { AiItemChangeUtils } from './AiItemChangeUtils.mjs'
 import { AiRebuildPostProcessUtils } from './AiRebuildPostProcessUtils.mjs'
 import { AiUniversalRebuildNormalizer } from './AiUniversalRebuildNormalizer.mjs'
+import { AiBoxedBarcodeFormFidelityUtils } from './AiBoxedBarcodeFormFidelityUtils.mjs'
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
 /** Allowlisted action runtime used by the in-app assistant. */
 export class AiActionBridge {
@@ -864,6 +865,20 @@ export class AiActionBridge {
             itemCountAfterNormalize: Array.isArray(this.state.items) ? this.state.items.length : 0
         })
         let didMutate = false
+        const boxedBarcodeResult = await AiBoxedBarcodeFormFidelityUtils.apply({
+            state: this.state,
+            previewRenderer: this.previewRenderer,
+            renderAfterMutation: () => this.#renderAfterMutationAsync()
+        })
+        this.#debugLog('postprocess:boxed-barcode-form', {
+            applied: Boolean(boxedBarcodeResult?.applied), didMutate: Boolean(boxedBarcodeResult?.didMutate), reason: String(boxedBarcodeResult?.reason || ''),
+            itemCountAfterGuard: Array.isArray(this.state.items) ? this.state.items.length : 0, rowTargets: boxedBarcodeResult?.diagnostics?.rowTargets || null,
+            shapeTargets: boxedBarcodeResult?.diagnostics?.shapeTargets || null, overlapChecks: boxedBarcodeResult?.diagnostics?.overlapChecks || null
+        })
+        if (boxedBarcodeResult?.didMutate) {
+            didMutate = true
+            await this.#renderAfterMutationAsync()
+        }
         if (appliedNormalization) {
             const clearedMediaLength = this.#clearMediaLengthOverride()
             if (clearedMediaLength) {

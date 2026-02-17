@@ -78,10 +78,38 @@
     backdrop-filter: blur(3px);
     display: flex;
     justify-content: flex-end;
+    align-items: stretch;
     padding: 14px;
+    overflow: hidden;
+}
+
+.assistant-overlay.assistant-overlay-cutout {
+    background: transparent;
+    backdrop-filter: none;
+}
+
+.assistant-overlay-scrim {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    display: none;
+}
+
+.assistant-overlay.assistant-overlay-cutout .assistant-overlay-scrim {
+    display: block;
+}
+
+.assistant-overlay-pane {
+    position: absolute;
+    background: rgba(7, 9, 13, 0.58);
+    backdrop-filter: blur(3px);
+    pointer-events: none;
 }
 
 .assistant-panel {
+    position: relative;
+    z-index: 1;
     width: min(560px, calc(100vw - 18px));
     height: calc(100vh - 28px);
     display: flex;

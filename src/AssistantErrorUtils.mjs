@@ -3,6 +3,36 @@
  */
 export class AssistantErrorUtils {
     /**
+     * Returns true when an upstream error indicates unresolved function-call output chaining.
+     * @param {object} input
+     * @param {number} input.status
+     * @param {unknown} input.payload
+     * @param {string} [input.fallbackText]
+     * @returns {boolean}
+     */
+    static isMissingToolOutputError({ status, payload, fallbackText = '' }) {
+        const normalizedStatus = Number(status || 0)
+        if (normalizedStatus !== 400) return false
+        const detail = `${AssistantErrorUtils.extractErrorMessage(payload)} ${String(fallbackText || '').trim()}`.toLowerCase()
+        return detail.includes('no tool output found for function call')
+    }
+
+    /**
+     * Returns true when a thrown error is tagged as a missing tool output chain mismatch.
+     * @param {unknown} error
+     * @returns {boolean}
+     */
+    static isMissingToolOutputErrorFromThrowable(error) {
+        if (!error || typeof error !== 'object') return false
+        const maybeError = /** @type {{ code?: unknown, message?: unknown }} */ (error)
+        if (String(maybeError.code || '').trim().toLowerCase() === 'assistant_missing_tool_output') {
+            return true
+        }
+        const message = String(maybeError.message || '').toLowerCase()
+        return message.includes('no tool output found for function call')
+    }
+
+    /**
      * Extracts a machine-friendly error code from heterogeneous payloads.
      * @param {unknown} payload
      * @returns {string}
@@ -67,6 +97,10 @@ export class AssistantErrorUtils {
         const code = AssistantErrorUtils.extractErrorCode(payload).toLowerCase()
         const payloadMessage = AssistantErrorUtils.extractErrorMessage(payload)
         const detail = payloadMessage || String(fallbackText || '').trim()
+
+        if (AssistantErrorUtils.isMissingToolOutputError({ status: normalizedStatus, payload, fallbackText })) {
+            return translateFn('assistant.errorMissingToolOutput')
+        }
 
         if (normalizedStatus === 429) {
             if (code === 'insufficient_quota') {
