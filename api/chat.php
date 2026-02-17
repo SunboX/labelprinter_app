@@ -4,6 +4,42 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 
 /**
+ * Stores one environment value in superglobals and process env when available.
+ *
+ * @param string $key
+ * @param string $value
+ */
+function setEnvValue(string $key, string $value): void
+{
+    if (function_exists('putenv') && is_callable('putenv')) {
+        @putenv($key . '=' . $value);
+    }
+    $_ENV[$key] = $value;
+    $_SERVER[$key] = $value;
+}
+
+/**
+ * Reads one environment value from process env, $_ENV, or $_SERVER.
+ *
+ * @param string $key
+ * @return string|null
+ */
+function getEnvValue(string $key): ?string
+{
+    $fromProcess = getenv($key);
+    if ($fromProcess !== false) {
+        return (string)$fromProcess;
+    }
+    if (array_key_exists($key, $_ENV)) {
+        return is_string($_ENV[$key]) ? $_ENV[$key] : (string)$_ENV[$key];
+    }
+    if (array_key_exists($key, $_SERVER)) {
+        return is_string($_SERVER[$key]) ? $_SERVER[$key] : (string)$_SERVER[$key];
+    }
+    return null;
+}
+
+/**
  * Loads key/value pairs from a dotenv-style file into process env.
  *
  * @param string $path
@@ -38,9 +74,7 @@ function loadEnvFile(string $path): void
         } elseif (str_starts_with($value, "'") && str_ends_with($value, "'")) {
             $value = substr($value, 1, -1);
         }
-        putenv($key . '=' . $value);
-        $_ENV[$key] = $value;
-        $_SERVER[$key] = $value;
+        setEnvValue($key, $value);
     }
 }
 
@@ -603,11 +637,12 @@ function buildDocsContext(string $query, array $snippets, int $maxSnippets, int 
 }
 
 $envCandidates = [];
-$explicitEnvPath = trim((string)(getenv('APP_ENV_FILE') ?: ''));
+$explicitEnvPath = trim((string)(getEnvValue('APP_ENV_FILE') ?? ''));
 if ($explicitEnvPath !== '') {
     $envCandidates[] = $explicitEnvPath;
 }
 $envCandidates[] = __DIR__ . '/../.env';
+$envCandidates[] = __DIR__ . '/.env';
 $envCandidates = array_values(array_unique($envCandidates));
 foreach ($envCandidates as $envPath) {
     loadEnvFile($envPath);
@@ -624,8 +659,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$debugLogsEnabled = parseBoolEnv(getenv('AI_DEBUG_LOGS') ?: null, false);
-$functionArgsPreviewChars = parsePositiveIntEnv(getenv('AI_DEBUG_FUNCTION_ARGS_PREVIEW_CHARS') ?: null, 1200, 120, 20000);
+$debugLogsEnabled = parseBoolEnv(getEnvValue('AI_DEBUG_LOGS'), false);
+$functionArgsPreviewChars = parsePositiveIntEnv(getEnvValue('AI_DEBUG_FUNCTION_ARGS_PREVIEW_CHARS'), 1200, 120, 20000);
 $requestId = buildAssistantRequestId();
 header('X-AI-Request-Id: ' . $requestId);
 $startedAt = microtime(true);
@@ -676,9 +711,9 @@ if ($bucketData['n'] > $maxReq) {
     exit;
 }
 
-$apiKey = trim((string)(getenv('OPENAI_API_KEY') ?: ''));
+$apiKey = trim((string)(getEnvValue('OPENAI_API_KEY') ?? ''));
 if ($apiKey === '') {
-    $apiKeyFile = trim((string)(getenv('OPENAI_API_KEY_FILE') ?: ''));
+    $apiKeyFile = trim((string)(getEnvValue('OPENAI_API_KEY_FILE') ?? ''));
     if ($apiKeyFile !== '' && is_file($apiKeyFile)) {
         $apiKey = trim((string)file_get_contents($apiKeyFile));
     }
@@ -701,12 +736,12 @@ logAssistantDebug($debugLogsEnabled, 'request-start', [
 $uiState = isset($body['ui_state']) && is_array($body['ui_state']) ? $body['ui_state'] : null;
 $uiCapabilities = isset($body['ui_capabilities']) && is_array($body['ui_capabilities']) ? $body['ui_capabilities'] : null;
 
-$docsEnabled = parseBoolEnv(getenv('AI_DOCS_ENABLED') ?: null, true);
-$docsDir = resolveDocsDir(getenv('AI_DOCS_DIR') ?: null);
-$docsFiles = parseDocFiles(getenv('AI_DOCS_FILES') ?: null);
-$maxDocSnippets = parsePositiveIntEnv(getenv('AI_DOCS_MAX_SNIPPETS') ?: null, 4, 1, 12);
-$maxDocSnippetChars = parsePositiveIntEnv(getenv('AI_DOCS_SNIPPET_CHARS') ?: null, 700, 180, 2000);
-$maxDocContextChars = parsePositiveIntEnv(getenv('AI_DOCS_MAX_CONTEXT_CHARS') ?: null, 3200, 500, 12000);
+$docsEnabled = parseBoolEnv(getEnvValue('AI_DOCS_ENABLED'), true);
+$docsDir = resolveDocsDir(getEnvValue('AI_DOCS_DIR'));
+$docsFiles = parseDocFiles(getEnvValue('AI_DOCS_FILES'));
+$maxDocSnippets = parsePositiveIntEnv(getEnvValue('AI_DOCS_MAX_SNIPPETS'), 4, 1, 12);
+$maxDocSnippetChars = parsePositiveIntEnv(getEnvValue('AI_DOCS_SNIPPET_CHARS'), 700, 180, 2000);
+$maxDocContextChars = parsePositiveIntEnv(getEnvValue('AI_DOCS_MAX_CONTEXT_CHARS'), 3200, 500, 12000);
 
 $docsContext = '';
 if ($docsEnabled) {
@@ -929,9 +964,9 @@ $tools = [[
     ]
 ]];
 
-$model = trim((string)(getenv('OPENAI_MODEL') ?: 'gpt-4.1-mini'));
-$maxOutputTokens = parsePositiveIntEnv(getenv('AI_MAX_OUTPUT_TOKENS') ?: null, 2200, 600, 8000);
-$reasoningEffort = parseReasoningEffortEnv(getenv('OPENAI_REASONING_EFFORT') ?: null, 'minimal');
+$model = trim((string)(getEnvValue('OPENAI_MODEL') ?? 'gpt-4.1-mini'));
+$maxOutputTokens = parsePositiveIntEnv(getEnvValue('AI_MAX_OUTPUT_TOKENS'), 2200, 600, 8000);
+$reasoningEffort = parseReasoningEffortEnv(getEnvValue('OPENAI_REASONING_EFFORT'), 'minimal');
 $payload = [
     'model' => $model,
     'instructions' => $instructions,

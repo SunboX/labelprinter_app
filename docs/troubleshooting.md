@@ -13,6 +13,8 @@ Checks:
 - On live hosting, verify the PHP endpoint exists at `POST /api/chat.php`.
 - Verify `.env` is available to the backend and contains `OPENAI_API_KEY`.
 - Verify OpenAI API key is configured server-side.
+- If live response body is `{"error":"Server not configured"}`, backend cannot read `OPENAI_API_KEY`.
+- If you deploy with FTP workflow, remember `.env` files are excluded and must be provisioned separately on host.
 - Check server logs for upstream errors and rate limiting (`429`).
 - Ensure endpoint returns JSON and allows `POST`.
 
