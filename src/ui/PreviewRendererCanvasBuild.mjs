@@ -1,5 +1,4 @@
 import { PreviewLayoutUtils } from '../PreviewLayoutUtils.mjs'
-import { RulerUtils } from '../RulerUtils.mjs'
 import { ParameterTemplateUtils } from '../ParameterTemplateUtils.mjs'
 import { ImageRasterUtils } from '../ImageRasterUtils.mjs'
 import { IconRasterUtils } from '../IconRasterUtils.mjs'
@@ -10,6 +9,8 @@ import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { Media, Resolution } from 'labelprinterkit-web/src/index.mjs'
 import { PreviewRendererCanvasSupport } from './PreviewRendererCanvasSupport.mjs'
 import { PreviewRendererBase } from './PreviewRendererBase.mjs'
+import { RulerCanvasUtils } from './RulerCanvasUtils.mjs'
+import { PreviewPositionModeUtils } from './PreviewPositionModeUtils.mjs'
 
 /**
  * Canvas construction and low-level rendering helpers for preview output.
@@ -199,7 +200,15 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             }
         }
 
-        const baseTotalLength = feedPadStart + blocks.reduce((sum, block) => sum + block.span, 0) + feedPadEnd
+        const baseTotalLength =
+            feedPadStart +
+            blocks.reduce((sum, block) => {
+                if (!PreviewPositionModeUtils.shouldAdvanceFlowCursor(block?.ref)) {
+                    return sum
+                }
+                return sum + Math.max(0, Number(block?.span || 0))
+            }, 0) +
+            feedPadEnd
         const contentAxisEnd = this._computeMaxFlowAxisEnd(blocks, isHorizontal, feedPadStart)
         const minLength = res.minLength
         const autoLengthDots = PreviewLayoutUtils.computeAutoLabelLengthDots(baseTotalLength, contentAxisEnd, feedPadEnd, minLength)
@@ -221,13 +230,18 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 ctx,
                 block,
                 flowCursor,
+                feedPadStart,
                 canvas,
                 isHorizontal,
                 textDotScale,
                 maxFontDots,
                 layoutItems
             })
-            flowCursor += block.span
+            flowCursor = PreviewPositionModeUtils.resolveNextFlowCursor({
+                item: block.ref,
+                flowCursor,
+                span: block.span
+            })
         }
 
         // Preview shows only the printable area; margins are hinted in render().
@@ -255,6 +269,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      *  ctx: CanvasRenderingContext2D,
      *  block: object,
      *  flowCursor: number,
+     *  feedPadStart: number,
      *  canvas: HTMLCanvasElement,
      *  isHorizontal: boolean,
      *  textDotScale: number,
@@ -262,16 +277,26 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      *  layoutItems: Array<object>
      * }} options
      */
-    _renderFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, textDotScale, maxFontDots, layoutItems }) {
+    _renderFlowBlock({ ctx, block, flowCursor, feedPadStart, canvas, isHorizontal, textDotScale, maxFontDots, layoutItems }) {
         const item = block?.ref
         if (!item) return
 
         if (item.type === 'text') {
-            this._renderTextFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, textDotScale, maxFontDots, layoutItems })
+            this._renderTextFlowBlock({
+                ctx,
+                block,
+                flowCursor,
+                feedPadStart,
+                canvas,
+                isHorizontal,
+                textDotScale,
+                maxFontDots,
+                layoutItems
+            })
             return
         }
         if (item.type === 'qr') {
-            this._renderQrFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, layoutItems })
+            this._renderQrFlowBlock({ ctx, block, flowCursor, feedPadStart, canvas, isHorizontal, layoutItems })
             return
         }
         if (item.type === 'barcode') {
@@ -279,6 +304,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 ctx,
                 block,
                 flowCursor,
+                feedPadStart,
                 canvas,
                 isHorizontal,
                 layoutItems,
@@ -293,6 +319,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 ctx,
                 block,
                 flowCursor,
+                feedPadStart,
                 canvas,
                 isHorizontal,
                 layoutItems,
@@ -307,6 +334,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 ctx,
                 block,
                 flowCursor,
+                feedPadStart,
                 canvas,
                 isHorizontal,
                 layoutItems,
@@ -317,7 +345,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             return
         }
         if (item.type === 'shape') {
-            this._renderShapeFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, layoutItems })
+            this._renderShapeFlowBlock({ ctx, block, flowCursor, feedPadStart, canvas, isHorizontal, layoutItems })
         }
     }
 
@@ -327,6 +355,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      *  ctx: CanvasRenderingContext2D,
      *  block: object,
      *  flowCursor: number,
+     *  feedPadStart: number,
      *  canvas: HTMLCanvasElement,
      *  isHorizontal: boolean,
      *  textDotScale: number,
@@ -334,7 +363,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      *  layoutItems: Array<object>
      * }} options
      */
-    _renderTextFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, textDotScale, maxFontDots, layoutItems }) {
+    _renderTextFlowBlock({ ctx, block, flowCursor, feedPadStart, canvas, isHorizontal, textDotScale, maxFontDots, layoutItems }) {
         const item = block.ref
         const resolvedSize =
             block.fontSizeDots || Math.min(Math.max(8, Math.round((item.fontSize || 16) * textDotScale)), maxFontDots)
@@ -348,7 +377,8 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         const verticalScale = Number.isFinite(block.textVerticalScale) ? block.textVerticalScale : 1
         const underlineMetrics = PreviewRendererCanvasSupport.computeUnderlineMetrics(resolvedSize, 1)
         const underlineOffset = Math.max(1, Number(block.textUnderlineOffset || underlineMetrics.offset)) * verticalScale
-        const underlineThickness = Math.max(1, Number(block.textUnderlineThickness || underlineMetrics.thickness)) * verticalScale
+        const underlineThicknessRaw = Number(block.textUnderlineThickness || underlineMetrics.thickness) * verticalScale
+        const underlineThickness = Math.max(1, underlineThicknessRaw)
         const strikethroughMetrics = PreviewRendererCanvasSupport.computeStrikethroughMetrics(resolvedSize, 1)
         const strikethroughOffset =
             Math.max(1, Number(block.textStrikethroughOffset || strikethroughMetrics.offset)) * verticalScale
@@ -359,16 +389,36 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         const scaledLineGap = Math.max(0, Number(block.textLineGap || 0) * verticalScale)
         const fallbackAscent = Math.max(1, Number(block.ascent || resolvedSize * verticalScale))
         const fallbackDescent = Math.max(0, Number(block.descent || 0))
-        const yAdjust = item.yOffset || 0
-        const drawX = this._resolveFlowDrawX(item, flowCursor, isHorizontal)
+        const yAdjust = Number(item.yOffset || 0)
+        const drawX = isHorizontal
+            ? PreviewPositionModeUtils.resolveFeedAxisStart({
+                  item,
+                  flowCursor,
+                  feedPadStart,
+                  isHorizontal: true,
+                  span: block.span,
+                  drawSpan: Math.max(1, Number(block.textInkWidth || block.textAdvanceWidth || 1)),
+                  feedOffset: Number(item.xOffset || 0)
+              })
+            : Number(item.xOffset || 0)
 
         // Preserve the previous single-line metrics/rendering path so existing text sizing snapshots stay stable.
         if (textLines.length === 1) {
             const singleLineUnderlineExtra = item.textUnderline ? underlineOffset + underlineThickness : 0
             const blockHeight = fallbackAscent + fallbackDescent + singleLineUnderlineExtra
-            const baselineY = isHorizontal
-                ? (canvas.height - blockHeight) / 2 + fallbackAscent + yAdjust
-                : flowCursor + (block.span - blockHeight) / 2 + fallbackAscent + yAdjust
+            const blockTop = isHorizontal
+                ? (canvas.height - blockHeight) / 2 + yAdjust
+                : PreviewPositionModeUtils.resolveFeedAxisStart({
+                      item,
+                      flowCursor,
+                      feedPadStart,
+                      isHorizontal: false,
+                      span: block.span,
+                      drawSpan: blockHeight,
+                      feedOffset: yAdjust,
+                      centerInFlowSpan: true
+                  })
+            const baselineY = blockTop + fallbackAscent
             const textMetrics = ctx.measureText(block.resolvedText || '')
             const inkLeft = Number.isFinite(textMetrics.actualBoundingBoxLeft) ? textMetrics.actualBoundingBoxLeft : 0
             const inkRight = Number.isFinite(textMetrics.actualBoundingBoxRight)
@@ -433,7 +483,16 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         const blockHeight = Math.max(1, Number(block.textTotalHeight || fallbackAscent + fallbackDescent))
         const blockTop = isHorizontal
             ? (canvas.height - blockHeight) / 2 + yAdjust
-            : flowCursor + (block.span - blockHeight) / 2 + yAdjust
+            : PreviewPositionModeUtils.resolveFeedAxisStart({
+                  item,
+                  flowCursor,
+                  feedPadStart,
+                  isHorizontal: false,
+                  span: block.span,
+                  drawSpan: blockHeight,
+                  feedOffset: yAdjust,
+                  centerInFlowSpan: true
+              })
         const textRenderBounds = {
             x: drawX,
             y: blockTop,
@@ -530,23 +589,38 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      *  ctx: CanvasRenderingContext2D,
      *  block: object,
      *  flowCursor: number,
+     *  feedPadStart: number,
      *  canvas: HTMLCanvasElement,
      *  isHorizontal: boolean,
      *  layoutItems: Array<object>
      * }} options
      */
-    _renderQrFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, layoutItems }) {
+    _renderQrFlowBlock({ ctx, block, flowCursor, feedPadStart, canvas, isHorizontal, layoutItems }) {
         const item = block.ref
         const drawSize = Math.max(1, block.qrSize || item.size || 1)
-        const drawX = this._resolveFlowDrawX(item, flowCursor, isHorizontal)
-        const drawY = this._resolveCenteredFlowDrawY({
-            flowCursor,
-            span: block.span,
-            drawHeight: drawSize,
-            canvasHeight: canvas.height,
-            yAdjust: item.yOffset || 0,
-            isHorizontal
-        })
+        const drawX = isHorizontal
+            ? PreviewPositionModeUtils.resolveFeedAxisStart({
+                  item,
+                  flowCursor,
+                  feedPadStart,
+                  isHorizontal: true,
+                  span: block.span,
+                  drawSpan: drawSize,
+                  feedOffset: Number(item.xOffset || 0)
+              })
+            : Number(item.xOffset || 0)
+        const drawY = isHorizontal
+            ? Math.max(0, (canvas.height - drawSize) / 2 + Number(item.yOffset || 0))
+            : PreviewPositionModeUtils.resolveFeedAxisStart({
+                  item,
+                  flowCursor,
+                  feedPadStart,
+                  isHorizontal: false,
+                  span: block.span,
+                  drawSpan: drawSize,
+                  feedOffset: Number(item.yOffset || 0),
+                  centerInFlowSpan: true
+              })
         const qrBounds = { x: drawX, y: drawY, width: drawSize, height: drawSize }
         RotationUtils.drawWithRotation(ctx, qrBounds, item.rotation, () => {
             ctx.drawImage(block.qrCanvas, drawX, drawY, drawSize, drawSize)
@@ -565,6 +639,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      *  ctx: CanvasRenderingContext2D,
      *  block: object,
      *  flowCursor: number,
+     *  feedPadStart: number,
      *  canvas: HTMLCanvasElement,
      *  isHorizontal: boolean,
      *  layoutItems: Array<object>,
@@ -573,19 +648,44 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      *  drawHeight: number
      * }} options
      */
-    _renderRasterFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, layoutItems, drawCanvas, drawWidth, drawHeight }) {
+    _renderRasterFlowBlock({
+        ctx,
+        block,
+        flowCursor,
+        feedPadStart,
+        canvas,
+        isHorizontal,
+        layoutItems,
+        drawCanvas,
+        drawWidth,
+        drawHeight
+    }) {
         const item = block.ref
         const safeWidth = Math.max(1, drawWidth)
         const safeHeight = Math.max(1, drawHeight)
-        const drawX = this._resolveFlowDrawX(item, flowCursor, isHorizontal)
-        const drawY = this._resolveCenteredFlowDrawY({
-            flowCursor,
-            span: block.span,
-            drawHeight: safeHeight,
-            canvasHeight: canvas.height,
-            yAdjust: item.yOffset || 0,
-            isHorizontal
-        })
+        const drawX = isHorizontal
+            ? PreviewPositionModeUtils.resolveFeedAxisStart({
+                  item,
+                  flowCursor,
+                  feedPadStart,
+                  isHorizontal: true,
+                  span: block.span,
+                  drawSpan: safeWidth,
+                  feedOffset: Number(item.xOffset || 0)
+              })
+            : Number(item.xOffset || 0)
+        const drawY = isHorizontal
+            ? Math.max(0, (canvas.height - safeHeight) / 2 + Number(item.yOffset || 0))
+            : PreviewPositionModeUtils.resolveFeedAxisStart({
+                  item,
+                  flowCursor,
+                  feedPadStart,
+                  isHorizontal: false,
+                  span: block.span,
+                  drawSpan: safeHeight,
+                  feedOffset: Number(item.yOffset || 0),
+                  centerInFlowSpan: true
+              })
         const bounds = { x: drawX, y: drawY, width: safeWidth, height: safeHeight }
         if (drawCanvas) {
             RotationUtils.drawWithRotation(ctx, bounds, item.rotation, () => {
@@ -606,26 +706,39 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      *  ctx: CanvasRenderingContext2D,
      *  block: object,
      *  flowCursor: number,
+     *  feedPadStart: number,
      *  canvas: HTMLCanvasElement,
      *  isHorizontal: boolean,
      *  layoutItems: Array<object>
      * }} options
      */
-    _renderShapeFlowBlock({ ctx, block, flowCursor, canvas, isHorizontal, layoutItems }) {
+    _renderShapeFlowBlock({ ctx, block, flowCursor, feedPadStart, canvas, isHorizontal, layoutItems }) {
         const item = block.ref
         const shapeWidth = Math.max(1, block.shapeWidth || item.width || 1)
         const shapeHeight = Math.max(1, block.shapeHeight || item.height || 1)
         const drawX = isHorizontal
-            ? this._resolveFlowDrawX(item, flowCursor, isHorizontal)
+            ? PreviewPositionModeUtils.resolveFeedAxisStart({
+                  item,
+                  flowCursor,
+                  feedPadStart,
+                  isHorizontal: true,
+                  span: block.span,
+                  drawSpan: shapeWidth,
+                  feedOffset: Number(item.xOffset || 0)
+              })
             : Math.max(0, (canvas.width - shapeWidth) / 2 + (item.xOffset || 0))
-        const drawY = this._resolveCenteredFlowDrawY({
-            flowCursor,
-            span: block.span,
-            drawHeight: shapeHeight,
-            canvasHeight: canvas.height,
-            yAdjust: item.yOffset || 0,
-            isHorizontal
-        })
+        const drawY = isHorizontal
+            ? Math.max(0, (canvas.height - shapeHeight) / 2 + Number(item.yOffset || 0))
+            : PreviewPositionModeUtils.resolveFeedAxisStart({
+                  item,
+                  flowCursor,
+                  feedPadStart,
+                  isHorizontal: false,
+                  span: block.span,
+                  drawSpan: shapeHeight,
+                  feedOffset: Number(item.yOffset || 0),
+                  centerInFlowSpan: true
+              })
         const shapeBounds = { x: drawX, y: drawY, width: shapeWidth, height: shapeHeight }
         RotationUtils.drawWithRotation(ctx, shapeBounds, item.rotation, () => {
             ShapeDrawUtils.drawShape(ctx, item, drawX, drawY, shapeWidth, shapeHeight)
@@ -637,36 +750,6 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             item,
             bounds: RotationUtils.computeRotatedBounds(interactionBounds, item.rotation)
         })
-    }
-
-    /**
-     * Resolves X position for flow items by orientation.
-     * @param {object} item
-     * @param {number} flowCursor
-     * @param {boolean} isHorizontal
-     * @returns {number}
-     */
-    _resolveFlowDrawX(item, flowCursor, isHorizontal) {
-        return isHorizontal ? (item.xOffset || 0) + flowCursor : item.xOffset || 0
-    }
-
-    /**
-     * Resolves centered Y position for flow items by orientation.
-     * @param {{
-     *  flowCursor: number,
-     *  span: number,
-     *  drawHeight: number,
-     *  canvasHeight: number,
-     *  yAdjust: number,
-     *  isHorizontal: boolean
-     * }} options
-     * @returns {number}
-     */
-    _resolveCenteredFlowDrawY({ flowCursor, span, drawHeight, canvasHeight, yAdjust, isHorizontal }) {
-        if (isHorizontal) {
-            return Math.max(0, (canvasHeight - drawHeight) / 2 + yAdjust)
-        }
-        return flowCursor + Math.max(0, (span - drawHeight) / 2 + yAdjust)
     }
 
     /**
@@ -725,105 +808,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      * @returns {number}
      */
     _computeMaxFlowAxisEnd(blocks, isHorizontal, feedPadStart) {
-        let cursor = Math.max(0, feedPadStart || 0)
-        let maxEnd = cursor
-        blocks.forEach((block) => {
-            const item = block.ref || {}
-            if (isHorizontal) {
-                let start = cursor
-                let size = Math.max(1, block.span || 1)
-                let crossSize = Math.max(
-                    1,
-                    block.shapeHeight || block.imageHeight || block.iconHeight || block.barcodeHeight || block.qrSize || 1
-                )
-                if (item.type === 'text') {
-                    const inkLeft = Math.max(0, block.textInkLeft || 0)
-                    const inkWidth = Math.max(1, block.textInkWidth || block.textAdvanceWidth || 1)
-                    const textHeight = Math.max(
-                        1,
-                        block.textTotalHeight || (block.ascent || block.fontSizeDots || 0) + (block.descent || 0)
-                    )
-                    start = cursor + (item.xOffset || 0) + inkLeft
-                    size = inkWidth
-                    crossSize = textHeight
-                } else if (item.type === 'shape') {
-                    start = cursor + (item.xOffset || 0)
-                    size = Math.max(1, block.shapeWidth || item.width || 1)
-                    crossSize = Math.max(1, block.shapeHeight || item.height || 1)
-                } else if (item.type === 'image') {
-                    start = cursor + (item.xOffset || 0)
-                    size = Math.max(1, block.imageWidth || item.width || 1)
-                    crossSize = Math.max(1, block.imageHeight || item.height || 1)
-                } else if (item.type === 'icon') {
-                    start = cursor + (item.xOffset || 0)
-                    size = Math.max(1, block.iconWidth || item.width || 1)
-                    crossSize = Math.max(1, block.iconHeight || item.height || 1)
-                } else if (item.type === 'barcode') {
-                    start = cursor + (item.xOffset || 0)
-                    size = Math.max(1, block.barcodeWidth || item.width || 1)
-                    crossSize = Math.max(1, block.barcodeHeight || item.height || 1)
-                } else if (item.type === 'qr') {
-                    start = cursor + (item.xOffset || 0)
-                    size = Math.max(1, block.qrSize || item.size || 1)
-                    crossSize = size
-                }
-                const rotatedBounds = RotationUtils.computeRotatedBounds(
-                    { x: start, y: 0, width: size, height: crossSize },
-                    item.rotation
-                )
-                maxEnd = Math.max(maxEnd, rotatedBounds.x + rotatedBounds.width)
-            } else {
-                let start = cursor
-                let size = Math.max(1, block.span || 1)
-                let crossSize = Math.max(
-                    1,
-                    block.shapeWidth || block.imageWidth || block.iconWidth || block.barcodeWidth || block.qrSize || 1
-                )
-                const yAdjust = item.yOffset || 0
-                if (item.type === 'text') {
-                    const textHeight = Math.max(
-                        1,
-                        block.textTotalHeight || (block.ascent || block.fontSizeDots || 0) + (block.descent || 0)
-                    )
-                    const textWidth = Math.max(1, block.textInkWidth || block.textAdvanceWidth || 1)
-                    start = cursor + (Math.max(0, (block.span || textHeight) - textHeight) / 2 + yAdjust)
-                    size = textHeight
-                    crossSize = textWidth
-                } else if (item.type === 'shape') {
-                    const shapeHeight = Math.max(1, block.shapeHeight || item.height || 1)
-                    start = cursor + Math.max(0, ((block.span || shapeHeight) - shapeHeight) / 2 + yAdjust)
-                    size = shapeHeight
-                    crossSize = Math.max(1, block.shapeWidth || item.width || 1)
-                } else if (item.type === 'image') {
-                    const imageHeight = Math.max(1, block.imageHeight || item.height || 1)
-                    start = cursor + Math.max(0, ((block.span || imageHeight) - imageHeight) / 2 + yAdjust)
-                    size = imageHeight
-                    crossSize = Math.max(1, block.imageWidth || item.width || 1)
-                } else if (item.type === 'icon') {
-                    const iconHeight = Math.max(1, block.iconHeight || item.height || 1)
-                    start = cursor + Math.max(0, ((block.span || iconHeight) - iconHeight) / 2 + yAdjust)
-                    size = iconHeight
-                    crossSize = Math.max(1, block.iconWidth || item.width || 1)
-                } else if (item.type === 'barcode') {
-                    const barcodeHeight = Math.max(1, block.barcodeHeight || item.height || 1)
-                    start = cursor + Math.max(0, ((block.span || barcodeHeight) - barcodeHeight) / 2 + yAdjust)
-                    size = barcodeHeight
-                    crossSize = Math.max(1, block.barcodeWidth || item.width || 1)
-                } else if (item.type === 'qr') {
-                    const qrSize = Math.max(1, block.qrSize || item.size || 1)
-                    start = cursor + Math.max(0, ((block.span || qrSize) - qrSize) / 2 + yAdjust)
-                    size = qrSize
-                    crossSize = qrSize
-                }
-                const rotatedBounds = RotationUtils.computeRotatedBounds(
-                    { x: 0, y: start, width: crossSize, height: size },
-                    item.rotation
-                )
-                maxEnd = Math.max(maxEnd, rotatedBounds.y + rotatedBounds.height)
-            }
-            cursor += Math.max(0, block.span || 0)
-        })
-        return maxEnd
+        return PreviewPositionModeUtils.computeMaxFlowAxisEnd(blocks, isHorizontal, feedPadStart)
     }
 
     /**
@@ -975,107 +960,17 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         highlightLengthMm = 0,
         viewportShiftPx = 0
     ) {
-        if (!canvas || !dpi || !lengthDots) return
-        const parent = canvas.parentElement
-        const cssWidth = Math.max(
-            1,
-            Math.round(parent?.clientWidth || canvas.clientWidth || canvas.getBoundingClientRect().width || 0)
-        )
-        const cssHeight = Math.max(
-            1,
-            Math.round(parent?.clientHeight || canvas.clientHeight || canvas.getBoundingClientRect().height || 0)
-        )
-        if (!cssWidth || !cssHeight) return
-        canvas.style.width = `${cssWidth}px`
-        canvas.style.height = `${cssHeight}px`
-        const dpr = window.devicePixelRatio || 1
-        canvas.width = Math.max(1, Math.round(cssWidth * dpr))
-        canvas.height = Math.max(1, Math.round(cssHeight * dpr))
-        const ctx = canvas.getContext('2d')
-        ctx.save()
-        ctx.scale(dpr, dpr)
-        ctx.clearRect(0, 0, cssWidth, cssHeight)
-        const rootStyles = getComputedStyle(document.documentElement)
-        const rulerBase = rootStyles.getPropertyValue('--ruler-base').trim() || '#23262f'
-        ctx.fillStyle = rulerBase
-        ctx.fillRect(0, 0, cssWidth, cssHeight)
-        ctx.strokeStyle = '#5b606a'
-        ctx.lineWidth = 1
-
-        const dotsPerMm = dpi / 25.4
-        const lengthMm = lengthDots / dotsPerMm
-        const axisLengthPx = orientation === 'x' ? cssWidth : cssHeight
-        const safeViewportShiftPx = Number.isFinite(viewportShiftPx) ? viewportShiftPx : 0
-        // Keep ruler zoom in sync with the tape even when the tape is wider than the visible viewport.
-        const scaleAxisPx = axisLengthPxOverride > 0 ? axisLengthPxOverride : axisLengthPx
-        const { pixelsPerMm, startPx } = RulerUtils.computeRulerScale(lengthMm, scaleAxisPx, offsetPx)
-        const { startPx: highlightStartPx, lengthPx: highlightLengthPx } = RulerUtils.computeRulerHighlight(
-            startPx,
-            pixelsPerMm,
+        RulerCanvasUtils.drawRulerAxis(
+            canvas,
+            lengthDots,
+            dpi,
+            orientation,
+            showUnitLabel,
+            offsetPx,
+            axisLengthPxOverride,
             highlightLengthMm,
-            axisLengthPx
+            viewportShiftPx
         )
-        if (highlightLengthPx > 0) {
-            const highlightColor = rootStyles.getPropertyValue('--ruler').trim() || '#2a2f3a'
-            ctx.fillStyle = highlightColor
-            if (orientation === 'x') {
-                ctx.fillRect(highlightStartPx - safeViewportShiftPx, 0, highlightLengthPx, cssHeight)
-            } else {
-                ctx.fillRect(0, highlightStartPx - safeViewportShiftPx, cssWidth, highlightLengthPx)
-            }
-        }
-
-        const horizontalLabelInset = 6
-        const verticalLabelInset = 6
-        const tickBleedPx = 1
-
-        for (let mm = 0; mm <= lengthMm; mm += 1) {
-            const pos = startPx + mm * pixelsPerMm - safeViewportShiftPx
-            if (!RulerUtils.isAxisPositionVisible(pos, axisLengthPx, tickBleedPx)) continue
-            const isMajor = mm % 10 === 0
-            const isMid = mm % 5 === 0
-            const size = isMajor ? 14 : isMid ? 9 : 6
-            ctx.beginPath()
-            if (orientation === 'x') {
-                ctx.moveTo(pos, 0)
-                ctx.lineTo(pos, size)
-            } else {
-                ctx.moveTo(0, pos)
-                ctx.lineTo(size, pos)
-            }
-            ctx.stroke()
-            if (isMajor) {
-                ctx.fillStyle = '#d7dbe4'
-                ctx.font = '10px Barlow, sans-serif'
-                if (orientation === 'x') {
-                    const labelText = `${mm}`
-                    const measuredLabelWidth = ctx.measureText(labelText).width
-                    const labelInset = Math.max(horizontalLabelInset, Math.ceil(measuredLabelWidth / 2 + 2))
-                    const labelX = RulerUtils.computeRulerLabelPosition(pos, startPx, axisLengthPx, labelInset)
-                    ctx.textAlign = 'center'
-                    ctx.textBaseline = 'alphabetic'
-                    ctx.fillText(labelText, labelX, cssHeight - 6)
-                } else {
-                    const labelPos = RulerUtils.computeRulerLabelPosition(pos, startPx, axisLengthPx, verticalLabelInset)
-                    ctx.save()
-                    ctx.translate(cssWidth - 9, labelPos)
-                    ctx.rotate(-Math.PI / 2)
-                    ctx.textAlign = 'center'
-                    ctx.textBaseline = 'middle'
-                    ctx.fillText(`${mm}`, 0, 0)
-                    ctx.restore()
-                }
-            }
-        }
-
-        if (showUnitLabel) {
-            ctx.fillStyle = '#d7dbe4'
-            ctx.font = '10px Barlow, sans-serif'
-            ctx.textAlign = 'left'
-            ctx.textBaseline = 'alphabetic'
-            ctx.fillText('mm', 4, 12)
-        }
-        ctx.restore()
     }
 
     /**

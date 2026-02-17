@@ -8,7 +8,12 @@ describe('assistant rendered-label context', () => {
         assert.match(source, /#getRenderedLabelAttachment = async \(\) => null/)
         assert.match(source, /set getRenderedLabelAttachment\(callback\)/)
         assert.match(source, /async #resolveRenderedLabelAttachment\(\)/)
-        assert.match(source, /outgoingAttachments\.unshift\(renderedLabelAttachment\)/)
+        assert.match(source, /const skipRenderedLabelForRebuild = actionContext\.forceRebuild && userAttachmentCount > 0/)
+        assert.match(
+            source,
+            /if \(!skipRenderedLabelForRebuild\) \{\s*const renderedLabelAttachment = await this\.\#resolveRenderedLabelAttachment\(\)\s*if \(renderedLabelAttachment\) \{\s*outgoingAttachments\.unshift\(renderedLabelAttachment\)/s
+        )
+        assert.match(source, /skippedRenderedLabelForRebuild:\s*skipRenderedLabelForRebuild/)
         assert.match(source, /#setBusyState\(true\)/)
         assert.match(source, /#setBusyState\(false\)/)
         assert.match(source, /AiResponseUtils\.extractIncompleteReason\(response\)/)
