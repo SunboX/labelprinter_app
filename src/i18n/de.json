@@ -42,6 +42,7 @@
         "errorQuota": "Das KI-API-Kontingent ist aufgebraucht oder es fehlen Credits. Bitte Billing/Limits prüfen.",
         "errorAuth": "Die KI-API-Authentifizierung ist fehlgeschlagen. Bitte API-Key-Konfiguration am Server prüfen.",
         "errorModel": "Das konfigurierte KI-Modell ist für dieses API-Projekt nicht verfügbar. Bitte OPENAI_MODEL prüfen.",
+        "errorMissingToolOutput": "Diese Assistent-Sitzung ist nach einem Aktionsaufruf aus dem Takt geraten. Bitte sende deine letzte Anweisung erneut.",
         "errorServer": "Der Assistent-Dienst ist vorübergehend nicht verfügbar. Bitte gleich erneut versuchen.",
         "errorHttp": "Assistent-Anfrage fehlgeschlagen (HTTP {{status}}).",
         "errorWithDetails": "{{message}}",

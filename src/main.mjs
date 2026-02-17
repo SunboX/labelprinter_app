@@ -960,7 +960,9 @@ async function startApp() {
             working: els.aiWorking,
             attachSketch: els.aiAttachSketch,
             imageInput: els.aiImageInput,
-            attachments: els.aiAttachments
+            attachments: els.aiAttachments,
+            preview: els.preview,
+            canvasWrap: els.canvasWrap
         },
         setStatus,
         translate

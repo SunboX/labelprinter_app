@@ -69,6 +69,19 @@ describe('assistant-error-utils', () => {
         assert.equal(message, 'Invalid request payload')
     })
 
+    it('maps missing tool output chaining errors to a dedicated recovery message', () => {
+        const message = AssistantErrorUtils.buildRequestErrorMessage({
+            status: 400,
+            payload: {
+                error: {
+                    message: 'No tool output found for function call call_abc123.'
+                }
+            },
+            translate: createTranslate()
+        })
+        assert.equal(message, 'assistant.errorMissingToolOutput')
+    })
+
     it('falls back to generic HTTP status when no details are available', () => {
         const message = AssistantErrorUtils.buildRequestErrorMessage({
             status: 418,

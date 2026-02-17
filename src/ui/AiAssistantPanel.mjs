@@ -20,6 +20,11 @@ export class AiAssistantPanel {
     #bound = false
     #endpoint = ''
     #debugEnabled = false
+    #overlayBackdropElements = null
+    #overlayBackdropSyncFrame = null
+    #overlayResizeObserver = null
+    #handleOverlayViewportChange = () => this.#scheduleOverlayBackdropSync()
+    #handleOverlayCanvasWrapScroll = () => this.#scheduleOverlayBackdropSync()
 
     /**
      * @param {object} els
@@ -33,6 +38,8 @@ export class AiAssistantPanel {
      * @param {HTMLButtonElement | null} els.attachSketch
      * @param {HTMLInputElement | null} els.imageInput
      * @param {HTMLDivElement | null} els.attachments
+     * @param {HTMLCanvasElement | null} [els.preview]
+     * @param {HTMLDivElement | null} [els.canvasWrap]
      * @param {(text: string, type?: 'info' | 'success' | 'error') => void} setStatus
      * @param {(key: string, params?: Record<string, string | number>) => string} translate
      */
@@ -117,6 +124,11 @@ export class AiAssistantPanel {
         }
         if (shouldOpen && this.els.input) {
             this.els.input.focus()
+        }
+        if (shouldOpen) {
+            this.#scheduleOverlayBackdropSync()
+        } else {
+            this.#cancelOverlayBackdropSync()
         }
     }
 
@@ -211,6 +223,148 @@ export class AiAssistantPanel {
                 this.toggle(false)
             }
         })
+        this.#bindOverlayBackdropTracking()
+    }
+
+    /**
+     * Binds viewport and preview listeners used for assistant overlay cutout sync.
+     */
+    #bindOverlayBackdropTracking() {
+        const overlay = this.els.overlay
+        if (!overlay) return
+        const backdrop = this.#ensureOverlayBackdropPanes()
+        if (!backdrop) return
+        window.addEventListener('resize', this.#handleOverlayViewportChange, { passive: true })
+        window.addEventListener('scroll', this.#handleOverlayViewportChange, { capture: true, passive: true })
+        if (this.els.canvasWrap) {
+            this.els.canvasWrap.addEventListener('scroll', this.#handleOverlayCanvasWrapScroll, { passive: true })
+        }
+        if (typeof ResizeObserver === 'function' && this.els.preview) {
+            this.#overlayResizeObserver = new ResizeObserver(() => {
+                this.#scheduleOverlayBackdropSync()
+            })
+            this.#overlayResizeObserver.observe(this.els.preview)
+        }
+    }
+
+    /**
+     * Ensures assistant overlay blur panes exist.
+     * @returns {{ scrim: HTMLDivElement, top: HTMLDivElement, left: HTMLDivElement, right: HTMLDivElement, bottom: HTMLDivElement } | null}
+     */
+    #ensureOverlayBackdropPanes() {
+        const overlay = this.els.overlay
+        if (!overlay) return null
+        if (this.#overlayBackdropElements) return this.#overlayBackdropElements
+        const scrim = document.createElement('div')
+        scrim.className = 'assistant-overlay-scrim'
+        const top = document.createElement('div')
+        top.className = 'assistant-overlay-pane assistant-overlay-pane-top'
+        const left = document.createElement('div')
+        left.className = 'assistant-overlay-pane assistant-overlay-pane-left'
+        const right = document.createElement('div')
+        right.className = 'assistant-overlay-pane assistant-overlay-pane-right'
+        const bottom = document.createElement('div')
+        bottom.className = 'assistant-overlay-pane assistant-overlay-pane-bottom'
+        scrim.append(top, left, right, bottom)
+        overlay.prepend(scrim)
+        overlay.classList.add('assistant-overlay-cutout')
+        this.#overlayBackdropElements = { scrim, top, left, right, bottom }
+        return this.#overlayBackdropElements
+    }
+
+    /**
+     * Resolves viewport dimensions used for cutout geometry.
+     * @returns {{ width: number, height: number } | null}
+     */
+    #resolveViewportBounds() {
+        const width = Math.max(0, Number(window.innerWidth || document.documentElement?.clientWidth || 0))
+        const height = Math.max(0, Number(window.innerHeight || document.documentElement?.clientHeight || 0))
+        if (!width || !height) return null
+        return { width, height }
+    }
+
+    /**
+     * Resolves a viewport-clamped cutout rectangle for the preview canvas.
+     * @param {{ width: number, height: number }} viewport
+     * @returns {{ left: number, top: number, right: number, bottom: number } | null}
+     */
+    #resolvePreviewHoleRect(viewport) {
+        const preview = this.els.preview
+        if (!preview || typeof preview.getBoundingClientRect !== 'function') return null
+        const rect = preview.getBoundingClientRect()
+        const leftRaw = Math.max(0, Math.min(viewport.width, Number(rect.left) || 0))
+        const topRaw = Math.max(0, Math.min(viewport.height, Number(rect.top) || 0))
+        const rightRaw = Math.max(leftRaw, Math.min(viewport.width, Number(rect.right) || 0))
+        const bottomRaw = Math.max(topRaw, Math.min(viewport.height, Number(rect.bottom) || 0))
+        if (rightRaw - leftRaw < 1 || bottomRaw - topRaw < 1) return null
+        const left = Math.floor(leftRaw)
+        const top = Math.floor(topRaw)
+        const right = Math.ceil(rightRaw)
+        const bottom = Math.ceil(bottomRaw)
+        return { left, top, right, bottom }
+    }
+
+    /**
+     * Schedules one animation-frame sync for the assistant overlay cutout panes.
+     */
+    #scheduleOverlayBackdropSync() {
+        if (this.#overlayBackdropSyncFrame) return
+        this.#overlayBackdropSyncFrame = window.requestAnimationFrame(() => {
+            this.#overlayBackdropSyncFrame = null
+            this.#syncOverlayBackdropPanes()
+        })
+    }
+
+    /**
+     * Cancels a queued animation-frame sync for the assistant overlay cutout panes.
+     */
+    #cancelOverlayBackdropSync() {
+        if (!this.#overlayBackdropSyncFrame) return
+        window.cancelAnimationFrame(this.#overlayBackdropSyncFrame)
+        this.#overlayBackdropSyncFrame = null
+    }
+
+    /**
+     * Updates blur pane geometry so the preview canvas remains unblurred.
+     */
+    #syncOverlayBackdropPanes() {
+        const overlay = this.els.overlay
+        if (!overlay || overlay.hidden) return
+        const backdrop = this.#ensureOverlayBackdropPanes()
+        if (!backdrop) return
+        const viewport = this.#resolveViewportBounds()
+        if (!viewport) return
+        const holeRect = this.#resolvePreviewHoleRect(viewport)
+        if (!holeRect) {
+            this.#setBackdropPaneRect(backdrop.top, 0, 0, viewport.width, viewport.height)
+            this.#setBackdropPaneRect(backdrop.left, 0, 0, 0, 0)
+            this.#setBackdropPaneRect(backdrop.right, 0, 0, 0, 0)
+            this.#setBackdropPaneRect(backdrop.bottom, 0, 0, 0, 0)
+            return
+        }
+        const middleHeight = Math.max(0, holeRect.bottom - holeRect.top)
+        this.#setBackdropPaneRect(backdrop.top, 0, 0, viewport.width, holeRect.top)
+        this.#setBackdropPaneRect(backdrop.left, 0, holeRect.top, holeRect.left, middleHeight)
+        this.#setBackdropPaneRect(backdrop.right, holeRect.right, holeRect.top, viewport.width - holeRect.right, middleHeight)
+        this.#setBackdropPaneRect(backdrop.bottom, 0, holeRect.bottom, viewport.width, viewport.height - holeRect.bottom)
+    }
+
+    /**
+     * Applies one absolute rectangle to a blur pane.
+     * @param {HTMLDivElement} pane
+     * @param {number} left
+     * @param {number} top
+     * @param {number} width
+     * @param {number} height
+     */
+    #setBackdropPaneRect(pane, left, top, width, height) {
+        const safeWidth = Math.max(0, Math.round(Number(width) || 0))
+        const safeHeight = Math.max(0, Math.round(Number(height) || 0))
+        pane.style.display = safeWidth > 0 && safeHeight > 0 ? 'block' : 'none'
+        pane.style.left = `${Math.round(Number(left) || 0)}px`
+        pane.style.top = `${Math.round(Number(top) || 0)}px`
+        pane.style.width = `${safeWidth}px`
+        pane.style.height = `${safeHeight}px`
     }
 
     /**
@@ -318,16 +472,31 @@ export class AiAssistantPanel {
         this.#attachments = []
         this.#renderAttachments()
         try {
-            const response = await this.#requestAssistant(rawText, outgoingAttachments, {
-                startFresh: actionContext.forceRebuild
-            })
+            let response
+            try {
+                response = await this.#requestAssistant(rawText, outgoingAttachments, {
+                    startFresh: actionContext.forceRebuild
+                })
+            } catch (error) {
+                if (!AssistantErrorUtils.isMissingToolOutputErrorFromThrowable(error)) {
+                    throw error
+                }
+                // Recover from stale thread chaining by retrying without previous_response_id.
+                this.#debugLog('request-retry-start-fresh', {
+                    reason: 'missing-tool-output',
+                    previousResponseId: String(this.#previousResponseId || '')
+                })
+                this.#previousResponseId = null
+                response = await this.#requestAssistant(rawText, outgoingAttachments, { startFresh: true })
+            }
             const assistantText = AiResponseUtils.extractOutputText(response)
             const extractedActions = AiResponseUtils.extractActions(response)
+            const functionCallCount = AiResponseUtils.countFunctionCalls(response)
             this.#debugLog('response-received', {
                 requestId: String(response?._requestId || ''),
                 status: String(response?.status || ''),
                 incompleteReason: AiResponseUtils.extractIncompleteReason(response),
-                functionCallCount: AiResponseUtils.countFunctionCalls(response),
+                functionCallCount,
                 outputTextLength: assistantText.length,
                 extractedActionCount: extractedActions.length
             })
@@ -404,7 +573,6 @@ export class AiAssistantPanel {
                 this.#pendingRebuildContext = null
             }
             if (!assistantText && !actions.length) {
-                const functionCallCount = AiResponseUtils.countFunctionCalls(response)
                 if (functionCallCount > 0) {
                     this.#appendMessage('assistant', this.translate('assistant.unhandledFunctionCall'))
                     return
@@ -416,7 +584,12 @@ export class AiAssistantPanel {
                     this.#appendMessage('assistant', this.translate('assistant.emptyReply'))
                 }
             }
-            this.#previousResponseId = typeof response?.id === 'string' ? response.id : this.#previousResponseId
+            if (functionCallCount > 0) {
+                // Function-call responses require explicit tool outputs before they can be chained.
+                this.#previousResponseId = null
+            } else if (typeof response?.id === 'string' && response.id.trim()) {
+                this.#previousResponseId = response.id
+            }
         } catch (error) {
             const message = AssistantErrorUtils.buildRuntimeErrorMessage(error, this.translate)
             this.#debugLog('request-error', {
@@ -566,19 +739,29 @@ export class AiAssistantPanel {
         const requestId = String(response.headers.get('X-AI-Request-Id') || '')
         if (!response.ok) {
             const parsedError = await this.#parseErrorResponse(response)
+            const status = Number(response.status || 0)
             this.#debugLog('request-http-error', {
                 requestId,
-                status: Number(response.status || 0),
+                status,
                 parsedErrorPayload: parsedError.payload,
                 parsedErrorText: parsedError.text
             })
+            const missingToolOutput = AssistantErrorUtils.isMissingToolOutputError({
+                status,
+                payload: parsedError.payload,
+                fallbackText: parsedError.text
+            })
             const detail = AssistantErrorUtils.buildRequestErrorMessage({
-                status: Number(response.status || 0),
+                status,
                 payload: parsedError.payload,
                 fallbackText: parsedError.text,
                 translate: this.translate
             })
-            throw new Error(detail || this.translate('assistant.errorHttp', { status: response.status || '?' }))
+            const requestError = new Error(detail || this.translate('assistant.errorHttp', { status: response.status || '?' }))
+            if (missingToolOutput) {
+                requestError.code = 'assistant_missing_tool_output'
+            }
+            throw requestError
         }
         const parsedResponse = await response.json()
         if (parsedResponse && typeof parsedResponse === 'object') {
