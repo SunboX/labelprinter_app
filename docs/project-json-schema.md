@@ -11,6 +11,7 @@ Project root must be a JSON object with at least an `items` array.
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `appVersion` | `string` | no | App version from `package.json` used when payload was saved/shared |
+| `meta` | `object` | no | Serialization metadata (for example editor identity) |
 | `media` | `string` | no | Tape/media id (for example `W9`, `W24`) |
 | `mediaLengthMm` | `number \| null` | no | `null` = auto length |
 | `zoom` | `number` | no | Clamped by app zoom limits |
@@ -25,6 +26,19 @@ Project root must be a JSON object with at least an `items` array.
 | `parameterDataRaw` | `string` | no | Raw JSON text when present |
 | `customFontLinks` | `array` | no | Google Fonts CSS URLs |
 | `items` | `array` | yes | Label objects (see union below) |
+
+## `meta` Object
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `editor` | `object` | no | Editor source metadata |
+
+### `meta.editor` Object
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `name` | `string` | no | Editor/app name (for example `labelprinter-app`) |
+| `url` | `string` | no | Editor URL used for save/share origin |
 
 ## `ble` Object
 
