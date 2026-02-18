@@ -11,16 +11,32 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 $packagePath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'package.json';
-$version = '';
-
-if (is_file($packagePath) && is_readable($packagePath)) {
-    $packageJson = file_get_contents($packagePath);
-    if (is_string($packageJson) && $packageJson !== '') {
-        $decoded = json_decode($packageJson, true);
-        if (is_array($decoded) && array_key_exists('version', $decoded)) {
-            $version = trim((string)$decoded['version']);
-        }
-    }
+$fallbackVersionPath = __DIR__ . DIRECTORY_SEPARATOR . 'app-version.json';
+$version = readVersionFromJsonFile($packagePath);
+if ($version === '') {
+    $version = readVersionFromJsonFile($fallbackVersionPath);
 }
 
 echo json_encode(['version' => $version], JSON_UNESCAPED_SLASHES);
+
+/**
+ * Reads and normalizes a version string from a JSON file that contains a "version" key.
+ *
+ * @param string $path
+ * @return string
+ */
+function readVersionFromJsonFile(string $path): string
+{
+    if (!is_file($path) || !is_readable($path)) {
+        return '';
+    }
+    $raw = file_get_contents($path);
+    if (!is_string($raw) || $raw === '') {
+        return '';
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded) || !array_key_exists('version', $decoded)) {
+        return '';
+    }
+    return trim((string)$decoded['version']);
+}
