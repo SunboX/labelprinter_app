@@ -112,15 +112,41 @@ function createPreviewRenderer() {
 }
 
 /**
+ * Creates printer-compatible WebUSB configuration descriptors.
+ * @returns {Array<object>}
+ */
+function createPrinterUsbConfigurations() {
+    return [
+        {
+            interfaces: [
+                {
+                    interfaceNumber: 0,
+                    alternates: [
+                        {
+                            interfaceClass: 7,
+                            endpoints: [
+                                { direction: 'out', endpointNumber: 2 },
+                                { direction: 'in', endpointNumber: 1 }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
+
+/**
  * Creates a fake USB device object.
- * @param {{ vendorId?: number, productId?: number, serialNumber?: string | null }} [overrides={}]
- * @returns {{ vendorId: number, productId: number, serialNumber: string | null }}
+ * @param {{ vendorId?: number, productId?: number, serialNumber?: string | null, configurations?: Array<object> }} [overrides={}]
+ * @returns {{ vendorId: number, productId: number, serialNumber: string | null, configurations: Array<object> }}
  */
 function createUsbDevice(overrides = {}) {
     return {
         vendorId: 0x1234,
         productId: 0x5678,
         serialNumber: 'SERIAL-1',
+        configurations: createPrinterUsbConfigurations(),
         ...overrides
     }
 }
@@ -335,6 +361,69 @@ describe('print-controller usb reconnect', () => {
         assert.equal(chooserCalls, 0)
         assert.equal(RecordingPrinter.backend?.device, grantedDevice)
         assert.equal(storage.getItem(WEBUSB_DEVICE_STORAGE_KEY), serializeUsbIdentity(grantedDevice))
+    })
+
+    it('uses chooser when the only granted device is not printer-compatible', async () => {
+        const incompatibleDevice = createUsbDevice({
+            serialNumber: 'GRANTED-INCOMPATIBLE',
+            configurations: [
+                {
+                    interfaces: [
+                        {
+                            interfaceNumber: 0,
+                            alternates: [
+                                {
+                                    interfaceClass: 3,
+                                    endpoints: [{ direction: 'in', endpointNumber: 1 }]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        })
+        const storage = createMemoryStorage()
+        installLocalStorage(storage)
+        installNavigatorUsb(async () => [incompatibleDevice])
+
+        const openedDevices = []
+        WebUSBBackend.prototype.open = async function openStub() {
+            openedDevices.push(this.device)
+        }
+
+        let chooserCalls = 0
+        const chooserDevice = createUsbDevice({ serialNumber: 'CHOOSER-INCOMPATIBLE' })
+        WebUSBBackend.requestDevice = async () => {
+            chooserCalls += 1
+            return { device: chooserDevice }
+        }
+
+        const { controller } = createControllerHarness()
+        await controller.print([{}])
+
+        assert.equal(chooserCalls, 1)
+        assert.equal(openedDevices.length, 0)
+        assert.equal(RecordingPrinter.backend?.device, chooserDevice)
+    })
+
+    it('normalizes chooser backend endpoint numbers for WebUSB transfer APIs', async () => {
+        const storage = createMemoryStorage()
+        installLocalStorage(storage)
+        installNavigatorUsb(async () => [])
+
+        const chooserDevice = createUsbDevice({ serialNumber: 'CHOOSER-ENDPOINTS' })
+        WebUSBBackend.requestDevice = async () => ({
+            device: chooserDevice,
+            interfaceNumber: 0,
+            outEndpoint: 0x02,
+            inEndpoint: 0x81
+        })
+
+        const { controller } = createControllerHarness()
+        await controller.print([{}])
+
+        assert.equal(RecordingPrinter.backend?.outEndpoint, 2)
+        assert.equal(RecordingPrinter.backend?.inEndpoint, 1)
     })
 
     it('persists identity after chooser connection and subsequent granted reconnect', async () => {
