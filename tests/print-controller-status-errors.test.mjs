@@ -36,11 +36,12 @@ function installNavigatorUsb(getDevices) {
 
 /**
  * Creates a minimal canvas-like object compatible with labelprinterkit Label rendering.
+ * @param {object} [media=Media.W9]
  * @returns {{ width: number, height: number, getContext: Function }}
  */
-function createFakeRenderCanvas() {
+function createFakeRenderCanvas(media = Media.W9) {
     const width = Resolution.LOW.minLength
-    const height = Media.W9.printArea
+    const height = Math.max(1, Number(media?.printArea) || Media.W9.printArea)
     const data = new Uint8ClampedArray(width * height * 4)
     data.fill(255)
     return {
@@ -58,14 +59,16 @@ function createFakeRenderCanvas() {
 
 /**
  * Creates a preview renderer stub that returns deterministic media and canvas output.
+ * @param {{ media?: object }} [options={}]
  * @returns {{ buildCanvasFromState: () => Promise<{ media: object, res: object, printCanvas: { render: Function } }> }}
  */
-function createPreviewRenderer() {
-    const canvas = createFakeRenderCanvas()
+function createPreviewRenderer(options = {}) {
+    const media = options.media || Media.W9
+    const canvas = createFakeRenderCanvas(media)
     return {
         async buildCanvasFromState() {
             return {
-                media: Media.W9,
+                media,
                 res: Resolution.LOW,
                 printCanvas: {
                     render() {
@@ -138,13 +141,16 @@ class FakeStatusBackend {
 
 /**
  * Creates a PrintController test harness.
+ * @param {{ mediaId?: string, renderMedia?: object }} [options={}]
  * @returns {{ controller: PrintController, els: { print: { disabled: boolean } }, statusUpdates: Array<{ text: string, type: string }> }}
  */
-function createControllerHarness() {
+function createControllerHarness(options = {}) {
+    const mediaId = typeof options.mediaId === 'string' && options.mediaId ? options.mediaId : 'W9'
+    const renderMedia = options.renderMedia || Media[mediaId] || Media.W9
     const els = { print: { disabled: false } }
     const statusUpdates = []
     const state = {
-        media: 'W9',
+        media: mediaId,
         backend: 'usb',
         printer: 'P700',
         ble: {
@@ -158,7 +164,7 @@ function createControllerHarness() {
         els,
         state,
         { P700 },
-        createPreviewRenderer(),
+        createPreviewRenderer({ media: renderMedia }),
         (text, type = 'info') => statusUpdates.push({ text, type }),
         (key) => key
     )
@@ -231,5 +237,32 @@ describe('print-controller printer status errors', () => {
             'Loaded media mismatch: printer has 24mm tape, but this job expects 9mm tape. Load 9mm tape and retry.'
         )
         assert.equal(statusUpdates.at(-1)?.type, 'error')
+    })
+
+    it('treats cloned render media as the same canonical media to avoid false mismatch errors', async () => {
+        installNavigatorUsb(async () => [])
+        const backend = new FakeStatusBackend([
+            createStatus({
+                mediaWidth: Media.W24.width,
+                mediaType: Media.W24.mediaType
+            }),
+            createStatus({
+                mediaWidth: Media.W24.width,
+                mediaType: Media.W24.mediaType
+            })
+        ])
+        WebUSBBackend.requestDevice = async () => backend
+
+        const clonedW24Media = { ...Media.W24 }
+        const { controller, els, statusUpdates } = createControllerHarness({
+            mediaId: 'W24',
+            renderMedia: clonedW24Media
+        })
+        await controller.print([{}])
+
+        assert.equal(backend.statusCalls, 2)
+        assert.equal(els.print.disabled, false)
+        assert.equal(statusUpdates.at(-1)?.text, 'print.sentSingle')
+        assert.equal(statusUpdates.at(-1)?.type, 'success')
     })
 })

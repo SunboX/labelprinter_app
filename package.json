@@ -1,6 +1,6 @@
 {
     "name": "labelprinter-app",
-    "version": "1.1.5",
+    "version": "1.1.6",
     "description": "Browser label printer application built on top of labelprinterkit",
     "type": "module",
     "scripts": {
