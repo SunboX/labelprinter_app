@@ -1,6 +1,7 @@
 import { AiResponseUtils } from '../AiResponseUtils.mjs'
 import { AssistantErrorUtils } from '../AssistantErrorUtils.mjs'
 import { AssistantToolChoiceUtils } from '../AssistantToolChoiceUtils.mjs'
+import { AppApiEndpointUtils } from '../AppApiEndpointUtils.mjs'
 import { MediaIntentUtils } from '../MediaIntentUtils.mjs'
 
 /**
@@ -138,7 +139,7 @@ export class AiAssistantPanel {
      * @returns {string}
      */
     #resolveEndpoint() {
-        return this.#isLocalHost() ? '/api/chat' : '/api/chat.php'
+        return AppApiEndpointUtils.resolveAssistantEndpoint()
     }
 
     /**
@@ -162,9 +163,9 @@ export class AiAssistantPanel {
             const storageFlag = parseFlag(window.localStorage.getItem('AI_DEBUG_LOGS'))
             if (typeof storageFlag === 'boolean') return storageFlag
         } catch (_error) {
-            return this.#isLocalHost()
+            return AppApiEndpointUtils.isLocalHost()
         }
-        return this.#isLocalHost()
+        return AppApiEndpointUtils.isLocalHost()
     }
 
     /**
@@ -175,15 +176,6 @@ export class AiAssistantPanel {
     #debugLog(event, context = {}) {
         if (!this.#debugEnabled) return
         console.info(`[assistant-debug-ui] ${event}`, context)
-    }
-
-    /**
-     * Returns true when running on localhost.
-     * @returns {boolean}
-     */
-    #isLocalHost() {
-        const host = String(window.location.hostname || '').toLowerCase()
-        return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.localhost')
     }
 
     /**
