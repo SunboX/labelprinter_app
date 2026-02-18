@@ -123,17 +123,31 @@ function parseDocsFiles(rawValue) {
 }
 
 /**
- * Reads the application version from package.json.
+ * Reads and normalizes a version field from a JSON file.
+ * @param {string} jsonPath
  * @returns {Promise<string>}
  */
-async function readAppVersion() {
+async function readVersionFromJsonFile(jsonPath) {
     try {
-        const packageText = await readFile(resolve(projectRoot, 'package.json'), 'utf8')
-        const packageJson = JSON.parse(packageText)
-        return String(packageJson?.version || '').trim()
+        const rawText = await readFile(jsonPath, 'utf8')
+        const parsed = JSON.parse(rawText)
+        return String(parsed?.version || '').trim()
     } catch (_error) {
         return ''
     }
+}
+
+/**
+ * Reads the application version from known version sources.
+ * @returns {Promise<string>}
+ */
+async function readAppVersion() {
+    const versionSources = [resolve(projectRoot, 'package.json'), resolve(projectRoot, 'api', 'app-version.json')]
+    for (const sourcePath of versionSources) {
+        const version = await readVersionFromJsonFile(sourcePath)
+        if (version) return version
+    }
+    return ''
 }
 
 /**

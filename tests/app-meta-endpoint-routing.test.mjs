@@ -19,6 +19,7 @@ describe('app meta endpoint routing', () => {
         const phpSource = await readFile('api/app-meta.php', 'utf8')
         assert.match(phpSource, /\$_SERVER\['REQUEST_METHOD'\]\s*!==\s*'GET'/)
         assert.match(phpSource, /package\.json/)
+        assert.match(phpSource, /app-version\.json/)
         assert.match(phpSource, /json_encode\(\['version'\s*=>\s*\$version\]/)
     })
 })
