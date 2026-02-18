@@ -1,7 +1,11 @@
 import { Job, Label, Media, P700, WebBluetoothBackend, WebUSBBackend } from 'labelprinterkit-web/src/index.mjs'
 
 const WEBUSB_DEVICE_STORAGE_KEY = 'labelprinter.app.webusb.lastDevice.v1'
-const WEBUSB_REQUEST_FILTERS = [{ classCode: 7 }]
+const WEBUSB_PRINTER_CLASS_CODE = 7
+const WEBUSB_DEFAULT_INTERFACE_NUMBER = 0
+const WEBUSB_DEFAULT_OUT_ENDPOINT_NUMBER = 0x02
+const WEBUSB_DEFAULT_IN_ENDPOINT_NUMBER = 0x01
+const WEBUSB_REQUEST_FILTERS = [{ classCode: WEBUSB_PRINTER_CLASS_CODE }]
 
 /**
  * Handles printing the current label state.
@@ -155,6 +159,7 @@ export class PrintController {
      */
     async #requestUsbDeviceFromChooser() {
         const backend = await WebUSBBackend.requestDevice({ filters: WEBUSB_REQUEST_FILTERS })
+        await this.#configureUsbBackendTransport(backend)
         return { backend, device: backend?.device || null }
     }
 
@@ -164,7 +169,9 @@ export class PrintController {
      * @returns {Promise<object>}
      */
     async #openUsbDevice(device) {
-        const backend = new WebUSBBackend(device)
+        const backendOptions = this.#resolveUsbBackendOptions(device) || undefined
+        const backend = new WebUSBBackend(device, backendOptions)
+        this.#normalizeUsbBackendEndpoints(backend)
         await backend.open()
         return backend
     }
@@ -253,15 +260,22 @@ export class PrintController {
             return null
         }
 
+        const compatibleDevices = devices.filter((device) => this.#isUsbReconnectCandidateCompatible(device, storedIdentity))
+        if (!compatibleDevices.length) {
+            return null
+        }
+
         if (storedIdentity) {
-            const matchingDevices = devices.filter((device) => this.#matchesStoredUsbIdentity(device, storedIdentity))
+            const matchingDevices = compatibleDevices.filter((device) =>
+                this.#matchesStoredUsbIdentity(device, storedIdentity)
+            )
             if (matchingDevices.length === 1) {
                 return matchingDevices[0]
             }
         }
 
-        if (devices.length === 1) {
-            return devices[0]
+        if (compatibleDevices.length === 1) {
+            return compatibleDevices[0]
         }
 
         return null
@@ -284,6 +298,169 @@ export class PrintController {
             return true
         }
         return String(device.serialNumber || '') === storedIdentity.serialNumber
+    }
+
+    /**
+     * Configures backend transport details using USB descriptors when available.
+     * @param {object | null} backend
+     * @returns {Promise<void>}
+     */
+    async #configureUsbBackendTransport(backend) {
+        if (!backend || typeof backend !== 'object') {
+            return
+        }
+
+        const resolvedOptions = this.#resolveUsbBackendOptions(backend?.device)
+        if (resolvedOptions) {
+            const currentInterfaceNumber = Number(backend.interfaceNumber)
+            const hasClaimInterface = typeof backend?.device?.claimInterface === 'function'
+            const hasReleaseInterface = typeof backend?.device?.releaseInterface === 'function'
+            if (
+                Number.isInteger(currentInterfaceNumber) &&
+                currentInterfaceNumber >= 0 &&
+                hasClaimInterface &&
+                hasReleaseInterface &&
+                currentInterfaceNumber !== resolvedOptions.interfaceNumber
+            ) {
+                try {
+                    await backend.device.releaseInterface(currentInterfaceNumber)
+                } catch (_error) {
+                    // Ignore release failures and retry with the resolved interface.
+                }
+                await backend.device.claimInterface(resolvedOptions.interfaceNumber)
+            }
+
+            backend.interfaceNumber = resolvedOptions.interfaceNumber
+            backend.outEndpoint = resolvedOptions.outEndpoint
+            backend.inEndpoint = resolvedOptions.inEndpoint
+            return
+        }
+
+        this.#normalizeUsbBackendEndpoints(backend)
+    }
+
+    /**
+     * Determines whether a granted USB device is safe for reconnect.
+     * @param {object} device
+     * @param {{ vendorId: number, productId: number, serialNumber: string | null } | null} storedIdentity
+     * @returns {boolean}
+     */
+    #isUsbReconnectCandidateCompatible(device, storedIdentity) {
+        if (!device) {
+            return false
+        }
+        if (this.#matchesStoredUsbIdentity(device, storedIdentity)) {
+            return true
+        }
+        return this.#resolveUsbBackendOptions(device) !== null
+    }
+
+    /**
+     * Resolves backend endpoint/interface settings from USB descriptors.
+     * @param {object | null} device
+     * @returns {{ interfaceNumber: number, outEndpoint: number, inEndpoint: number | null } | null}
+     */
+    #resolveUsbBackendOptions(device) {
+        const configurations = Array.isArray(device?.configurations) ? device.configurations : []
+        for (const configuration of configurations) {
+            const interfaces = Array.isArray(configuration?.interfaces) ? configuration.interfaces : []
+            for (const iface of interfaces) {
+                const interfaceNumber = Number(iface?.interfaceNumber)
+                if (!Number.isInteger(interfaceNumber) || interfaceNumber < 0) {
+                    continue
+                }
+                const alternates = Array.isArray(iface?.alternates) ? iface.alternates : []
+                for (const alternate of alternates) {
+                    if (Number(alternate?.interfaceClass) !== WEBUSB_PRINTER_CLASS_CODE) {
+                        continue
+                    }
+                    const endpoints = Array.isArray(alternate?.endpoints) ? alternate.endpoints : []
+                    const outEndpoint = this.#findUsbEndpointNumber(endpoints, 'out')
+                    if (outEndpoint == null) {
+                        continue
+                    }
+                    const inEndpoint = this.#findUsbEndpointNumber(endpoints, 'in')
+                    if (inEndpoint == null) {
+                        continue
+                    }
+                    return {
+                        interfaceNumber,
+                        outEndpoint,
+                        inEndpoint
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+    /**
+     * Finds an endpoint number for the requested direction.
+     * @param {Array<object>} endpoints
+     * @param {'in' | 'out'} direction
+     * @returns {number | null}
+     */
+    #findUsbEndpointNumber(endpoints, direction) {
+        const expectedDirection = String(direction)
+        for (const endpoint of endpoints) {
+            const endpointDirection = String(endpoint?.direction || '').toLowerCase()
+            if (endpointDirection !== expectedDirection) {
+                continue
+            }
+            const normalizedNumber = this.#normalizeUsbEndpointNumber(
+                endpoint?.endpointNumber ?? endpoint?.endpointAddress ?? endpoint?.address
+            )
+            if (normalizedNumber != null) {
+                return normalizedNumber
+            }
+        }
+        return null
+    }
+
+    /**
+     * Normalizes endpoint numbers to the 1-15 range used by WebUSB transfer APIs.
+     * @param {number | null | undefined} value
+     * @returns {number | null}
+     */
+    #normalizeUsbEndpointNumber(value) {
+        const numericValue = Number(value)
+        if (!Number.isInteger(numericValue)) {
+            return null
+        }
+        if (numericValue >= 1 && numericValue <= 15) {
+            return numericValue
+        }
+        const maskedValue = numericValue & 0x0f
+        if (maskedValue >= 1 && maskedValue <= 15) {
+            return maskedValue
+        }
+        return null
+    }
+
+    /**
+     * Applies default-safe endpoint normalization for toolkit backend instances.
+     * @param {object | null} backend
+     */
+    #normalizeUsbBackendEndpoints(backend) {
+        if (!backend || typeof backend !== 'object') {
+            return
+        }
+
+        const normalizedInterfaceNumber = Number(backend.interfaceNumber)
+        backend.interfaceNumber =
+            Number.isInteger(normalizedInterfaceNumber) && normalizedInterfaceNumber >= 0
+                ? normalizedInterfaceNumber
+                : WEBUSB_DEFAULT_INTERFACE_NUMBER
+
+        const normalizedOutEndpoint = this.#normalizeUsbEndpointNumber(backend.outEndpoint)
+        backend.outEndpoint =
+            normalizedOutEndpoint == null ? WEBUSB_DEFAULT_OUT_ENDPOINT_NUMBER : normalizedOutEndpoint
+
+        if (backend.inEndpoint == null) {
+            return
+        }
+        const normalizedInEndpoint = this.#normalizeUsbEndpointNumber(backend.inEndpoint)
+        backend.inEndpoint = normalizedInEndpoint == null ? WEBUSB_DEFAULT_IN_ENDPOINT_NUMBER : normalizedInEndpoint
     }
 
     /**
