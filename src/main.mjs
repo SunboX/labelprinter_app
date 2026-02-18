@@ -10,6 +10,7 @@ import { ZoomUtils } from './ZoomUtils.mjs'
 import { FontFamilyUtils } from './FontFamilyUtils.mjs'
 import { I18n } from './I18n.mjs'
 import { AppElements } from './AppElements.mjs'
+import { AppApiEndpointUtils } from './AppApiEndpointUtils.mjs'
 import { AppRuntimeConfig } from './AppRuntimeConfig.mjs'
 import { AppRuntimeNoiseGuards } from './AppRuntimeNoiseGuards.mjs'
 import { AiActionBridge } from './ui/AiActionBridge.mjs'
@@ -934,7 +935,8 @@ async function startApp() {
         els.localeSelect.value = i18n.locale
     }
     try {
-        const response = await fetch('/api/app-meta', { cache: 'no-store' })
+        const appMetaEndpoint = AppApiEndpointUtils.resolveAppMetaEndpoint()
+        const response = await fetch(appMetaEndpoint, { cache: 'no-store' })
         if (response.ok) {
             const payload = await response.json()
             appVersion = String(payload?.version || '').trim()

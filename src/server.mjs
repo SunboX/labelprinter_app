@@ -680,7 +680,7 @@ function logAssistantDebug(event, context = {}) {
     console.info(`[assistant-debug] ${event} ${safeContext}`)
 }
 
-app.get('/api/app-meta', async (_req, res) => {
+app.get(['/api/app-meta', '/api/app-meta.php'], async (_req, res) => {
     const version = await appVersionPromise
     res.json({ version })
 })
