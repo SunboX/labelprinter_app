@@ -41,6 +41,7 @@ const assistantDebugConfig = {
     enabled: parseBooleanEnv(process.env.AI_DEBUG_LOGS, false),
     functionArgsPreviewChars: parsePositiveIntEnv(process.env.AI_DEBUG_FUNCTION_ARGS_PREVIEW_CHARS, 1200, 120, 20000)
 }
+const appVersionPromise = readAppVersion()
 
 /** @type {Promise<Array<{ source: string, text: string, search: string }>> | null} */
 let docsCachePromise = null
@@ -119,6 +120,20 @@ function parseDocsFiles(rawValue) {
         .filter(Boolean)
         .filter((entry) => !entry.includes('..'))
     return parsed.length ? parsed : DEFAULT_DOC_FILES
+}
+
+/**
+ * Reads the application version from package.json.
+ * @returns {Promise<string>}
+ */
+async function readAppVersion() {
+    try {
+        const packageText = await readFile(resolve(projectRoot, 'package.json'), 'utf8')
+        const packageJson = JSON.parse(packageText)
+        return String(packageJson?.version || '').trim()
+    } catch (_error) {
+        return ''
+    }
 }
 
 /**
@@ -664,6 +679,11 @@ function logAssistantDebug(event, context = {}) {
     const safeContext = JSON.stringify(context)
     console.info(`[assistant-debug] ${event} ${safeContext}`)
 }
+
+app.get('/api/app-meta', async (_req, res) => {
+    const version = await appVersionPromise
+    res.json({ version })
+})
 
 app.post('/api/chat', async (req, res) => {
     const requestId = buildAssistantRequestId()

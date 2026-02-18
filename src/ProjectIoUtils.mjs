@@ -35,13 +35,16 @@ export class ProjectIoUtils {
     /**
      * Creates a serializable project payload from the current state.
      * @param {object} state
+     * @param {{ appVersion?: unknown }} [options]
      * @returns {object}
      */
-    static buildProjectPayload(state) {
+    static buildProjectPayload(state, options = {}) {
         const normalizedParameters = ProjectIoUtils.#normalizeParameterDefinitions(state.parameters)
         const normalizedParameterDataRows = ProjectIoUtils.#normalizeParameterDataRows(state.parameterDataRows)
         const normalizedCustomFontLinks = ProjectIoUtils.#normalizeCustomFontLinks(state.customFontLinks)
+        const normalizedAppVersion = ProjectIoUtils.#normalizeAppVersion(options.appVersion)
         return {
+            appVersion: normalizedAppVersion,
             media: state.media,
             mediaLengthMm: state.mediaLengthMm ?? null,
             zoom: ZoomUtils.clampZoom(state.zoom ?? 1),
@@ -56,6 +59,15 @@ export class ProjectIoUtils {
             customFontLinks: normalizedCustomFontLinks,
             items: (state.items || []).map((item) => ProjectIoUtils.stripRuntimeFields(item))
         }
+    }
+
+    /**
+     * Normalizes application version strings for serialization.
+     * @param {unknown} version
+     * @returns {string}
+     */
+    static #normalizeAppVersion(version) {
+        return String(version || '').trim()
     }
 
     /**

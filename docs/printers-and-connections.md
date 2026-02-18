@@ -58,6 +58,8 @@ How to configure:
 Implementation detail:
 
 - Device request uses USB class filter `classCode: 7`.
+- After a device is granted once for this origin, later prints try `navigator.usb.getDevices()` first and reconnect without showing the chooser when selection is unambiguous (remembered device match or exactly one granted device).
+- If no granted device is available or selection is ambiguous, the browser chooser is shown again.
 
 ## Connection Method 2: WebBluetooth (BLE)
 

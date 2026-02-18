@@ -167,6 +167,7 @@
         "title": "Imprint",
         "responsible": "Responsible for this website",
         "contact": "Contact",
+        "version": "Version",
         "githubAria": "GitHub repository",
         "githubTitle": "GitHub",
         "mastodonAria": "Mastodon profile",

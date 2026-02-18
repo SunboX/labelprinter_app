@@ -53,7 +53,8 @@ describe('project-io-utils', () => {
                 }
             ]
         }
-        const payload = ProjectIoUtils.buildProjectPayload(state)
+        const payload = ProjectIoUtils.buildProjectPayload(state, { appVersion: '1.2.3' })
+        assert.equal(payload.appVersion, '1.2.3')
         assert.equal(payload.items[0]._qrCache, undefined)
         assert.equal(payload.items[0].type, 'qr')
         assert.equal(payload.items[0].positionMode, 'absolute')
