@@ -50,10 +50,14 @@ export class PrintController {
             for (let index = 0; index < normalizedValueMaps.length; index += 1) {
                 const valueMap = normalizedValueMaps[index]
                 const renderResult = await this.previewRenderer.buildCanvasFromState({ parameterValues: valueMap })
-                media = renderResult.media
+                const pageMedia = this.#resolveCanonicalJobMedia(renderResult.media)
+                if (pageMedia) {
+                    media = pageMedia
+                }
                 pages.push(new Label(renderResult.res, renderResult.printCanvas))
             }
-            const job = new Job(media || Media[this.state.media] || Media.W24)
+            const fallbackMedia = this.#resolveCanonicalJobMedia(Media[this.state.media]) || Media.W24
+            const job = new Job(media || fallbackMedia)
             pages.forEach((page) => job.addPage(page))
 
             this.setStatus(
@@ -461,6 +465,53 @@ export class PrintController {
         }
         const normalizedInEndpoint = this.#normalizeUsbEndpointNumber(backend.inEndpoint)
         backend.inEndpoint = normalizedInEndpoint == null ? WEBUSB_DEFAULT_IN_ENDPOINT_NUMBER : normalizedInEndpoint
+    }
+
+    /**
+     * Resolves the canonical toolkit media object for job creation.
+     * @param {object | null | undefined} media
+     * @returns {object | null}
+     */
+    #resolveCanonicalJobMedia(media) {
+        const directById = this.#resolveMediaById(media?.id)
+        if (directById) {
+            return directById
+        }
+        const directByDimensions = this.#resolveMediaByDimensions(media)
+        if (directByDimensions) {
+            return directByDimensions
+        }
+        return media && typeof media === 'object' ? media : null
+    }
+
+    /**
+     * Resolves media by symbolic media id.
+     * @param {string | null | undefined} mediaId
+     * @returns {object | null}
+     */
+    #resolveMediaById(mediaId) {
+        if (typeof mediaId !== 'string' || !mediaId) {
+            return null
+        }
+        const candidate = Media[mediaId]
+        return candidate && typeof candidate === 'object' ? candidate : null
+    }
+
+    /**
+     * Resolves media by width and media type.
+     * @param {object | null | undefined} media
+     * @returns {object | null}
+     */
+    #resolveMediaByDimensions(media) {
+        const width = Number(media?.width)
+        const mediaType = Number(media?.mediaType)
+        if (!Number.isFinite(width) || !Number.isFinite(mediaType)) {
+            return null
+        }
+        const matches = Object.values(Media).find(
+            (candidate) => Number(candidate?.width) === width && Number(candidate?.mediaType) === mediaType
+        )
+        return matches && typeof matches === 'object' ? matches : null
     }
 
     /**
