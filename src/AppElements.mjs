@@ -22,6 +22,7 @@ export class AppElements {
             loadProject: safeRoot.querySelector('[data-load-project]'),
             shareProject: safeRoot.querySelector('[data-share-project]'),
             loadInput: safeRoot.querySelector('[data-load-input]'),
+            appVersion: safeRoot.querySelector('[data-app-version]'),
             print: safeRoot.querySelector('[data-print]'),
             status: safeRoot.querySelector('[data-status]'),
             mode: safeRoot.querySelector('[data-mode]'),

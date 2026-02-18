@@ -44,6 +44,7 @@
 
 ## Commit & Pull Request Guidelines
 - Commit messages must start with a prefix like `fix:`, `feature:`, or another agreed label, followed by a short imperative summary.
+- With every change or update, increment the app version in `package.json`.
 - Use concise MR summaries, include affected areas and test results.
 - Attach UI screenshots for visual changes.
 

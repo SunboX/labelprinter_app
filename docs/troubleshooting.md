@@ -106,6 +106,7 @@ Checks:
 - Check cable/device mode.
 - Reconnect device and retry.
 - Verify browser supports WebUSB in secure context.
+- The chooser appears again when no previous USB permission exists for this origin, permission was cleared, or multiple granted devices are available without a unique remembered match.
 
 ## Barcode Shows Placeholder Instead Of Bars
 

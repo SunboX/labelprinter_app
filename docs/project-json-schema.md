@@ -10,6 +10,7 @@ Project root must be a JSON object with at least an `items` array.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
+| `appVersion` | `string` | no | App version from `package.json` used when payload was saved/shared |
 | `media` | `string` | no | Tape/media id (for example `W9`, `W24`) |
 | `mediaLengthMm` | `number \| null` | no | `null` = auto length |
 | `zoom` | `number` | no | Clamped by app zoom limits |

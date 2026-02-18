@@ -20,6 +20,7 @@ const els = AppElements.query(document)
 const printerMap = AppRuntimeConfig.createPrinterMap()
 const shapeTypes = AppRuntimeConfig.createShapeTypes()
 let idCounter = 1
+let appVersion = ''
 
 /**
  * Generates the next item id.
@@ -481,7 +482,7 @@ class AppController {
      * @returns {string}
      */
     #buildProjectShareUrl() {
-        const payload = ProjectIoUtils.buildProjectPayload(this.state)
+        const payload = ProjectIoUtils.buildProjectPayload(this.state, { appVersion })
         const encodedProject = ProjectUrlUtils.encodeProjectPayloadParam(payload)
         const shareUrl = new URL(window.location.href)
         shareUrl.searchParams.set(ProjectUrlUtils.PROJECT_PARAM, encodedProject)
@@ -526,7 +527,7 @@ class AppController {
      */
     async #saveProject() {
         if (!this.els.saveProject) return
-        const payload = ProjectIoUtils.buildProjectPayload(this.state)
+        const payload = ProjectIoUtils.buildProjectPayload(this.state, { appVersion })
         const contents = JSON.stringify(payload, null, 2)
         const suggestedName = this.#buildSuggestedFileName()
 
@@ -931,6 +932,16 @@ async function startApp() {
     i18n.applyTranslations(document)
     if (els.localeSelect) {
         els.localeSelect.value = i18n.locale
+    }
+    try {
+        const response = await fetch('/api/app-meta', { cache: 'no-store' })
+        if (response.ok) {
+            const payload = await response.json()
+            appVersion = String(payload?.version || '').trim()
+        }
+    } catch (_error) {}
+    if (els.appVersion) {
+        els.appVersion.textContent = appVersion || '—'
     }
 
     const translate = (key, params = {}) => i18n.t(key, params)
