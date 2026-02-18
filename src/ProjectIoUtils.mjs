@@ -35,7 +35,7 @@ export class ProjectIoUtils {
     /**
      * Creates a serializable project payload from the current state.
      * @param {object} state
-     * @param {{ appVersion?: unknown }} [options]
+     * @param {{ appVersion?: unknown, editorName?: unknown, editorUrl?: unknown }} [options]
      * @returns {object}
      */
     static buildProjectPayload(state, options = {}) {
@@ -43,8 +43,13 @@ export class ProjectIoUtils {
         const normalizedParameterDataRows = ProjectIoUtils.#normalizeParameterDataRows(state.parameterDataRows)
         const normalizedCustomFontLinks = ProjectIoUtils.#normalizeCustomFontLinks(state.customFontLinks)
         const normalizedAppVersion = ProjectIoUtils.#normalizeAppVersion(options.appVersion)
+        const normalizedProjectMeta = ProjectIoUtils.#normalizeProjectMeta({
+            editorName: options.editorName,
+            editorUrl: options.editorUrl
+        })
         return {
             appVersion: normalizedAppVersion,
+            meta: normalizedProjectMeta,
             media: state.media,
             mediaLengthMm: state.mediaLengthMm ?? null,
             zoom: ZoomUtils.clampZoom(state.zoom ?? 1),
@@ -62,12 +67,56 @@ export class ProjectIoUtils {
     }
 
     /**
+     * Normalizes project metadata for serialization.
+     * @param {{ editorName?: unknown, editorUrl?: unknown }} options
+     * @returns {{ editor: { name: string, url: string } }}
+     */
+    static #normalizeProjectMeta(options) {
+        return {
+            editor: {
+                name: ProjectIoUtils.#normalizeEditorName(options.editorName),
+                url: ProjectIoUtils.#normalizeEditorUrl(options.editorUrl)
+            }
+        }
+    }
+
+    /**
      * Normalizes application version strings for serialization.
      * @param {unknown} version
      * @returns {string}
      */
     static #normalizeAppVersion(version) {
         return String(version || '').trim()
+    }
+
+    /**
+     * Normalizes editor names for project metadata.
+     * @param {unknown} editorName
+     * @returns {string}
+     */
+    static #normalizeEditorName(editorName) {
+        const normalized = String(editorName || '').trim()
+        return normalized || 'labelprinter-app'
+    }
+
+    /**
+     * Normalizes editor URLs for project metadata.
+     * @param {unknown} editorUrl
+     * @returns {string}
+     */
+    static #normalizeEditorUrl(editorUrl) {
+        const normalized = String(editorUrl || '').trim()
+        if (normalized) return normalized
+        try {
+            const href = String(globalThis?.location?.href || '').trim()
+            if (!href) return ''
+            const url = new URL(href)
+            url.search = ''
+            url.hash = ''
+            return url.toString()
+        } catch (_error) {
+            return ''
+        }
     }
 
     /**

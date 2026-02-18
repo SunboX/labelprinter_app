@@ -329,6 +329,7 @@ class AppController {
         const stamp = new Date().toISOString().slice(0, 10)
         return `label-project-${stamp}.json`
     }
+
     /**
      * Triggers a download for browsers without a save file picker.
      * @param {string} contents

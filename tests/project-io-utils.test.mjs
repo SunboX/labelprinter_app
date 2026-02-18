@@ -53,8 +53,18 @@ describe('project-io-utils', () => {
                 }
             ]
         }
-        const payload = ProjectIoUtils.buildProjectPayload(state, { appVersion: '1.2.3' })
+        const payload = ProjectIoUtils.buildProjectPayload(state, {
+            appVersion: '1.2.3',
+            editorName: 'Labelprinter App',
+            editorUrl: 'https://example.com/src/'
+        })
         assert.equal(payload.appVersion, '1.2.3')
+        assert.deepEqual(payload.meta, {
+            editor: {
+                name: 'Labelprinter App',
+                url: 'https://example.com/src/'
+            }
+        })
         assert.equal(payload.items[0]._qrCache, undefined)
         assert.equal(payload.items[0].type, 'qr')
         assert.equal(payload.items[0].positionMode, 'absolute')
@@ -66,6 +76,16 @@ describe('project-io-utils', () => {
         assert.deepEqual(payload.parameters, [{ name: 'host', defaultValue: 'localhost' }])
         assert.deepEqual(payload.parameterDataRows, [{ host: 'printer-1' }])
         assert.deepEqual(payload.customFontLinks, ['https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap'])
+    })
+
+    it('buildProjectPayload falls back to default editor metadata', () => {
+        const payload = ProjectIoUtils.buildProjectPayload(defaultState, { appVersion: '1.2.3' })
+        assert.deepEqual(payload.meta, {
+            editor: {
+                name: 'labelprinter-app',
+                url: ''
+            }
+        })
     })
 
     it('normalizeProjectState throws when items are missing', () => {
