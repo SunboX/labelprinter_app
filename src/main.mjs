@@ -5,6 +5,7 @@ import { PrintController } from './ui/PrintController.mjs'
 import { ProjectIoUtils } from './ProjectIoUtils.mjs'
 import { ProjectUrlUtils } from './ProjectUrlUtils.mjs'
 import { ParameterDataFileUtils } from './ParameterDataFileUtils.mjs'
+import { AppProjectFileUtils } from './AppProjectFileUtils.mjs'
 import { ShapeMenuUtils } from './ShapeMenuUtils.mjs'
 import { ZoomUtils } from './ZoomUtils.mjs'
 import { FontFamilyUtils } from './FontFamilyUtils.mjs'
@@ -15,14 +16,18 @@ import { AppRuntimeConfig } from './AppRuntimeConfig.mjs'
 import { AppRuntimeNoiseGuards } from './AppRuntimeNoiseGuards.mjs'
 import { AiActionBridge } from './ui/AiActionBridge.mjs'
 import { AiAssistantPanel } from './ui/AiAssistantPanel.mjs'
+import { WebMcpBridge } from './ui/WebMcpBridge.mjs'
+import { RasterWorkerClient } from './ui/RasterWorkerClient.mjs'
+import { ParameterDataWorkerClient } from './ui/ParameterDataWorkerClient.mjs'
+import { CodeRasterWorkerClient } from './ui/CodeRasterWorkerClient.mjs'
+import { PrintPageWorkerPoolClient } from './ui/PrintPageWorkerPoolClient.mjs'
+import { ParameterValidationWorkerClient } from './ui/ParameterValidationWorkerClient.mjs'
 import { Media, Resolution } from 'labelprinterkit-web/src/index.mjs'
-
 const els = AppElements.query(document)
 const printerMap = AppRuntimeConfig.createPrinterMap()
 const shapeTypes = AppRuntimeConfig.createShapeTypes()
 let idCounter = 1
 let appVersion = ''
-
 /**
  * Generates the next item id.
  * @returns {string}
@@ -31,7 +36,6 @@ function nextId() {
     return `item-${idCounter++}`
 }
 const defaultState = AppRuntimeConfig.createDefaultState(nextId)
-
 let state = JSON.parse(JSON.stringify(defaultState))
 AppRuntimeNoiseGuards.install()
 
@@ -147,7 +151,6 @@ class AppController {
         this.#handleStateChange()
         this.itemsEditor.render()
     }
-
     /**
      * Opens requested item editor controls originating from preview interactions.
      * @param {{ itemId: string, type: string }} request
@@ -236,6 +239,62 @@ class AppController {
         this.#syncZoomControls()
         this.previewRenderer.render()
     }
+    /** Sets zoom from external callers (for example WebMCP actions). */
+    setZoom(zoom) {
+        this.#setZoom(zoom)
+    }
+    /** Sets locale from external callers (for example WebMCP actions). */
+    setLocale(locale) {
+        this.#handleLocaleChange(locale)
+    }
+    /**
+     * Applies project payloads from external callers.
+     * @param {Record<string, any>} rawProject
+     * @param {string} [sourceLabel='WebMCP']
+     * @returns {Promise<void>}
+     */
+    async applyProjectPayload(rawProject, sourceLabel = 'WebMCP') {
+        await this.#applyLoadedProject(rawProject, sourceLabel)
+    }
+    /**
+     * Loads a project JSON from URL and applies it.
+     * @param {string} projectUrl
+     * @returns {Promise<void>}
+     */
+    async loadProjectFromUrl(projectUrl) {
+        const resolvedUrl = new URL(String(projectUrl || '').trim(), window.location.href)
+        const response = await fetch(resolvedUrl.toString(), { cache: 'no-store' })
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`)
+        }
+        const rawProject = await response.json()
+        await this.#applyLoadedProject(rawProject, this.#t('messages.sourceUrlParameter'))
+    }
+    /**
+     * Loads parameter rows from URL and applies them.
+     * @param {string} parameterDataUrl
+     * @returns {Promise<void>}
+     */
+    async loadParameterDataFromUrl(parameterDataUrl) {
+        const resolvedUrl = new URL(String(parameterDataUrl || '').trim(), window.location.href)
+        const response = await fetch(resolvedUrl.toString(), { cache: 'no-store' })
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`)
+        }
+        const { jsonText } = await ParameterDataFileUtils.convertResponseToParameterJsonText(
+            response,
+            resolvedUrl.toString()
+        )
+        this.parameterPanel.applyParameterDataRawText(jsonText, resolvedUrl.toString())
+    }
+    /** Builds the current serializable project payload. */
+    buildProjectPayload() {
+        return ProjectIoUtils.buildProjectPayload(this.state, { appVersion })
+    }
+    /** Builds the current share URL payload. */
+    buildProjectShareUrl() {
+        return this.#buildProjectShareUrl()
+    }
     /**
      * Syncs zoom controls with the current zoom value.
      */
@@ -322,77 +381,6 @@ class AppController {
         }
     }
     /**
-     * Builds a suggested file name for project exports.
-     * @returns {string}
-     */
-    #buildSuggestedFileName() {
-        const stamp = new Date().toISOString().slice(0, 10)
-        return `label-project-${stamp}.json`
-    }
-
-    /**
-     * Triggers a download for browsers without a save file picker.
-     * @param {string} contents
-     * @param {string} fileName
-     */
-    #downloadProjectFallback(contents, fileName) {
-        const blob = new Blob([contents], { type: 'application/json' })
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = fileName
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
-        window.setTimeout(() => URL.revokeObjectURL(url), 0)
-    }
-    /**
-     * Prompts the user for a local JSON file.
-     * @returns {Promise<File | null>}
-     */
-    async #promptForProjectFile() {
-        if (window.showOpenFilePicker) {
-            const [handle] = await window.showOpenFilePicker({
-                multiple: false,
-                types: [
-                    {
-                        description: this.#t('messages.projectJsonDescription'),
-                        accept: { 'application/json': ['.json'] }
-                    }
-                ]
-            })
-            return handle ? handle.getFile() : null
-        }
-
-        if (!this.els.loadInput) return null
-
-        return new Promise((resolve) => {
-            const input = this.els.loadInput
-            let settled = false
-            const cleanup = () => {
-                input.removeEventListener('change', onChange)
-                window.removeEventListener('focus', onFocus)
-            }
-            const onChange = () => {
-                settled = true
-                cleanup()
-                resolve(input.files?.[0] ?? null)
-            }
-            const onFocus = () => {
-                window.setTimeout(() => {
-                    if (settled) return
-                    cleanup()
-                    resolve(null)
-                }, 0)
-            }
-            // Fallback to a hidden file input when the picker API is unavailable.
-            input.addEventListener('change', onChange)
-            window.addEventListener('focus', onFocus, { once: true })
-            input.value = ''
-            input.click()
-        })
-    }
-    /**
      * Applies a raw project object to the editor state.
      * @param {object} rawState
      * @param {string} sourceLabel
@@ -449,7 +437,6 @@ class AppController {
             return false
         }
     }
-
     /**
      * Loads parameter rows from a URL query parameter when present.
      * Supported parameter:
@@ -531,7 +518,7 @@ class AppController {
         if (!this.els.saveProject) return
         const payload = ProjectIoUtils.buildProjectPayload(this.state, { appVersion })
         const contents = JSON.stringify(payload, null, 2)
-        const suggestedName = this.#buildSuggestedFileName()
+        const suggestedName = AppProjectFileUtils.buildSuggestedFileName()
 
         try {
             if (window.showSaveFilePicker) {
@@ -558,7 +545,7 @@ class AppController {
                 return
             }
             const fileName = fallbackName.endsWith('.json') ? fallbackName : `${fallbackName}.json`
-            this.#downloadProjectFallback(contents, fileName)
+            AppProjectFileUtils.downloadProjectFallback(contents, fileName)
             this.setStatus(this.#t('messages.downloaded', { fileName }), 'success')
         } catch (err) {
             if (err?.name === 'AbortError') {
@@ -576,7 +563,11 @@ class AppController {
     async #loadProject() {
         if (!this.els.loadProject) return
         try {
-            const file = await this.#promptForProjectFile()
+            const file = await AppProjectFileUtils.promptForProjectFile({
+                translate: (key) => this.#t(key),
+                inputElement: this.els.loadInput,
+                windowRef: window
+            })
             if (!file) {
                 this.setStatus(this.#t('messages.loadCanceled'), 'info')
                 return
@@ -749,6 +740,7 @@ class AppController {
      */
     async #handlePrintClick(options = {}) {
         const skipBatchConfirm = Boolean(options.skipBatchConfirm)
+        await this.parameterPanel.waitForValidation()
         if (this.parameterPanel.hasBlockingErrors()) {
             this.setStatus(this.#t('messages.parameterFixBeforePrint'), 'error')
             return
@@ -890,7 +882,6 @@ class AppController {
             })
         }
         this.els.print.addEventListener('click', () => this.#handlePrintClick())
-
         this.els.mode.addEventListener('change', () => {
             this.state.backend = this.els.mode.value
             this.#toggleBleFields()
@@ -915,16 +906,13 @@ class AppController {
         this.els.printer.addEventListener('change', () => {
             this.state.printer = this.els.printer.value
         })
-
         this.els.bleService.addEventListener('input', (e) => (this.state.ble.serviceUuid = e.target.value))
         this.els.bleWrite.addEventListener('input', (e) => (this.state.ble.writeCharacteristicUuid = e.target.value))
         this.els.bleNotify.addEventListener('input', (e) => (this.state.ble.notifyCharacteristicUuid = e.target.value))
         this.els.bleFilter.addEventListener('input', (e) => (this.state.ble.namePrefix = e.target.value))
     }
 }
-
 const i18n = new I18n()
-
 /**
  * Starts the localized app bootstrap sequence.
  * @returns {Promise<void>}
@@ -946,12 +934,25 @@ async function startApp() {
     if (els.appVersion) {
         els.appVersion.textContent = appVersion || '—'
     }
-
     const translate = (key, params = {}) => i18n.t(key, params)
-    const previewRenderer = new PreviewRenderer(els, state, setStatus, translate)
+    const rasterWorkerClient = RasterWorkerClient.createDefault()
+    const codeRasterWorkerClient = CodeRasterWorkerClient.createDefault()
+    const parameterDataWorkerClient = ParameterDataWorkerClient.createDefault()
+    const parameterValidationWorkerClient = ParameterValidationWorkerClient.createDefault()
+    const printPageWorkerPoolClient = PrintPageWorkerPoolClient.createDefault()
+    ParameterDataFileUtils.setDefaultWorkerClient(parameterDataWorkerClient)
+    const previewRenderer = new PreviewRenderer(els, state, setStatus, translate, {
+        rasterWorkerClient,
+        codeRasterWorkerClient
+    })
     const itemsEditor = new ItemsEditor(els, state, shapeTypes, noop, nextId, translate, setStatus)
-    const parameterPanel = new ParameterPanel(els, state, setStatus, noop, translate)
-    const printController = new PrintController(els, state, printerMap, previewRenderer, setStatus, translate)
+    const parameterPanel = new ParameterPanel(els, state, setStatus, noop, translate, {
+        parameterDataWorkerClient,
+        parameterValidationWorkerClient
+    })
+    const printController = new PrintController(els, state, printerMap, previewRenderer, setStatus, translate, {
+        printPageWorkerPoolClient
+    })
     const app = new AppController(els, state, itemsEditor, parameterPanel, previewRenderer, printController, setStatus, i18n)
     const aiActionBridge = new AiActionBridge({
         els,
@@ -963,6 +964,7 @@ async function startApp() {
         translate,
         shapeTypes
     })
+    const webMcpBridge = new WebMcpBridge({ aiActionBridge, appController: app, translate })
     const aiAssistant = new AiAssistantPanel(
         {
             overlay: els.aiOverlay,
@@ -985,12 +987,11 @@ async function startApp() {
     aiAssistant.getUiState = () => aiActionBridge.getUiStateSnapshot()
     aiAssistant.getActionCapabilities = () => aiActionBridge.getActionCapabilities()
     aiAssistant.getRenderedLabelAttachment = () => previewRenderer.getRenderedLabelAttachment()
-
     await itemsEditor.loadInstalledFontFamilies()
     await app.init()
     await aiAssistant.init()
+    await webMcpBridge.init()
 }
-
 startApp().catch((err) => {
     console.error(err)
     setStatus(i18n.t('messages.appInitFailed'), 'error')

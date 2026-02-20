@@ -82,6 +82,15 @@
 - Manual: run `npm start`, open `http://localhost:3000/`, open assistant from toolbar, ask an editor question, attach one sketch, then request one editor action (for example "add a text item").
 - Expected: assistant replies in panel, actions execute only through allowlisted commands, and endpoint errors are surfaced in chat/status.
 
+## WebMCP
+- Unit: `tests/webmcp-bridge.test.mjs` validates WebMCP registration behavior (`registerTool` + `provideContext`), mixed action routing, response envelope shape, and invalid-action error handling.
+- Unit: `tests/webmcp-wiring.test.mjs` verifies `src/main.mjs` imports/initializes `WebMcpBridge` and exposes the required app-control wrappers.
+- Manual: use Chrome Canary/Dev with version `146.0.7672.0+`, enable `chrome://flags/#enable-webmcp-testing`, relaunch, then open `http://localhost:3000/`.
+- Manual: install/open the Model Context Tool Inspector extension and inspect the current tab tools.
+- Expected: exactly one app tool is registered: `labelprinter_action`.
+- Manual: execute a mixed action payload (for example `add_item`, `set_zoom`, `build_share_url`) through the inspector.
+- Expected: the editor mutates as requested, and tool output returns JSON with `ok`, `executed`, `errors`, `warnings`, `results`, and `uiState`.
+
 ## Workspace zoom
 - Unit: `tests/zoom-utils.test.mjs` validates zoom clamping, stepping, label formatting, and display-aware zoom persistence payload matching.
 - Manual: run `npm start`, open `http://localhost:3000/`, use `-`, `+`, and the zoom slider in the workspace header.
@@ -112,9 +121,17 @@
 ## Parameterized labels
 - Unit: `tests/parameter-template-utils.test.mjs` validates placeholder extraction and substitution, JSON parsing constraints, and parameter-row validation diagnostics.
 - Unit: `tests/parameter-data-file-utils.test.mjs` validates conversion from JSON/CSV/XLS/XLSX/ODS to normalized JSON preview text.
+- Unit: `tests/parameter-validation-worker-client.test.mjs` validates worker request payload normalization and fallback behavior for large-row validation/preview computations.
 - Unit: `tests/project-io-utils.test.mjs` also covers serialization/normalization for `parameters` and `parameterDataRows`.
 - Manual: run `npm start`, open `http://localhost:3000/`, add parameters in the inspector, use them in text/QR as `{{name}}`, then upload a JSON/CSV/XLS/XLSX/ODS file.
 - Expected: input is converted to JSON preview, issues are shown with row-aware highlighting, preview uses the first row, and Print produces one label per row (with confirmation when row count exceeds 10).
+
+## Worker acceleration
+- Unit: `tests/worker-rpc-client.test.mjs` validates worker RPC request correlation, timeout handling, stale-response drops, and error propagation.
+- Unit: `tests/raster-worker-client.test.mjs`, `tests/code-raster-worker-client.test.mjs`, and `tests/parameter-data-worker-client.test.mjs` validate image/icon/QR/barcode/spreadsheet worker client payloads and fallback behavior.
+- Unit: `tests/print-page-worker-pool-client.test.mjs` validates deterministic output ordering, worker transport failure fallback markers, and worker-snapshot eligibility checks.
+- Unit: `tests/print-controller-worker-pool.test.mjs` validates worker-pool integration in print flow, including per-page fallback to sequential preview rendering.
+- Unit: `tests/preview-worker-wiring.test.mjs` validates app wiring for worker clients in preview, print, and parameter validation paths.
 
 ## Localization
 - Unit: `tests/i18n.test.mjs` validates locale detection, interpolation, and `data-i18n` attribute application.

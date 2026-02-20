@@ -162,7 +162,8 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     width: iconWidth,
                     height: iconHeight,
                     cache: this._imageRenderCache,
-                    loadSourceImage: this._getSourceImage.bind(this)
+                    loadSourceImage: this._getSourceImage.bind(this),
+                    rasterWorkerClient: this._rasterWorkerClient
                 })
                 const span = isHorizontal ? iconWidth : Math.max(iconHeight + 4, iconHeight)
                 blocks.push({ ref: item, span, iconWidth, iconHeight, iconCanvas })
@@ -179,7 +180,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                     printWidth,
                     isHorizontal
                 )
-                const barcodeCanvas = PreviewRendererCanvasSupport.getCachedBarcodeCanvas(
+                const barcodeCanvas = await PreviewRendererCanvasSupport.getCachedBarcodeCanvas(
                     this,
                     resolvedBarcodeData,
                     barcodeWidth,
@@ -643,7 +644,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      *  canvas: HTMLCanvasElement,
      *  isHorizontal: boolean,
      *  layoutItems: Array<object>,
-     *  drawCanvas: HTMLCanvasElement | null,
+     *  drawCanvas: CanvasImageSource | null,
      *  drawWidth: number,
      *  drawHeight: number
      * }} options
@@ -810,13 +811,12 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
     _computeMaxFlowAxisEnd(blocks, isHorizontal, feedPadStart) {
         return PreviewPositionModeUtils.computeMaxFlowAxisEnd(blocks, isHorizontal, feedPadStart)
     }
-
     /**
      * Returns a cached monochrome image canvas or generates one.
      * @param {object} item
      * @param {number} width
      * @param {number} height
-     * @returns {Promise<HTMLCanvasElement | null>}
+     * @returns {Promise<CanvasImageSource | null>}
      */
     async _getCachedImageCanvas(item, width, height) {
         const imageData = String(item?.imageData || '')
@@ -831,6 +831,25 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             this._imageRenderCache.set(cacheKey, cached)
             return cached
         }
+        if (this._rasterWorkerClient?.isAvailable?.() && typeof this._rasterWorkerClient.rasterizeImage === 'function') {
+            try {
+                const workerResult = await this._rasterWorkerClient.rasterizeImage({
+                    source: imageData,
+                    width: safeWidth,
+                    height: safeHeight,
+                    cacheKey,
+                    options: normalizedOptions
+                })
+                if (workerResult?.bitmap) {
+                    this._imageRenderCache.set(cacheKey, workerResult.bitmap)
+                    if (this._imageRenderCache.size > 96) {
+                        const oldestKey = this._imageRenderCache.keys().next().value
+                        if (oldestKey) this._imageRenderCache.delete(oldestKey)
+                    }
+                    return workerResult.bitmap
+                }
+            } catch (_error) {}
+        }
         const sourceImage = await this._getSourceImage(imageData)
         if (!sourceImage) return null
         const canvas = this._buildMonochromeImageCanvas(sourceImage, safeWidth, safeHeight, normalizedOptions)
@@ -838,9 +857,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         const maxEntries = 96
         if (this._imageRenderCache.size > maxEntries) {
             const oldestKey = this._imageRenderCache.keys().next().value
-            if (oldestKey) {
-                this._imageRenderCache.delete(oldestKey)
-            }
+            if (oldestKey) this._imageRenderCache.delete(oldestKey)
         }
         return canvas
     }
@@ -882,31 +899,20 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         if (this._sourceImageCache.has(imageData)) {
             return this._sourceImageCache.get(imageData)
         }
-        const imageElement = await this._loadImageElement(imageData)
+        const imageElement = await new Promise((resolve) => {
+            const candidate = new Image()
+            candidate.onload = () => resolve(candidate)
+            candidate.onerror = () => resolve(null)
+            candidate.src = imageData
+        })
         if (!imageElement) return null
         this._sourceImageCache.set(imageData, imageElement)
         const maxEntries = 32
         if (this._sourceImageCache.size > maxEntries) {
             const oldestKey = this._sourceImageCache.keys().next().value
-            if (oldestKey) {
-                this._sourceImageCache.delete(oldestKey)
-            }
+            if (oldestKey) this._sourceImageCache.delete(oldestKey)
         }
         return imageElement
-    }
-
-    /**
-     * Creates and decodes an HTML image element.
-     * @param {string} imageData
-     * @returns {Promise<HTMLImageElement | null>}
-     */
-    async _loadImageElement(imageData) {
-        return new Promise((resolve) => {
-            const imageElement = new Image()
-            imageElement.onload = () => resolve(imageElement)
-            imageElement.onerror = () => resolve(null)
-            imageElement.src = imageData
-        })
     }
 
     /**

@@ -1,4 +1,4 @@
-import { Job, Label, Media, P700, WebBluetoothBackend, WebUSBBackend } from 'labelprinterkit-web/src/index.mjs'
+import { Job, Label, Media, P700, Resolution, WebBluetoothBackend, WebUSBBackend } from 'labelprinterkit-web/src/index.mjs'
 
 const WEBUSB_DEVICE_STORAGE_KEY = 'labelprinter.app.webusb.lastDevice.v1'
 const WEBUSB_PRINTER_CLASS_CODE = 7
@@ -18,14 +18,16 @@ export class PrintController {
      * @param {{ buildCanvasFromState: (options?: { parameterValues?: Record<string, string> }) => Promise<object> }} previewRenderer
      * @param {(text: string, type?: string) => void} setStatus
      * @param {(key: string, params?: Record<string, string | number>) => string} translate
+     * @param {{ printPageWorkerPoolClient?: { isAvailable?: () => boolean, canRenderStateSnapshot?: (stateSnapshot: object) => boolean, renderPages?: (options: { stateSnapshot: object, parameterValueMaps: Array<Record<string, string>> }) => Promise<Array<any>> } | null }} [options={}]
      */
-    constructor(els, state, printerMap, previewRenderer, setStatus, translate) {
+    constructor(els, state, printerMap, previewRenderer, setStatus, translate, options = {}) {
         this.els = els
         this.state = state
         this.printerMap = printerMap
         this.previewRenderer = previewRenderer
         this.setStatus = setStatus
         this.translate = typeof translate === 'function' ? translate : (key) => key
+        this.printPageWorkerPoolClient = options?.printPageWorkerPoolClient || null
     }
 
     /**
@@ -45,17 +47,7 @@ export class PrintController {
         )
         this.els.print.disabled = true
         try {
-            let media = null
-            const pages = []
-            for (let index = 0; index < normalizedValueMaps.length; index += 1) {
-                const valueMap = normalizedValueMaps[index]
-                const renderResult = await this.previewRenderer.buildCanvasFromState({ parameterValues: valueMap })
-                const pageMedia = this.#resolveCanonicalJobMedia(renderResult.media)
-                if (pageMedia) {
-                    media = pageMedia
-                }
-                pages.push(new Label(renderResult.res, renderResult.printCanvas))
-            }
+            const { pages, media } = await this.#buildPrintPages(normalizedValueMaps)
             const fallbackMedia = this.#resolveCanonicalJobMedia(Media[this.state.media]) || Media.W24
             const job = new Job(media || fallbackMedia)
             pages.forEach((page) => job.addPage(page))
@@ -80,6 +72,131 @@ export class PrintController {
         } finally {
             this.els.print.disabled = false
         }
+    }
+
+    /**
+     * Builds print pages, using worker pool acceleration when possible.
+     * Falls back to in-thread rendering for unsupported or failed pages.
+     * @param {Array<Record<string, string>>} parameterValueMaps
+     * @returns {Promise<{ pages: Label[], media: object | null }>}
+     */
+    async #buildPrintPages(parameterValueMaps) {
+        let media = null
+        const pages = []
+        const canUseWorkerPool =
+            parameterValueMaps.length > 1 &&
+            this.printPageWorkerPoolClient?.isAvailable?.() &&
+            typeof this.printPageWorkerPoolClient.renderPages === 'function'
+
+        if (canUseWorkerPool) {
+            const stateSnapshot = this.#buildWorkerStateSnapshot()
+            const workerSupportsSnapshot =
+                typeof this.printPageWorkerPoolClient.canRenderStateSnapshot === 'function'
+                    ? this.printPageWorkerPoolClient.canRenderStateSnapshot(stateSnapshot)
+                    : true
+            if (workerSupportsSnapshot) {
+                try {
+                    const workerPages = await this.printPageWorkerPoolClient.renderPages({
+                        stateSnapshot,
+                        parameterValueMaps
+                    })
+                    for (let index = 0; index < parameterValueMaps.length; index += 1) {
+                        const workerPage = Array.isArray(workerPages) ? workerPages[index] : null
+                        if (workerPage?.bitmap) {
+                            const pageMedia = this.#resolveCanonicalJobMedia(workerPage.media)
+                            if (pageMedia) {
+                                media = pageMedia
+                            }
+                            const pageCanvas = this.#buildCanvasFromBitmap(
+                                workerPage.bitmap,
+                                Number(workerPage.width) || 1,
+                                Number(workerPage.height) || 1
+                            )
+                            pages.push(new Label(workerPage.res || stateSnapshot.resolution, pageCanvas))
+                            continue
+                        }
+                        if (workerPage?.error) {
+                            console.debug(`[PrintController] print-page worker fallback for page ${index}:`, workerPage.error)
+                        }
+                        const fallbackResult = await this.previewRenderer.buildCanvasFromState({
+                            parameterValues: parameterValueMaps[index]
+                        })
+                        const pageMedia = this.#resolveCanonicalJobMedia(fallbackResult.media)
+                        if (pageMedia) {
+                            media = pageMedia
+                        }
+                        pages.push(new Label(fallbackResult.res, fallbackResult.printCanvas))
+                    }
+                    return { pages, media }
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'unknown worker failure'
+                    console.debug('[PrintController] print-page worker pool disabled for this run:', message)
+                }
+            } else {
+                console.debug('[PrintController] print-page worker skipped for unsupported layout snapshot.')
+            }
+        }
+
+        for (let index = 0; index < parameterValueMaps.length; index += 1) {
+            const valueMap = parameterValueMaps[index]
+            const renderResult = await this.previewRenderer.buildCanvasFromState({ parameterValues: valueMap })
+            const pageMedia = this.#resolveCanonicalJobMedia(renderResult.media)
+            if (pageMedia) {
+                media = pageMedia
+            }
+            pages.push(new Label(renderResult.res, renderResult.printCanvas))
+        }
+        return { pages, media }
+    }
+
+    /**
+     * Builds a worker-serializable snapshot of print-relevant state.
+     * @returns {{ media: object, resolution: object, orientation: string, mediaLengthMm: number | null, items: object[], referencePrintAreaDots: number, referenceWidthMm: number }}
+     */
+    #buildWorkerStateSnapshot() {
+        const media = this.#resolveCanonicalJobMedia(Media[this.state.media]) || Media.W24
+        const resolution = Resolution[this.state.resolution] || Resolution.LOW
+        return {
+            media: { ...media },
+            resolution: { ...resolution },
+            orientation: this.state.orientation === 'vertical' ? 'vertical' : 'horizontal',
+            mediaLengthMm: Number.isFinite(Number(this.state.mediaLengthMm)) ? Number(this.state.mediaLengthMm) : null,
+            items: Array.isArray(this.state.items) ? this.state.items.map((item) => ({ ...item })) : [],
+            referencePrintAreaDots: Media.W9?.printArea || 64,
+            referenceWidthMm: Media.W9?.width || 9
+        }
+    }
+
+    /**
+     * Builds a canvas from worker-rendered bitmap payload.
+     * @param {ImageBitmap} bitmap
+     * @param {number} width
+     * @param {number} height
+     * @returns {OffscreenCanvas | HTMLCanvasElement}
+     */
+    #buildCanvasFromBitmap(bitmap, width, height) {
+        const safeWidth = Math.max(1, Math.round(Number(width) || 1))
+        const safeHeight = Math.max(1, Math.round(Number(height) || 1))
+        const canvas =
+            typeof OffscreenCanvas === 'function'
+                ? new OffscreenCanvas(safeWidth, safeHeight)
+                : (() => {
+                      const htmlCanvas = document.createElement('canvas')
+                      htmlCanvas.width = safeWidth
+                      htmlCanvas.height = safeHeight
+                      return htmlCanvas
+                  })()
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+            throw new Error('Unable to draw worker print bitmap.')
+        }
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, 0, safeWidth, safeHeight)
+        ctx.drawImage(bitmap, 0, 0, safeWidth, safeHeight)
+        if (bitmap && typeof bitmap.close === 'function') {
+            bitmap.close()
+        }
+        return canvas
     }
 
     /**
