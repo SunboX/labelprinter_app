@@ -52,27 +52,38 @@ export class PreviewRendererCanvasSupport {
      * @param {string} data
      * @param {number} size
      * @param {object} [item={}]
-     * @returns {Promise<HTMLCanvasElement>}
+     * @returns {Promise<CanvasImageSource>}
      */
     static async getCachedQrCanvas(renderer, data, size, item = {}) {
         const safeSize = Math.max(1, Math.round(Number(size) || 1))
         const normalizedOptions = QrCodeUtils.normalizeItemOptions(item)
         const cacheKey = `${safeSize}::${normalizedOptions.qrErrorCorrectionLevel}::${normalizedOptions.qrVersion}::${normalizedOptions.qrEncodingMode}::${String(data || '')}`
-        if (renderer._qrRenderCache?.has(cacheKey)) {
-            const cached = renderer._qrRenderCache.get(cacheKey)
-            renderer._qrRenderCache.delete(cacheKey)
-            renderer._qrRenderCache.set(cacheKey, cached)
+        const cached = PreviewRendererCanvasSupport.#touchCacheEntry(renderer._qrRenderCache, cacheKey)
+        if (cached) {
             return cached
         }
-        const builtCanvas = await PreviewRendererCanvasSupport.#buildQrCanvas(renderer, data, safeSize, normalizedOptions)
-        renderer._qrRenderCache?.set(cacheKey, builtCanvas)
-        const maxEntries = 96
-        if ((renderer._qrRenderCache?.size || 0) > maxEntries) {
-            const oldestKey = renderer._qrRenderCache.keys().next().value
-            if (oldestKey) {
-                renderer._qrRenderCache.delete(oldestKey)
+        if (
+            renderer?._codeRasterWorkerClient?.isAvailable?.() &&
+            typeof renderer._codeRasterWorkerClient.buildQrRaster === 'function'
+        ) {
+            try {
+                const workerResult = await renderer._codeRasterWorkerClient.buildQrRaster({
+                    data: String(data || ''),
+                    width: safeSize,
+                    cacheKey,
+                    options: normalizedOptions
+                })
+                if (workerResult?.bitmap) {
+                    PreviewRendererCanvasSupport.#setCacheEntry(renderer._qrRenderCache, cacheKey, workerResult.bitmap)
+                    return workerResult.bitmap
+                }
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'unknown worker error'
+                console.debug('[PreviewRenderer] qr worker fallback:', message)
             }
         }
+        const builtCanvas = await PreviewRendererCanvasSupport.#buildQrCanvas(renderer, data, safeSize, normalizedOptions)
+        PreviewRendererCanvasSupport.#setCacheEntry(renderer._qrRenderCache, cacheKey, builtCanvas)
         return builtCanvas
     }
 
@@ -83,9 +94,9 @@ export class PreviewRendererCanvasSupport {
      * @param {number} width
      * @param {number} height
      * @param {object} [item={}]
-     * @returns {HTMLCanvasElement}
+     * @returns {Promise<CanvasImageSource>}
      */
-    static getCachedBarcodeCanvas(renderer, data, width, height, item = {}) {
+    static async getCachedBarcodeCanvas(renderer, data, width, height, item = {}) {
         const safeWidth = Math.max(16, Math.round(Number(width) || 16))
         const safeHeight = Math.max(16, Math.round(Number(height) || 16))
         const normalizedOptions = BarcodeUtils.normalizeItemOptions(item)
@@ -102,11 +113,34 @@ export class PreviewRendererCanvasSupport {
             hashPart
         ].join('::')
 
-        if (renderer._barcodeRenderCache?.has(cacheKey)) {
-            const cached = renderer._barcodeRenderCache.get(cacheKey)
-            renderer._barcodeRenderCache.delete(cacheKey)
-            renderer._barcodeRenderCache.set(cacheKey, cached)
+        const cached = PreviewRendererCanvasSupport.#touchCacheEntry(renderer._barcodeRenderCache, cacheKey)
+        if (cached) {
             return cached
+        }
+        if (
+            renderer?._codeRasterWorkerClient?.isAvailable?.() &&
+            typeof renderer._codeRasterWorkerClient.buildBarcodeRaster === 'function'
+        ) {
+            try {
+                const workerResult = await renderer._codeRasterWorkerClient.buildBarcodeRaster({
+                    data: String(data || ''),
+                    width: safeWidth,
+                    height: safeHeight,
+                    cacheKey,
+                    options: normalizedOptions
+                })
+                if (workerResult?.bitmap) {
+                    PreviewRendererCanvasSupport.#setCacheEntry(
+                        renderer._barcodeRenderCache,
+                        cacheKey,
+                        workerResult.bitmap
+                    )
+                    return workerResult.bitmap
+                }
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'unknown worker error'
+                console.debug('[PreviewRenderer] barcode worker fallback:', message)
+            }
         }
 
         const builtCanvas = PreviewRendererCanvasSupport.buildBarcodeCanvas(
@@ -116,14 +150,7 @@ export class PreviewRendererCanvasSupport {
             safeHeight,
             normalizedOptions
         )
-        renderer._barcodeRenderCache?.set(cacheKey, builtCanvas)
-        const maxEntries = 96
-        if ((renderer._barcodeRenderCache?.size || 0) > maxEntries) {
-            const oldestKey = renderer._barcodeRenderCache.keys().next().value
-            if (oldestKey) {
-                renderer._barcodeRenderCache.delete(oldestKey)
-            }
-        }
+        PreviewRendererCanvasSupport.#setCacheEntry(renderer._barcodeRenderCache, cacheKey, builtCanvas)
         return builtCanvas
     }
 
@@ -200,6 +227,41 @@ export class PreviewRendererCanvasSupport {
             ctx.fillText(String(label || 'Barcode'), canvas.width / 2, canvas.height / 2)
         }
         return canvas
+    }
+
+    /**
+     * Returns one cache entry while refreshing LRU order.
+     * @param {Map<string, CanvasImageSource> | null | undefined} cache
+     * @param {string} cacheKey
+     * @returns {CanvasImageSource | null}
+     */
+    static #touchCacheEntry(cache, cacheKey) {
+        if (!cache?.has(cacheKey)) return null
+        const cached = cache.get(cacheKey)
+        cache.delete(cacheKey)
+        cache.set(cacheKey, cached)
+        return cached || null
+    }
+
+    /**
+     * Inserts one cache entry and prunes LRU overflow.
+     * @param {Map<string, CanvasImageSource> | null | undefined} cache
+     * @param {string} cacheKey
+     * @param {CanvasImageSource} value
+     * @param {number} [maxEntries=96]
+     */
+    static #setCacheEntry(cache, cacheKey, value, maxEntries = 96) {
+        if (!cache) return
+        cache.set(cacheKey, value)
+        while (cache.size > maxEntries) {
+            const oldestKey = cache.keys().next().value
+            if (!oldestKey) return
+            const removed = cache.get(oldestKey)
+            if (removed && typeof removed.close === 'function') {
+                removed.close()
+            }
+            cache.delete(oldestKey)
+        }
     }
 
     /**

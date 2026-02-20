@@ -44,6 +44,7 @@ The printer protocol and backend implementation are consumed from:
 ## Documentation
 
 - `docs/ai-assistant.md`: in-app assistant usage, action automation, and PHP endpoint setup.
+- `docs/webmcp.md`: browser-side WebMCP tool exposure for external in-browser agents.
 - `docs/getting-started.md`: step-by-step editor guide from setup to print.
 - `docs/objects-and-alignment.md`: object types, properties, editing behavior, and alignment.
 - `docs/parameter-data-formats.md`: parameter file formats and required CSV/spreadsheet structure.
@@ -90,4 +91,8 @@ App-level tests are in `tests/`.
 ## Notes
 
 - The app uses an import map in `src/index.html` to resolve `labelprinterkit-web` in the browser.
+- Worker paths are direct replacements with runtime capability checks and automatic in-thread fallback (no feature flag).
+- Preview/print raster hotspots (image, icon, QR, barcode) use workers when available and fall back to in-thread rendering per request on failure.
+- Multi-row print jobs use a print-page worker pool when snapshot constraints are met; unsupported layouts fall back page-by-page to the existing sequential renderer.
+- Spreadsheet parsing and large parameter validation/preview computations use workers when available, with unchanged user-facing error messaging.
 - Device access (WebUSB/WebBluetooth) still requires a user gesture and secure context (`localhost` or HTTPS).

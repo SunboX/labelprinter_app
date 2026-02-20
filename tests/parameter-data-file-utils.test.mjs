@@ -112,4 +112,86 @@ describe('parameter-data-file-utils', () => {
         assert.equal(rows[0].asset, 'sw1')
         assert.equal(rows[0].label, 'uplink')
     })
+
+    it('uses worker client for spreadsheet payloads when available', async () => {
+        let parseCalls = 0
+        const workerClient = {
+            isAvailable() {
+                return true
+            },
+            async parseSpreadsheet(bytes, sourceName) {
+                parseCalls += 1
+                assert.equal(bytes instanceof Uint8Array, true)
+                assert.equal(sourceName, 'rows.csv')
+                return [{ host: 'printer-a' }]
+            }
+        }
+        const file = createFileLike('rows.csv', 'text/csv', new TextEncoder().encode('host\nprinter-a\n'))
+
+        const result = await ParameterDataFileUtils.convertFileToParameterJsonText(file, { workerClient })
+        const rows = JSON.parse(result.jsonText)
+
+        assert.equal(parseCalls, 1)
+        assert.equal(rows.length, 1)
+        assert.equal(rows[0].host, 'printer-a')
+    })
+
+    it('bypasses worker client for JSON payloads', async () => {
+        let parseCalls = 0
+        const workerClient = {
+            isAvailable() {
+                return true
+            },
+            async parseSpreadsheet() {
+                parseCalls += 1
+                return []
+            }
+        }
+        const jsonText = '[{"name":"alpha"}]'
+        const file = createFileLike('rows.json', 'application/json', new TextEncoder().encode(jsonText))
+
+        const result = await ParameterDataFileUtils.convertFileToParameterJsonText(file, { workerClient })
+
+        assert.equal(parseCalls, 0)
+        assert.equal(result.format, 'json')
+        assert.equal(result.jsonText, jsonText)
+    })
+
+    it('surfaces worker parse errors for spreadsheet payloads', async () => {
+        const workerClient = {
+            isAvailable() {
+                return true
+            },
+            async parseSpreadsheet() {
+                const error = new Error('Failed to parse parameter data file (rows.csv): Invalid CSV payload')
+                error.name = 'WorkerResponseError'
+                throw error
+            }
+        }
+        const file = createFileLike('rows.csv', 'text/csv', new TextEncoder().encode('bad'))
+
+        await assert.rejects(
+            () => ParameterDataFileUtils.convertFileToParameterJsonText(file, { workerClient }),
+            /Failed to parse parameter data file \(rows\.csv\): Invalid CSV payload/
+        )
+    })
+
+    it('falls back to in-thread parser when worker transport fails', async () => {
+        const workerClient = {
+            isAvailable() {
+                return true
+            },
+            async parseSpreadsheet() {
+                throw new Error('worker transport disconnected')
+            }
+        }
+        const bytes = new TextEncoder().encode('name,value\nalpha,1\n')
+        const file = createFileLike('rows.csv', 'text/csv', bytes)
+
+        const result = await ParameterDataFileUtils.convertFileToParameterJsonText(file, { workerClient })
+        const rows = JSON.parse(result.jsonText)
+
+        assert.equal(rows.length, 1)
+        assert.equal(rows[0].name, 'alpha')
+    })
 })

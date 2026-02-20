@@ -10,12 +10,13 @@ export class IconRasterUtils {
      *  item: object,
      *  width: number,
      *  height: number,
-     *  cache: Map<string, HTMLCanvasElement>,
-     *  loadSourceImage: (imageData: string) => Promise<HTMLImageElement | null>
+     *  cache: Map<string, CanvasImageSource>,
+     *  loadSourceImage: (imageData: string) => Promise<HTMLImageElement | null>,
+     *  rasterWorkerClient?: { isAvailable?: () => boolean, rasterizeIcon?: (request: { source: string, width: number, height: number, cacheKey: string }) => Promise<{ bitmap: ImageBitmap }> } | null
      * }} options
-     * @returns {Promise<HTMLCanvasElement | null>}
+     * @returns {Promise<CanvasImageSource | null>}
      */
-    static async getCachedIconCanvas({ item, width, height, cache, loadSourceImage }) {
+    static async getCachedIconCanvas({ item, width, height, cache, loadSourceImage, rasterWorkerClient = null }) {
         const iconId = await IconLibraryUtils.ensureIconUsable(item?.iconId)
         const safeWidth = Math.max(1, Math.round(Number(width) || 1))
         const safeHeight = Math.max(1, Math.round(Number(height) || 1))
@@ -26,7 +27,24 @@ export class IconRasterUtils {
             cache.set(cacheKey, cached)
             return cached
         }
-        const sourceImage = await loadSourceImage(IconLibraryUtils.getIconSvgDataUrl(iconId, { validate: false }))
+        const iconSource = IconLibraryUtils.getIconSvgDataUrl(iconId, { validate: false })
+        const workerIconSource = IconRasterUtils.#resolveWorkerSourceUrl(iconSource)
+        if (rasterWorkerClient?.isAvailable?.() && typeof rasterWorkerClient.rasterizeIcon === 'function') {
+            try {
+                const workerResult = await rasterWorkerClient.rasterizeIcon({
+                    source: workerIconSource,
+                    width: safeWidth,
+                    height: safeHeight,
+                    cacheKey
+                })
+                if (workerResult?.bitmap) {
+                    cache.set(cacheKey, workerResult.bitmap)
+                    IconRasterUtils.#pruneCache(cache, 96)
+                    return workerResult.bitmap
+                }
+            } catch (_error) {}
+        }
+        const sourceImage = await loadSourceImage(iconSource)
         if (!sourceImage) return null
         const canvas = IconRasterUtils.buildMonochromeIconCanvas(sourceImage, safeWidth, safeHeight)
         cache.set(cacheKey, canvas)
@@ -53,24 +71,31 @@ export class IconRasterUtils {
         }
         ctx.drawImage(sourceImage, 0, 0, width, height)
         const imageData = ctx.getImageData(0, 0, width, height)
-        for (let index = 0; index < imageData.data.length; index += 4) {
-            const alpha = imageData.data[index + 3]
-            if (alpha < 10) {
-                imageData.data[index + 3] = 0
-                continue
-            }
-            const luminance =
-                imageData.data[index] * 0.2126 +
-                imageData.data[index + 1] * 0.7152 +
-                imageData.data[index + 2] * 0.0722
-            const isBlack = luminance < 160
-            imageData.data[index] = 0
-            imageData.data[index + 1] = 0
-            imageData.data[index + 2] = 0
-            imageData.data[index + 3] = isBlack ? 255 : 0
-        }
+        imageData.data.set(IconRasterUtils.convertRgbaToMonochromeIcon(imageData.data))
         ctx.putImageData(imageData, 0, 0)
         return canvas
+    }
+
+    /**
+     * Converts icon RGBA pixels to strict black/transparent RGBA pixels.
+     * @param {Uint8ClampedArray} pixels
+     * @returns {Uint8ClampedArray}
+     */
+    static convertRgbaToMonochromeIcon(pixels) {
+        const output = new Uint8ClampedArray(pixels.length)
+        for (let index = 0; index < pixels.length; index += 4) {
+            const alpha = pixels[index + 3]
+            if (alpha < 10) {
+                output[index + 3] = 0
+                continue
+            }
+            const luminance = pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722
+            output[index] = 0
+            output[index + 1] = 0
+            output[index + 2] = 0
+            output[index + 3] = luminance < 160 ? 255 : 0
+        }
+        return output
     }
 
     /**
@@ -82,7 +107,27 @@ export class IconRasterUtils {
         if (cache.size <= maxEntries) return
         const oldestKey = cache.keys().next().value
         if (oldestKey) {
+            const removed = cache.get(oldestKey)
+            if (removed && typeof removed.close === 'function') {
+                removed.close()
+            }
             cache.delete(oldestKey)
+        }
+    }
+
+    /**
+     * Resolves icon source URL for worker fetch contexts.
+     * @param {string} source
+     * @returns {string}
+     */
+    static #resolveWorkerSourceUrl(source) {
+        const normalized = String(source || '').trim()
+        if (!normalized) return ''
+        try {
+            if (typeof location === 'undefined') return normalized
+            return new URL(normalized, location.href).toString()
+        } catch (_error) {
+            return normalized
         }
     }
 }

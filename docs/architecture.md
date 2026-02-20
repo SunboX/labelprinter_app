@@ -9,11 +9,33 @@ This repository is the label printer application (editor/UI) and references `lab
 - `src/index.html`: app shell + import map
 - `src/main.mjs`: app controller and wiring
 - `src/ui/`: UI modules (`ItemsEditor`, `PreviewRenderer`, `PrintController`)
+- `src/ui/WebMcpBridge.mjs`: browser WebMCP bridge (`navigator.modelContext`) that exposes `labelprinter_action`
 - `src/*-utils.mjs`: app utility modules
 - `src/i18n/`: locale bundles (`en.json`, `de.json`)
 - `src/assets/icons/`: SVG icon catalog used by icon objects
 - `src/server.mjs`: local development static server
 - `tests/`: app-focused unit and manual-test docs
+
+## Worker Architecture
+
+- Worker RPC transport lives in `src/ui/WorkerRpcClient.mjs` and provides request correlation, timeout handling, and stale-response drop behavior.
+- Worker clients in `src/ui/`:
+  - `RasterWorkerClient.mjs`: image/icon raster loops
+  - `CodeRasterWorkerClient.mjs`: QR/barcode raster generation
+  - `ParameterDataWorkerClient.mjs`: spreadsheet parsing (`CSV/XLS/XLSX/ODS`)
+  - `ParameterValidationWorkerClient.mjs`: large-row validation + pretty preview computation
+  - `PrintPageWorkerPoolClient.mjs`: parallel page rendering for multi-row print jobs
+- Worker implementations in `src/workers/`:
+  - `RasterWorker.mjs`
+  - `CodeRasterWorker.mjs`
+  - `ParameterDataWorker.mjs`
+  - `ParameterValidationWorker.mjs`
+  - `PrintPageWorker.mjs`
+- Runtime behavior:
+  - Missing `Worker`/`OffscreenCanvas`/`createImageBitmap` disables only the affected worker path.
+  - Worker errors trigger per-request fallback to the previous main-thread implementation.
+  - QR/barcode output parity is preserved by using the same browser runtimes (`qrcode` and `JsBarcode`) in workers.
+  - Multi-row print parallelism is enabled only when at least two labels are queued and snapshot constraints are supported.
 
 ## URL-Driven Startup Flow
 

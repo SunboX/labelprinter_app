@@ -13,6 +13,7 @@ export class ParameterDataFileUtils {
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'application/vnd.oasis.opendocument.spreadsheet'
     ])
+    static #defaultWorkerClient = null
 
     /**
      * Returns the file input accept value for supported parameter data formats.
@@ -54,13 +55,23 @@ export class ParameterDataFileUtils {
     }
 
     /**
+     * Sets the default worker client used for spreadsheet parsing acceleration.
+     * @param {{ isAvailable?: () => boolean, parseSpreadsheet?: (bytes: Uint8Array, sourceName: string) => Promise<Record<string, unknown>[]> } | null} workerClient
+     */
+    static setDefaultWorkerClient(workerClient) {
+        const hasParser = workerClient && typeof workerClient.parseSpreadsheet === 'function'
+        ParameterDataFileUtils.#defaultWorkerClient = hasParser ? workerClient : null
+    }
+
+    /**
      * Converts a local file to parameter JSON text.
      * JSON files are returned as-is (to preserve parser diagnostics).
      * Spreadsheet formats are converted into pretty JSON array text.
      * @param {File} file
+     * @param {{ workerClient?: { isAvailable?: () => boolean, parseSpreadsheet?: (bytes: Uint8Array, sourceName: string) => Promise<Record<string, unknown>[]> } | null }} [options={}]
      * @returns {Promise<{ jsonText: string, format: string }>}
      */
-    static async convertFileToParameterJsonText(file) {
+    static async convertFileToParameterJsonText(file, options = {}) {
         if (!file || typeof file.arrayBuffer !== 'function') {
             throw new Error('Invalid parameter data file.')
         }
@@ -68,16 +79,17 @@ export class ParameterDataFileUtils {
         return ParameterDataFileUtils.#convertBytesToParameterJsonText(bytes, {
             sourceName: file.name || '',
             mimeType: file.type || ''
-        })
+        }, options)
     }
 
     /**
      * Converts a fetched response body to parameter JSON text.
      * @param {Response} response
      * @param {string} sourceName
+     * @param {{ workerClient?: { isAvailable?: () => boolean, parseSpreadsheet?: (bytes: Uint8Array, sourceName: string) => Promise<Record<string, unknown>[]> } | null }} [options={}]
      * @returns {Promise<{ jsonText: string, format: string }>}
      */
-    static async convertResponseToParameterJsonText(response, sourceName = '') {
+    static async convertResponseToParameterJsonText(response, sourceName = '', options = {}) {
         if (!response || typeof response.arrayBuffer !== 'function') {
             throw new Error('Invalid parameter data response.')
         }
@@ -85,19 +97,21 @@ export class ParameterDataFileUtils {
         return ParameterDataFileUtils.#convertBytesToParameterJsonText(bytes, {
             sourceName,
             mimeType: response.headers?.get('content-type') || ''
-        })
+        }, options)
     }
 
     /**
      * Converts a binary payload to parameter JSON text.
      * @param {Uint8Array} bytes
      * @param {{ sourceName: string, mimeType: string }} context
+     * @param {{ workerClient?: { isAvailable?: () => boolean, parseSpreadsheet?: (bytes: Uint8Array, sourceName: string) => Promise<Record<string, unknown>[]> } | null }} [options={}]
      * @returns {Promise<{ jsonText: string, format: string }>}
      */
-    static async #convertBytesToParameterJsonText(bytes, context) {
+    static async #convertBytesToParameterJsonText(bytes, context, options = {}) {
         const extension = ParameterDataFileUtils.#extractExtension(context.sourceName)
         const mimeType = ParameterDataFileUtils.#normalizeMimeType(context.mimeType)
         const rawText = ParameterDataFileUtils.#decodeUtf8(bytes)
+        const workerClient = options.workerClient ?? ParameterDataFileUtils.#defaultWorkerClient
 
         const treatAsJson =
             extension === 'json' ||
@@ -114,7 +128,7 @@ export class ParameterDataFileUtils {
             ParameterDataFileUtils.#spreadsheetExtensions.has(extension) ||
             ParameterDataFileUtils.#spreadsheetMimeTypes.has(mimeType)
         if (treatAsSpreadsheet) {
-            const rows = await ParameterDataFileUtils.#readSpreadsheetRows(bytes, context.sourceName)
+            const rows = await ParameterDataFileUtils.#readSpreadsheetRows(bytes, context.sourceName, workerClient)
             return {
                 jsonText: JSON.stringify(rows, null, 2),
                 format: extension || 'spreadsheet'
@@ -135,7 +149,7 @@ export class ParameterDataFileUtils {
         }
 
         try {
-            const rows = await ParameterDataFileUtils.#readSpreadsheetRows(bytes, context.sourceName)
+            const rows = await ParameterDataFileUtils.#readSpreadsheetRows(bytes, context.sourceName, workerClient)
             return {
                 jsonText: JSON.stringify(rows, null, 2),
                 format: extension || 'spreadsheet'
@@ -151,9 +165,25 @@ export class ParameterDataFileUtils {
      * Reads spreadsheet-like bytes and returns row objects.
      * @param {Uint8Array} bytes
      * @param {string} sourceName
+     * @param {{ isAvailable?: () => boolean, parseSpreadsheet?: (bytes: Uint8Array, sourceName: string) => Promise<Record<string, unknown>[]> } | null} workerClient
      * @returns {Promise<Record<string, unknown>[]>}
      */
-    static async #readSpreadsheetRows(bytes, sourceName) {
+    static async #readSpreadsheetRows(bytes, sourceName, workerClient) {
+        if (workerClient && typeof workerClient.parseSpreadsheet === 'function') {
+            const workerAvailable =
+                typeof workerClient.isAvailable === 'function' ? workerClient.isAvailable() : true
+            if (workerAvailable) {
+                try {
+                    return await workerClient.parseSpreadsheet(bytes, sourceName)
+                } catch (error) {
+                    if (error?.name === 'WorkerResponseError') {
+                        throw error
+                    }
+                    const message = error instanceof Error ? error.message : 'unknown worker error'
+                    console.debug('[ParameterDataFileUtils] spreadsheet worker fallback:', message)
+                }
+            }
+        }
         const xlsx = await ParameterDataFileUtils.#loadXlsxLibrary()
         let workbook
         try {

@@ -14,19 +14,28 @@ export class ParameterPanel {
      * @param {(text: string, type?: string) => void} setStatus
      * @param {() => void} onChange
      * @param {(key: string, params?: Record<string, string | number>) => string} translate
+     * @param {{
+     *  parameterDataWorkerClient?: { isAvailable?: () => boolean, parseSpreadsheet?: (bytes: Uint8Array, sourceName: string) => Promise<Record<string, unknown>[]> } | null,
+     *  parameterValidationWorkerClient?: { isAvailable?: () => boolean, validateParameters?: (payload: object) => Promise<any> } | null
+     * }} [options={}]
      */
-    constructor(els, state, setStatus, onChange, translate) {
+    constructor(els, state, setStatus, onChange, translate, options = {}) {
         this.els = els
         this.state = state
         this.setStatus = setStatus
         this.onChange = onChange
         this.translate = translate
+        this.parameterDataWorkerClient = options.parameterDataWorkerClient || null
+        this.parameterValidationWorkerClient = options.parameterValidationWorkerClient || null
         this.validation = { errors: [], warnings: [], placeholders: [] }
         this.parseError = null
         this.parseErrorLine = null
         this.parseErrorColumn = null
         this.previewText = '[]'
         this.rowLineRanges = []
+        this._parameterValidationRowThreshold = 200
+        this._validationRequestToken = 0
+        this._pendingValidationPromise = null
         this._eventsBound = false
     }
 
@@ -140,6 +149,17 @@ export class ParameterPanel {
     }
 
     /**
+     * Waits for any in-flight validation worker request.
+     * @returns {Promise<void>}
+     */
+    async waitForValidation() {
+        if (!this._pendingValidationPromise) return
+        try {
+            await this._pendingValidationPromise
+        } catch (_error) {}
+    }
+
+    /**
      * Ensures parameter state fields are present and normalized.
      */
     #ensureStateShape() {
@@ -220,7 +240,9 @@ export class ParameterPanel {
                 this.setStatus(this.translate('parameterStatus.loadCanceled'), 'info')
                 return
             }
-            const { jsonText } = await ParameterDataFileUtils.convertFileToParameterJsonText(file)
+            const { jsonText } = await ParameterDataFileUtils.convertFileToParameterJsonText(file, {
+                workerClient: this.parameterDataWorkerClient
+            })
             this.applyParameterDataRawText(jsonText, file.name)
         } catch (err) {
             if (err?.name === 'AbortError') {
@@ -403,24 +425,114 @@ export class ParameterPanel {
      */
     #refreshValidationViews(rebuildPreview = true) {
         this.#ensureStateShape()
+        const requestToken = this.#nextValidationRequestToken()
+        if (this.#shouldUseValidationWorker()) {
+            this.#runValidationViaWorker(requestToken, rebuildPreview)
+            return
+        }
+        this._pendingValidationPromise = null
+        this.#applyValidationInThread(rebuildPreview)
+    }
 
+    /**
+     * Returns whether worker validation should be used for current payload size.
+     * @returns {boolean}
+     */
+    #shouldUseValidationWorker() {
+        if (this.parseError) return false
+        if (!this.parameterValidationWorkerClient || typeof this.parameterValidationWorkerClient.validateParameters !== 'function') {
+            return false
+        }
+        const workerAvailable =
+            typeof this.parameterValidationWorkerClient.isAvailable === 'function'
+                ? this.parameterValidationWorkerClient.isAvailable()
+                : true
+        if (!workerAvailable) return false
+        return this.state.parameterDataRows.length >= this._parameterValidationRowThreshold
+    }
+
+    /**
+     * Runs validation via worker and applies result if request token is current.
+     * @param {number} requestToken
+     * @param {boolean} rebuildPreview
+     */
+    #runValidationViaWorker(requestToken, rebuildPreview) {
+        const payload = {
+            definitions: this.state.parameters,
+            items: this.state.items,
+            rows: this.state.parameterDataRows,
+            rawJson: this.parseError ? '' : this.state.parameterDataRaw
+        }
+        const validationPromise = this.parameterValidationWorkerClient
+            .validateParameters(payload)
+            .then((result) => {
+                if (!this.#isCurrentValidationRequest(requestToken)) return
+                this.validation = result?.validation || { errors: [], warnings: [], placeholders: [] }
+                if (rebuildPreview && !this.parseError) {
+                    this.previewText = String(result?.previewText || '[]')
+                    this.rowLineRanges = Array.isArray(result?.rowLineRanges) ? result.rowLineRanges : []
+                }
+                this.#renderValidationViews()
+            })
+            .catch((error) => {
+                if (!this.#isCurrentValidationRequest(requestToken)) return
+                const message = error instanceof Error ? error.message : 'unknown worker error'
+                console.debug('[ParameterPanel] validation worker fallback:', message)
+                this.#applyValidationInThread(rebuildPreview)
+            })
+            .finally(() => {
+                if (this.#isCurrentValidationRequest(requestToken)) {
+                    this._pendingValidationPromise = null
+                }
+            })
+        this._pendingValidationPromise = validationPromise
+    }
+
+    /**
+     * Runs validation logic on the main thread.
+     * @param {boolean} rebuildPreview
+     */
+    #applyValidationInThread(rebuildPreview) {
         this.validation = ParameterTemplateUtils.validateParameterSetup(
             this.state.parameters,
             this.state.items,
             this.state.parameterDataRows,
             this.parseError ? '' : this.state.parameterDataRaw
         )
-
         if (rebuildPreview && !this.parseError) {
             const { prettyText, rowLineRanges } = ParameterTemplateUtils.buildPrettyArrayPreview(this.state.parameterDataRows)
             this.previewText = prettyText
             this.rowLineRanges = rowLineRanges
         }
+        this.#renderValidationViews()
+    }
 
+    /**
+     * Re-renders all validation-derived views.
+     */
+    #renderValidationViews() {
         this.#syncConditionalVisibility()
         this.#renderDataMeta()
         this.#renderIssues()
         this.#renderPreview()
+    }
+
+    /**
+     * Returns the next validation request token.
+     * @returns {number}
+     */
+    #nextValidationRequestToken() {
+        this._validationRequestToken += 1
+        return this._validationRequestToken
+    }
+
+    /**
+     * Returns whether the token matches the latest validation request.
+     * @param {number} requestToken
+     * @returns {boolean}
+     */
+    #isCurrentValidationRequest(requestToken) {
+        return Number(requestToken) === this._validationRequestToken
     }
 
     /**

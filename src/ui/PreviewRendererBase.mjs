@@ -13,12 +13,18 @@ export class PreviewRendererBase {
      * @param {object} state
      * @param {(text: string, type?: string) => void} setStatus
      * @param {(key: string, params?: Record<string, string | number>) => string} translate
+     * @param {{
+     *  rasterWorkerClient?: { isAvailable?: () => boolean, rasterizeImage?: Function, rasterizeIcon?: Function } | null,
+     *  codeRasterWorkerClient?: { isAvailable?: () => boolean, buildQrRaster?: Function, buildBarcodeRaster?: Function } | null
+     * }} [options={}]
      */
-    constructor(els, state, setStatus, translate) {
+    constructor(els, state, setStatus, translate, options = {}) {
         this.els = els
         this.state = state
         this.setStatus = setStatus
         this.translate = typeof translate === 'function' ? translate : (key) => key
+        this._rasterWorkerClient = options?.rasterWorkerClient || null
+        this._codeRasterWorkerClient = options?.codeRasterWorkerClient || null
         this._previewBusy = false
         this._previewQueued = false
         this._overlayCanvas = null
