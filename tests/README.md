@@ -83,12 +83,12 @@
 - Expected: assistant replies in panel, actions execute only through allowlisted commands, and endpoint errors are surfaced in chat/status.
 
 ## WebMCP
-- Unit: `tests/webmcp-bridge.test.mjs` validates WebMCP registration behavior (`registerTool` + `provideContext`), mixed action routing, response envelope shape, and invalid-action error handling.
+- Unit: `tests/webmcp-bridge.test.mjs` validates WebMCP registration behavior (`registerTool` + `provideContext`), mixed action routing, response envelope shape, invalid-action error handling, and extended controls (`set_ble`, `set_parameters`, `set_parameter_data_json`, `set_google_font_links`, `get_parameter_state`, `get_supported_values`).
 - Unit: `tests/webmcp-wiring.test.mjs` verifies `src/main.mjs` imports/initializes `WebMcpBridge` and exposes the required app-control wrappers.
 - Manual: use Chrome Canary/Dev with version `146.0.7672.0+`, enable `chrome://flags/#enable-webmcp-testing`, relaunch, then open `http://localhost:3000/`.
 - Manual: install/open the Model Context Tool Inspector extension and inspect the current tab tools.
 - Expected: exactly one app tool is registered: `labelprinter_action`.
-- Manual: execute a mixed action payload (for example `add_item`, `set_zoom`, `build_share_url`) through the inspector.
+- Manual: execute a mixed action payload (for example `add_item`, `set_zoom`, `set_parameters`, `set_parameter_data_json`, `build_share_url`) through the inspector.
 - Expected: the editor mutates as requested, and tool output returns JSON with `ok`, `executed`, `errors`, `warnings`, `results`, and `uiState`.
 
 ## Workspace zoom

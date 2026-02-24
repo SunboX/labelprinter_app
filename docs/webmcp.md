@@ -62,6 +62,11 @@ Output shape (single MCP text content with JSON):
 
 - `set_zoom`
 - `set_locale`
+- `set_ble`
+- `set_parameters`
+- `set_parameter_data_json`
+- `clear_parameter_data`
+- `set_google_font_links`
 - `load_project_json`
 - `load_project_url`
 - `load_parameter_data_url`
@@ -69,6 +74,8 @@ Output shape (single MCP text content with JSON):
 - `build_share_url`
 - `get_ui_state`
 - `get_action_capabilities`
+- `get_parameter_state`
+- `get_supported_values`
 
 ## Example
 
@@ -86,4 +93,5 @@ Output shape (single MCP text content with JSON):
 
 - `print`, `save_project`, and `share_project` depend on browser permissions and user-gesture/browser policy constraints.
 - URL-based loaders (`load_project_url`, `load_parameter_data_url`) still depend on reachable URLs and CORS/network behavior.
+- `set_parameter_data_json` expects JSON array-compatible row objects (single objects are wrapped to one-row arrays).
 - This integration uses the WebMCP imperative API only (no declarative form annotations).
