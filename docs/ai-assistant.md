@@ -75,7 +75,7 @@ Assistant answers are grounded by backend-loaded markdown snippets.
   - `AI_DOCS_SNIPPET_CHARS`
   - `AI_DOCS_MAX_CONTEXT_CHARS`
 - Assistant response tuning env vars:
-  - `OPENAI_REASONING_EFFORT` (`minimal`, `low`, `medium`, `high`; recommended: `minimal`)
+  - `OPENAI_REASONING_EFFORT` (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`; recommended: `none`)
   - `AI_MAX_OUTPUT_TOKENS` (recommended: `2200`)
 - Assistant diagnostics env vars:
   - `AI_DEBUG_LOGS` (`true` enables backend debug lines)
@@ -95,7 +95,7 @@ Required server config:
 1. Create a `.env` file from `.env.example`.
 2. Set at minimum:
    - `OPENAI_API_KEY`
-   - optional `OPENAI_MODEL`
+   - optional `OPENAI_MODEL` (default `gpt-5.4`)
 3. Configure docs grounding path:
    - set `AI_DOCS_DIR` and `AI_DOCS_FILES`
 4. Keep API keys out of frontend code.
