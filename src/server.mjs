@@ -3,6 +3,7 @@ import { readFile } from 'fs/promises'
 import { dirname, isAbsolute, join, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { config as loadDotEnv } from 'dotenv'
+import { AssistantBackendConfig } from './AssistantBackendConfig.mjs'
 import { AssistantToolChoiceUtils } from './AssistantToolChoiceUtils.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -35,7 +36,7 @@ const docsConfig = {
 
 const assistantConfig = {
     maxOutputTokens: parsePositiveIntEnv(process.env.AI_MAX_OUTPUT_TOKENS, 2200, 600, 8000),
-    reasoningEffort: parseReasoningEffortEnv(process.env.OPENAI_REASONING_EFFORT, 'minimal')
+    reasoningEffort: AssistantBackendConfig.parseReasoningEffort(process.env.OPENAI_REASONING_EFFORT)
 }
 const assistantDebugConfig = {
     enabled: parseBooleanEnv(process.env.AI_DEBUG_LOGS, false),
@@ -77,22 +78,6 @@ function parsePositiveIntEnv(rawValue, fallback, min, max) {
     const parsed = Number.parseInt(String(rawValue || ''), 10)
     if (!Number.isFinite(parsed) || parsed < min) return fallback
     return Math.min(parsed, max)
-}
-
-/**
- * Parses model reasoning effort from environment values.
- * @param {string | undefined} rawValue
- * @param {'minimal' | 'low' | 'medium' | 'high'} fallback
- * @returns {'minimal' | 'low' | 'medium' | 'high'}
- */
-function parseReasoningEffortEnv(rawValue, fallback) {
-    const normalized = String(rawValue || '')
-        .trim()
-        .toLowerCase()
-    if (normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high') {
-        return normalized
-    }
-    return fallback
 }
 
 /**
@@ -742,7 +727,7 @@ app.post('/api/chat', async (req, res) => {
     const docSnippets = await loadDocSnippets()
     const docsContext = buildDocsContext(rawMessage, docSnippets)
 
-    const model = String(process.env.OPENAI_MODEL || 'gpt-4.1-mini').trim()
+    const model = AssistantBackendConfig.resolveModel(process.env.OPENAI_MODEL)
     const payload = {
         model,
         instructions: buildAssistantInstructions(),

@@ -125,10 +125,10 @@ function parsePositiveIntEnv(?string $rawValue, int $fallback, int $min, int $ma
  * @param string $fallback
  * @return string
  */
-function parseReasoningEffortEnv(?string $rawValue, string $fallback = 'minimal'): string
+function parseReasoningEffortEnv(?string $rawValue, string $fallback = 'none'): string
 {
     $normalized = strtolower(trim((string)$rawValue));
-    if (in_array($normalized, ['minimal', 'low', 'medium', 'high'], true)) {
+    if (in_array($normalized, ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'], true)) {
         return $normalized;
     }
     return $fallback;
@@ -964,9 +964,9 @@ $tools = [[
     ]
 ]];
 
-$model = trim((string)(getEnvValue('OPENAI_MODEL') ?? 'gpt-4.1-mini'));
+$model = trim((string)(getEnvValue('OPENAI_MODEL') ?? 'gpt-5.4'));
 $maxOutputTokens = parsePositiveIntEnv(getEnvValue('AI_MAX_OUTPUT_TOKENS'), 2200, 600, 8000);
-$reasoningEffort = parseReasoningEffortEnv(getEnvValue('OPENAI_REASONING_EFFORT'), 'minimal');
+$reasoningEffort = parseReasoningEffortEnv(getEnvValue('OPENAI_REASONING_EFFORT'), 'none');
 $payload = [
     'model' => $model,
     'instructions' => $instructions,
