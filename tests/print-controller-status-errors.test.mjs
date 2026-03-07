@@ -36,6 +36,34 @@ function installNavigatorUsb(getDevices) {
 }
 
 /**
+ * Expands `{{param}}` tokens in a translation template.
+ * @param {string} template
+ * @param {Record<string, string | number>} [params={}]
+ * @returns {string}
+ */
+function interpolate(template, params = {}) {
+    return String(template || '').replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => String(params[key] ?? ''))
+}
+
+/**
+ * Creates a minimal translation stub for print media mismatch messages.
+ * @returns {(key: string, params?: Record<string, string | number>) => string}
+ */
+function createPrintTranslate() {
+    const translations = {
+        'print.mediaMismatch': 'Loaded media mismatch: printer has {{loadedMedia}}, but this job expects {{expectedMedia}}. Load {{expectedMedia}} and retry.',
+        'print.mediaDescriptionNone': 'no tape',
+        'print.mediaDescriptionWidth': '{{width}}mm tape',
+        'print.mediaDescriptionWidthType': '{{width}}mm {{mediaTypeLabel}}',
+        'print.mediaTypeNonLaminatedTape': 'non-laminated tape',
+        'print.mediaTypeHeatShrinkTube21': 'heat-shrink tube (2:1)',
+        'print.mediaTypeHeatShrinkTube31': 'heat-shrink tube (3:1)',
+        'print.mediaTypeIncompatibleTape': 'incompatible tape'
+    }
+    return (key, params = {}) => interpolate(translations[key] || key, params)
+}
+
+/**
  * Creates a minimal canvas-like object compatible with labelprinterkit Label rendering.
  * @param {object} [media=Media.W9]
  * @returns {{ width: number, height: number, getContext: Function }}
@@ -142,7 +170,7 @@ class FakeStatusBackend {
 
 /**
  * Creates a PrintController test harness.
- * @param {{ mediaId?: string, renderMedia?: object, printerMap?: Record<string, Function> }} [options={}]
+ * @param {{ mediaId?: string, renderMedia?: object, printerMap?: Record<string, Function>, translate?: (key: string, params?: Record<string, string | number>) => string }} [options={}]
  * @returns {{ controller: PrintController, els: { print: { disabled: boolean } }, statusUpdates: Array<{ text: string, type: string }> }}
  */
 function createControllerHarness(options = {}) {
@@ -167,7 +195,7 @@ function createControllerHarness(options = {}) {
         options.printerMap || { P700 },
         createPreviewRenderer({ media: renderMedia }),
         (text, type = 'info') => statusUpdates.push({ text, type }),
-        (key) => key
+        typeof options.translate === 'function' ? options.translate : (key) => key
     )
     return { controller, els, statusUpdates }
 }
@@ -222,7 +250,9 @@ describe('print-controller printer status errors', () => {
         ])
         WebUSBBackend.requestDevice = async () => backend
 
-        const { controller, els, statusUpdates } = createControllerHarness()
+        const { controller, els, statusUpdates } = createControllerHarness({
+            translate: createPrintTranslate()
+        })
         const originalConsoleError = console.error
         console.error = () => {}
         try {
@@ -269,6 +299,40 @@ describe('print-controller printer status errors', () => {
         assert.equal(els.print.disabled, false)
         assert.equal(statusUpdates.at(-1)?.text, 'print.sentSingle')
         assert.equal(statusUpdates.at(-1)?.type, 'success')
+    })
+
+    it('renders structured unsupported loaded-media details in mismatch messages', async () => {
+        installNavigatorUsb(async () => [])
+        const backend = new FakeStatusBackend([
+            createStatus({
+                mediaWidth: Media.W9.width,
+                mediaType: Media.W9.mediaType
+            }),
+            createStatus({
+                mediaWidth: 12,
+                mediaType: MediaType.NON_LAMINATED_TAPE
+            })
+        ])
+        WebUSBBackend.requestDevice = async () => backend
+
+        const { controller, els, statusUpdates } = createControllerHarness({
+            translate: createPrintTranslate()
+        })
+        const originalConsoleError = console.error
+        console.error = () => {}
+        try {
+            await controller.print([{}])
+        } finally {
+            console.error = originalConsoleError
+        }
+
+        assert.equal(backend.statusCalls, 2)
+        assert.equal(els.print.disabled, false)
+        assert.equal(
+            statusUpdates.at(-1)?.text,
+            'Loaded media mismatch: printer has 12mm non-laminated tape, but this job expects 9mm tape. Load 9mm tape and retry.'
+        )
+        assert.equal(statusUpdates.at(-1)?.type, 'error')
     })
 
     it('treats cloned render media as the same canonical media to avoid false mismatch errors', async () => {
