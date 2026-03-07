@@ -68,10 +68,82 @@ export class PrintController {
             )
         } catch (err) {
             console.error(err)
-            this.setStatus(err?.message || this.translate('print.failed'), 'error')
+            this.setStatus(this.#formatPrintError(err) || err?.message || this.translate('print.failed'), 'error')
         } finally {
             this.els.print.disabled = false
         }
+    }
+
+    /**
+     * Formats structured toolkit print errors into localized messages when possible.
+     * @param {any} error
+     * @returns {string | null}
+     */
+    #formatPrintError(error) {
+        if (error?.code === 'MEDIA_MISMATCH') {
+            return this.#formatMediaMismatchError(error?.details)
+        }
+        return null
+    }
+
+    /**
+     * Formats a structured media mismatch payload from labelprinterkit.
+     * @param {{ loadedMedia?: object, expectedMedia?: object } | null | undefined} details
+     * @returns {string | null}
+     */
+    #formatMediaMismatchError(details) {
+        const loadedMedia = this.#describeMediaDetails(details?.loadedMedia)
+        const expectedMedia = this.#describeMediaDetails(details?.expectedMedia)
+        if (!loadedMedia || !expectedMedia) {
+            return null
+        }
+        return this.translate('print.mediaMismatch', { loadedMedia, expectedMedia })
+    }
+
+    /**
+     * Formats normalized media details into a localized description.
+     * @param {{ width?: number, mediaTypeName?: string, mediaType?: number, isKnown?: boolean } | null | undefined} details
+     * @returns {string | null}
+     */
+    #describeMediaDetails(details) {
+        const mediaTypeName = typeof details?.mediaTypeName === 'string' ? details.mediaTypeName : ''
+        const width = Number(details?.width)
+        if (mediaTypeName === 'NO_MEDIA' || Number(details?.mediaType) === 0) {
+            return this.translate('print.mediaDescriptionNone')
+        }
+
+        const mediaTypeLabel = this.#translateMediaTypeLabel(mediaTypeName)
+        if (Number.isFinite(width) && width > 0) {
+            if (mediaTypeLabel) {
+                return this.translate('print.mediaDescriptionWidthType', { width, mediaTypeLabel })
+            }
+            return this.translate('print.mediaDescriptionWidth', { width })
+        }
+        if (mediaTypeLabel) {
+            return this.translate('print.mediaDescriptionType', { mediaTypeLabel })
+        }
+        return null
+    }
+
+    /**
+     * Maps toolkit media type identifiers to app-localized labels.
+     * @param {string} mediaTypeName
+     * @returns {string | null}
+     */
+    #translateMediaTypeLabel(mediaTypeName) {
+        if (!mediaTypeName || mediaTypeName === 'LAMINATED_TAPE' || mediaTypeName === 'NO_MEDIA') {
+            return null
+        }
+        const translationKey = {
+            NON_LAMINATED_TAPE: 'print.mediaTypeNonLaminatedTape',
+            HEATSHRINK_TUBE_21: 'print.mediaTypeHeatShrinkTube21',
+            HEATSHRINK_TUBE_31: 'print.mediaTypeHeatShrinkTube31',
+            INCOMPATIBLE_TAPE: 'print.mediaTypeIncompatibleTape'
+        }[mediaTypeName]
+        if (!translationKey) {
+            return null
+        }
+        return this.translate(translationKey)
     }
 
     /**
