@@ -1,6 +1,6 @@
 {
     "name": "labelprinter-app",
-    "version": "1.1.12",
+    "version": "1.1.13",
     "description": "Browser label printer application built on top of labelprinterkit",
     "type": "module",
     "scripts": {
@@ -15,7 +15,7 @@
         "dotenv": "^16.4.7",
         "interactjs": "^1.10.27",
         "jsbarcode": "^3.12.1",
-        "labelprinterkit-web": "git+ssh://git@github.com/SunboX/labelprinterkit.git#aac12bb7585df9fa878920b1a6ffd073bc3bc5df",
+        "labelprinterkit-web": "git+ssh://git@github.com/SunboX/labelprinterkit.git#59b4dcf4b0af3fe878e99d7781c33d963348bad0",
         "qrcode": "^1.5.1",
         "xlsx": "^0.18.5"
     }
