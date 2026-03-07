@@ -1,4 +1,5 @@
 import { P700, P750W, E500, E550W, H500 } from 'labelprinterkit-web/src/index.mjs'
+import { MediaWidthCompatiblePrinterFactory } from './MediaWidthCompatiblePrinterFactory.mjs'
 
 /**
  * Runtime configuration helpers for app defaults, shape catalog, and printer map.
@@ -9,7 +10,7 @@ export class AppRuntimeConfig {
      * @returns {Record<string, any>}
      */
     static createPrinterMap() {
-        return { P700, P750W, E500, E550W, H500 }
+        return MediaWidthCompatiblePrinterFactory.createPrinterMap({ P700, P750W, E500, E550W, H500 })
     }
 
     /**
