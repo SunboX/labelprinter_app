@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
+import { AppRuntimeConfig } from '../src/AppRuntimeConfig.mjs'
 import { PrintController } from '../src/ui/PrintController.mjs'
 import { ErrorCodes, Media, MediaType, P700, Resolution, Status, StatusCodes, WebUSBBackend } from 'labelprinterkit-web/src/index.mjs'
 
@@ -141,7 +142,7 @@ class FakeStatusBackend {
 
 /**
  * Creates a PrintController test harness.
- * @param {{ mediaId?: string, renderMedia?: object }} [options={}]
+ * @param {{ mediaId?: string, renderMedia?: object, printerMap?: Record<string, Function> }} [options={}]
  * @returns {{ controller: PrintController, els: { print: { disabled: boolean } }, statusUpdates: Array<{ text: string, type: string }> }}
  */
 function createControllerHarness(options = {}) {
@@ -163,7 +164,7 @@ function createControllerHarness(options = {}) {
     const controller = new PrintController(
         els,
         state,
-        { P700 },
+        options.printerMap || { P700 },
         createPreviewRenderer({ media: renderMedia }),
         (text, type = 'info') => statusUpdates.push({ text, type }),
         (key) => key
@@ -237,6 +238,37 @@ describe('print-controller printer status errors', () => {
             'Loaded media mismatch: printer has 24mm tape, but this job expects 9mm tape. Load 9mm tape and retry.'
         )
         assert.equal(statusUpdates.at(-1)?.type, 'error')
+    })
+
+    it('allows same-width non-laminated tape when the app printer map wraps toolkit printers', async () => {
+        installNavigatorUsb(async () => [])
+        const backend = new FakeStatusBackend([
+            createStatus({
+                mediaWidth: Media.W9.width,
+                mediaType: MediaType.NON_LAMINATED_TAPE
+            }),
+            createStatus({
+                mediaWidth: Media.W9.width,
+                mediaType: MediaType.NON_LAMINATED_TAPE
+            })
+        ])
+        WebUSBBackend.requestDevice = async () => backend
+
+        const { controller, els, statusUpdates } = createControllerHarness({
+            printerMap: AppRuntimeConfig.createPrinterMap()
+        })
+        const originalConsoleError = console.error
+        console.error = () => {}
+        try {
+            await controller.print([{}])
+        } finally {
+            console.error = originalConsoleError
+        }
+
+        assert.equal(backend.statusCalls, 2)
+        assert.equal(els.print.disabled, false)
+        assert.equal(statusUpdates.at(-1)?.text, 'print.sentSingle')
+        assert.equal(statusUpdates.at(-1)?.type, 'success')
     })
 
     it('treats cloned render media as the same canonical media to avoid false mismatch errors', async () => {
