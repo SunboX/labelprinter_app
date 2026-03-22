@@ -88,6 +88,11 @@ npm test
 
 App-level tests are in `tests/`.
 
+## License
+
+Code in this repository is licensed under PolyForm Noncommercial 1.0.0.
+See `LICENSE` for the full terms and `NOTICE` for the required notices.
+
 ## Notes
 
 - The app uses an import map in `src/index.html` to resolve `labelprinterkit-web` in the browser.
