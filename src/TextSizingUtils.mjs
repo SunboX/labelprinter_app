@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 André Fiedler
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * Text sizing helpers that keep font appearance stable across media widths.
  */

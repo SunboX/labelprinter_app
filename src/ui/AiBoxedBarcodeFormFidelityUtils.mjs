@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 André Fiedler
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { AiRebuildPlacementHeuristics } from './AiRebuildPlacementHeuristics.mjs'
 import { AiRebuildPostProcessUtils } from './AiRebuildPostProcessUtils.mjs'
 import { AiBoxedBarcodeGeometryUtils } from './AiBoxedBarcodeGeometryUtils.mjs'

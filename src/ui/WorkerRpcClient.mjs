@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 André Fiedler
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * Lightweight RPC wrapper around module workers.
  * Handles request correlation, timeout cleanup, and stale response drops.

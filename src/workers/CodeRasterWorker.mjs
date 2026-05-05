@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 André Fiedler
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * Handles incoming QR/barcode rasterization requests.
  * This worker intentionally uses classic-script runtime loading for parity with app runtimes.

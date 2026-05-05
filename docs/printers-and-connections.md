@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 André Fiedler
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Printers, Setup, And Connections
 
 This document explains supported printer models, required setup, and both connection methods (`WebUSB` and `WebBluetooth`).

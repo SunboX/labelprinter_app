@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 André Fiedler
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # WebMCP
 
 The app now exposes a browser-side WebMCP tool so external in-browser agents can execute label actions and extended app controls without DOM scraping.

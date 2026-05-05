@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 André Fiedler
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { Job, Label, Media, P700, Resolution, WebBluetoothBackend, WebUSBBackend } from 'labelprinterkit-web/src/index.mjs'
 
 const WEBUSB_DEVICE_STORAGE_KEY = 'labelprinter.app.webusb.lastDevice.v1'

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 André Fiedler
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Objects, Properties, And Alignment
 
 This document describes every object type that can be placed on a label, its editable properties, and how object interactions and alignment work.

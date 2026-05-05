@@ -1,0 +1,30 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: labelprinter-app
+Upstream-Contact: André Fiedler / SunboX <https://github.com/SunboX>
+Source: https://github.com/SunboX/labelprinter_app
+
+Files:
+ .prettierrc.json
+ api/app-version.json
+ package-lock.json
+ package.json
+ src/i18n/*.json
+ src/main.mjs
+ src/ui/AiActionBridge.mjs
+ src/ui/AiUniversalRebuildNormalizer.mjs
+ src/ui/ItemsEditor.mjs
+ src/ui/PreviewRendererCanvasBuild.mjs
+Copyright: 2026 André Fiedler
+License: AGPL-3.0-or-later
+
+Files:
+ src/assets/icons/*.svg
+ src/assets/labelprinter-icon.svg
+Copyright: 2026 André Fiedler
+License: CC-BY-SA-4.0
+
+Files:
+ src/assets/fonts/Barlow-*.ttf
+ src/assets/fonts/OFL.txt
+Copyright: 2017 The Barlow Project Authors (https://github.com/jpt/barlow)
+License: OFL-1.1

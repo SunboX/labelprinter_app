@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 André Fiedler
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { P700, P750W, E500, E550W, H500 } from 'labelprinterkit-web/src/index.mjs'
 import { MediaWidthCompatiblePrinterFactory } from './MediaWidthCompatiblePrinterFactory.mjs'
 

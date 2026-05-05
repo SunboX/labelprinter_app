@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 André Fiedler
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Getting Started: Create And Print A Label
 
 This guide walks through the normal editor flow from an empty screen to a printed label.

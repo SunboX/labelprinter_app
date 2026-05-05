@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 André Fiedler
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { AiResponseUtils } from '../AiResponseUtils.mjs'
 import { AssistantErrorUtils } from '../AssistantErrorUtils.mjs'
 import { AssistantToolChoiceUtils } from '../AssistantToolChoiceUtils.mjs'

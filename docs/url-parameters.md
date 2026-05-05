@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 André Fiedler
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # URL Parameters
 
 This app supports URL-based loading and print behavior flags.

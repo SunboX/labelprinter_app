@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 André Fiedler
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Project JSON Schema (Practical Reference)
 
 This document describes the project JSON payload saved/loaded by the app.

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 André Fiedler
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { ZoomUtils } from './ZoomUtils.mjs'
 import { QrCodeUtils } from './QrCodeUtils.mjs'
 import { ImageRasterUtils } from './ImageRasterUtils.mjs'

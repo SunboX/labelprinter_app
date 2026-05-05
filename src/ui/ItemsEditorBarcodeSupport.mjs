@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 André Fiedler
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { BarcodeUtils } from '../BarcodeUtils.mjs'
 import { RotationUtils } from '../RotationUtils.mjs'
 import { ItemsEditorImageSupport } from './ItemsEditorImageSupport.mjs'

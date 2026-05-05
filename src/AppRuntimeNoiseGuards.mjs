@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 André Fiedler
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 const EXTENSION_ASYNC_CHANNEL_CLOSED_MESSAGE =
     'A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received'
 

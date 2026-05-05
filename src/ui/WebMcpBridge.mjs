@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 André Fiedler
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { WebMcpBridgeSchemaUtils } from './WebMcpBridgeSchemaUtils.mjs'
 
 const WEB_MCP_TOOL_NAME = 'labelprinter_action'

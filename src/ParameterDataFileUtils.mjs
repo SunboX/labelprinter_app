@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 André Fiedler
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * Converts parameter data files (JSON/CSV/XLS/XLSX/ODS) into JSON text for UI validation/preview.
  */

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 André Fiedler
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Security And Privacy Notes
 
 This app is a browser-side editor/print client. It does not include an application backend for user/project storage.

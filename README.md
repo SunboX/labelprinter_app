@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 André Fiedler
+
+SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+
 # Labelprinter App
 
 Web-based label editor application built on top of `labelprinterkit`.
@@ -90,8 +96,29 @@ App-level tests are in `tests/`.
 
 ## License
 
-Code in this repository is licensed under PolyForm Noncommercial 1.0.0.
-See `LICENSE` for the full terms and `NOTICE` for the required notices.
+This project is available under two licensing options:
+
+### 1. Open-source license
+
+The software in this repository is licensed under the GNU Affero General Public License v3.0 or later (`AGPL-3.0-or-later`).
+
+You may use, modify, and distribute this project under the AGPL. If you modify the software and make it available to users over a network, the AGPL requires that those users can access the corresponding source code of the modified version.
+
+Documentation and app-owned media are licensed under Creative Commons Attribution-ShareAlike 4.0 (`CC-BY-SA-4.0`) unless otherwise marked.
+
+Bundled Barlow font files remain licensed under the SIL Open Font License 1.1 (`OFL-1.1`).
+
+### 2. Commercial/proprietary license
+
+For use in closed-source, proprietary, or otherwise AGPL-incompatible products, a separate commercial license is required.
+
+Commercial licensing contact: [SunboX on GitHub](https://github.com/SunboX)
+
+### Attribution / notices
+
+Copyright (C) 2026 André Fiedler.
+
+Copyright, license, attribution, and source-origin notices must be preserved as required by the applicable licenses and the notice files in this repository.
 
 ## Notes
 

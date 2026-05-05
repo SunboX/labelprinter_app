@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 André Fiedler
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { PreviewLayoutUtils } from '../PreviewLayoutUtils.mjs'
 import { ZoomUtils } from '../ZoomUtils.mjs'
 import { InteractionUtils } from '../InteractionUtils.mjs'
