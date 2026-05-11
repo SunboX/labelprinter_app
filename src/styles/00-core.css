@@ -160,6 +160,15 @@ body {
     margin-bottom: 10px;
 }
 
+.footer-slogan {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin: 0 0 12px;
+    text-align: center;
+}
+
 .footer-grid {
     display: grid;
     grid-template-columns: auto auto auto 1fr;
