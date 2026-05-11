@@ -89,3 +89,14 @@ If something does not behave as expected, start with [troubleshooting.md](./trou
 3. Optionally attach a sketch image.
 
 Assistant scope, supported actions, and backend routing are in [ai-assistant.md](./ai-assistant.md).
+
+## 10. Analytics
+
+- The app loads the centralized cookieless tracker from `https://analytics.andrefiedler.de/tracker.js`.
+- The public site key is `labelprinter_app`.
+- Register each deployed browser origin in the Analytics `analytics_sites` table or dashboard before expecting events. The production row should use the deployed app origin and public key `labelprinter_app`.
+
+```sql
+INSERT INTO analytics_sites (name, allowed_origin, public_key, active, created_at)
+VALUES ('Labelprinter App', 'https://your-labelprinter-app-origin.example', 'labelprinter_app', 1, UTC_TIMESTAMP());
+```
