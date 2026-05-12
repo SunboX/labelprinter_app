@@ -17,6 +17,7 @@ loadDotEnv({ path: resolve(projectRoot, '.env') })
 const app = express()
 const port = Number(process.env.PORT) || 3000
 const rateLimitBuckets = new Map()
+const staticAssetOptions = { redirect: false }
 
 const DEFAULT_DOC_FILES = [
     'getting-started.md',
@@ -54,7 +55,8 @@ let docsCachePromise = null
 app.use(express.json({ limit: '8mb' }))
 app.use('/node_modules', express.static(join(projectRoot, 'node_modules')))
 app.use('/docs', express.static(join(projectRoot, 'docs')))
-app.use(express.static(__dirname))
+app.use('/src', express.static(__dirname, staticAssetOptions))
+app.use(express.static(__dirname, staticAssetOptions))
 
 /**
  * Parses a boolean from environment strings.
@@ -683,6 +685,15 @@ function logAssistantDebug(event, context = {}) {
     console.info(`[assistant-debug] ${event} ${safeContext}`)
 }
 
+/**
+ * Sends the static app shell for crawlable route aliases.
+ * @param {express.Request} _req
+ * @param {express.Response} res
+ */
+function sendAppShell(_req, res) {
+    res.sendFile(join(__dirname, 'index.html'))
+}
+
 app.get(['/api/app-meta', '/api/app-meta.php'], async (_req, res) => {
     const version = await appVersionPromise
     res.json({ version })
@@ -792,9 +803,7 @@ app.post('/api/chat', async (req, res) => {
     }
 })
 
-app.get(['/src', '/src/'], (_req, res) => {
-    res.redirect('/')
-})
+app.get(['/src', '/src/'], sendAppShell)
 
 const server = app.listen(port, () => {
     console.log(`Labelprinter app running at http://localhost:${port}/`)
