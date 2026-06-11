@@ -15,7 +15,7 @@ This repository is the label printer application (editor/UI) and references `lab
 - `src/index.html`: app shell + import map
 - `src/main.mjs`: app controller and wiring
 - `src/ui/`: UI modules (`ItemsEditor`, `PreviewRenderer`, `PrintController`)
-- `src/ui/WebMcpBridge.mjs`: browser WebMCP bridge (`navigator.modelContext`) that exposes `labelprinter_action`
+- `src/ui/WebMcpBridge.mjs`: browser WebMCP bridge (`document.modelContext`) that exposes the action, context, validation, print-prep, and label-data import tools
 - `src/*-utils.mjs`: app utility modules
 - `src/i18n/`: locale bundles (`en.json`, `de.json`)
 - `src/assets/icons/`: SVG icon catalog used by icon objects

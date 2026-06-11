@@ -18,6 +18,8 @@ const app = express()
 const port = Number(process.env.PORT) || 3000
 const rateLimitBuckets = new Map()
 const staticAssetOptions = { redirect: false }
+const WEB_MCP_ORIGIN_TRIAL_TOKEN =
+    'AjH3Mb+g5uL8e0Csze4isEVXg1owuWGXz9NdNiKxCAsCDcylQmsp0XsxSHtTMXVvPCUcMf1t4PSf556Z8JXKjwwAAABQeyJvcmlnaW4iOiJodHRwczovL2xhYmVscHJpbnRlci5hcHA6NDQzIiwiZmVhdHVyZSI6IldlYk1DUCIsImV4cGlyeSI6MTc5NDg3MzYwMH0='
 
 const DEFAULT_DOC_FILES = [
     'getting-started.md',
@@ -53,10 +55,24 @@ const appVersionPromise = readAppVersion()
 let docsCachePromise = null
 
 app.use(express.json({ limit: '8mb' }))
+app.use(applyWebMcpResponseHeaders)
 app.use('/node_modules', express.static(join(projectRoot, 'node_modules')))
 app.use('/docs', express.static(join(projectRoot, 'docs')))
 app.use('/src', express.static(__dirname, staticAssetOptions))
 app.use(express.static(__dirname, staticAssetOptions))
+
+/**
+ * Applies WebMCP origin-trial and policy headers to browser responses.
+ * @param {express.Request} _req
+ * @param {express.Response} res
+ * @param {express.NextFunction} next
+ */
+function applyWebMcpResponseHeaders(_req, res, next) {
+    res.setHeader('Origin-Agent-Cluster', '?1')
+    res.setHeader('Permissions-Policy', 'tools=(self)')
+    res.setHeader('Origin-Trial', WEB_MCP_ORIGIN_TRIAL_TOKEN)
+    next()
+}
 
 /**
  * Parses a boolean from environment strings.

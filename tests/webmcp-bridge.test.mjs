@@ -19,7 +19,7 @@ function parseToolResponse(response) {
 }
 
 describe('webmcp-bridge', () => {
-    it('is a no-op when navigator.modelContext is unavailable', async () => {
+    it('is a no-op when modelContext is unavailable', async () => {
         const bridge = new WebMcpBridge({
             aiActionBridge: {
                 runActions: async () => ({ executed: [], errors: [], warnings: [] }),
@@ -35,14 +35,14 @@ describe('webmcp-bridge', () => {
                 buildProjectPayload: () => ({}),
                 buildProjectShareUrl: () => ''
             },
-            runtime: { navigator: {} }
+            runtime: { document: {}, navigator: {} }
         })
 
         assert.equal(await bridge.init(), false)
     })
 
-    it('registers the tool using registerTool when available', async () => {
-        let registeredTool = null
+    it('registers the tool set using document.modelContext.registerTool when available', async () => {
+        const registeredTools = []
         const bridge = new WebMcpBridge({
             aiActionBridge: {
                 runActions: async () => ({ executed: [], errors: [], warnings: [] }),
@@ -59,10 +59,79 @@ describe('webmcp-bridge', () => {
                 buildProjectShareUrl: () => ''
             },
             runtime: {
+                document: {
+                    modelContext: {
+                        registerTool: (tool) => {
+                            registeredTools.push(tool)
+                        }
+                    }
+                }
+            }
+        })
+
+        assert.equal(await bridge.init(), true)
+        const toolMap = new Map(registeredTools.map((tool) => [tool.name, tool]))
+        assert.deepEqual(
+            registeredTools.map((tool) => tool.name),
+            ['labelprinter_action', 'get_label_context', 'validate_project', 'prepare_print', 'import_label_data']
+        )
+
+        const actionTool = toolMap.get('labelprinter_action')
+        assert.ok(actionTool)
+        assert.equal(actionTool.title, 'Labelprinter action')
+        assert.equal(typeof actionTool.execute, 'function')
+        assert.equal(actionTool.inputSchema.type, 'object')
+        assert.deepEqual(actionTool.annotations, {
+            readOnlyHint: false,
+            untrustedContentHint: true
+        })
+        assert.deepEqual(toolMap.get('get_label_context')?.annotations, {
+            readOnlyHint: true,
+            untrustedContentHint: true
+        })
+        assert.deepEqual(toolMap.get('validate_project')?.annotations, {
+            readOnlyHint: true,
+            untrustedContentHint: true
+        })
+        assert.deepEqual(toolMap.get('prepare_print')?.annotations, {
+            readOnlyHint: false,
+            untrustedContentHint: true
+        })
+        assert.deepEqual(toolMap.get('import_label_data')?.annotations, {
+            readOnlyHint: false,
+            untrustedContentHint: true
+        })
+    })
+
+    it('prefers document.modelContext over deprecated navigator.modelContext', async () => {
+        const registeredTargets = []
+        const bridge = new WebMcpBridge({
+            aiActionBridge: {
+                runActions: async () => ({ executed: [], errors: [], warnings: [] }),
+                getUiStateSnapshot: () => ({}),
+                getActionCapabilities: () => ({})
+            },
+            appController: {
+                setZoom: () => {},
+                setLocale: () => {},
+                applyProjectPayload: async () => {},
+                loadProjectFromUrl: async () => {},
+                loadParameterDataFromUrl: async () => {},
+                buildProjectPayload: () => ({}),
+                buildProjectShareUrl: () => ''
+            },
+            runtime: {
+                document: {
+                    modelContext: {
+                        registerTool: (tool) => {
+                            registeredTargets.push(`document:${tool.name}`)
+                        }
+                    }
+                },
                 navigator: {
                     modelContext: {
                         registerTool: (tool) => {
-                            registeredTool = tool
+                            registeredTargets.push(`navigator:${tool.name}`)
                         }
                     }
                 }
@@ -70,14 +139,17 @@ describe('webmcp-bridge', () => {
         })
 
         assert.equal(await bridge.init(), true)
-        assert.ok(registeredTool)
-        assert.equal(registeredTool.name, 'labelprinter_action')
-        assert.equal(typeof registeredTool.execute, 'function')
-        assert.equal(registeredTool.inputSchema.type, 'object')
+        assert.deepEqual(registeredTargets, [
+            'document:labelprinter_action',
+            'document:get_label_context',
+            'document:validate_project',
+            'document:prepare_print',
+            'document:import_label_data'
+        ])
     })
 
-    it('falls back to provideContext when registerTool is unavailable', async () => {
-        let providedTools = []
+    it('ignores legacy provideContext-only runtimes', async () => {
+        let provided = false
         const bridge = new WebMcpBridge({
             aiActionBridge: {
                 runActions: async () => ({ executed: [], errors: [], warnings: [] }),
@@ -96,17 +168,16 @@ describe('webmcp-bridge', () => {
             runtime: {
                 navigator: {
                     modelContext: {
-                        provideContext: ({ tools }) => {
-                            providedTools = Array.isArray(tools) ? tools : []
+                        provideContext: () => {
+                            provided = true
                         }
                     }
                 }
             }
         })
 
-        assert.equal(await bridge.init(), true)
-        assert.equal(providedTools.length, 1)
-        assert.equal(providedTools[0].name, 'labelprinter_action')
+        assert.equal(await bridge.init(), false)
+        assert.equal(provided, false)
     })
 
     it('keeps mixed editor and extended actions in deterministic order', async () => {
@@ -144,7 +215,9 @@ describe('webmcp-bridge', () => {
                 navigator: {
                     modelContext: {
                         registerTool: (tool) => {
-                            registeredTool = tool
+                            if (tool.name === 'labelprinter_action') {
+                                registeredTool = tool
+                            }
                         }
                     }
                 }
@@ -195,7 +268,9 @@ describe('webmcp-bridge', () => {
                 navigator: {
                     modelContext: {
                         registerTool: (tool) => {
-                            registeredTool = tool
+                            if (tool.name === 'labelprinter_action') {
+                                registeredTool = tool
+                            }
                         }
                     }
                 }
@@ -234,6 +309,237 @@ describe('webmcp-bridge', () => {
         assert.deepEqual(supportedValuesResult?.supportedValues?.printers, ['P700', 'P750W'])
         assert.deepEqual(supportedValuesResult?.supportedValues?.media, ['W9', 'W24'])
         assert.deepEqual(supportedValuesResult?.supportedValues?.resolutions, ['LOW', 'HIGH'])
+    })
+
+    it('keeps oversized tool outputs parseable and within the WebMCP response budget', async () => {
+        let registeredTool = null
+        const largeProject = {
+            version: '1.1.20',
+            items: Array.from({ length: 12 }, (_entry, index) => ({
+                id: `item-${index + 1}`,
+                type: 'text',
+                text: `Long exported label text ${index + 1}: ${'x'.repeat(600)}`
+            }))
+        }
+        const bridge = new WebMcpBridge({
+            aiActionBridge: {
+                runActions: async () => ({ executed: [], errors: [], warnings: [] }),
+                getUiStateSnapshot: () => ({
+                    selection: largeProject.items.map((item) => item.id),
+                    diagnostics: 'u'.repeat(900)
+                }),
+                getActionCapabilities: () => ({ actions: [] })
+            },
+            appController: {
+                setZoom: () => {},
+                setLocale: () => {},
+                applyProjectPayload: async () => {},
+                loadProjectFromUrl: async () => {},
+                loadParameterDataFromUrl: async () => {},
+                buildProjectPayload: () => largeProject,
+                buildProjectShareUrl: () => ''
+            },
+            runtime: {
+                document: {
+                    modelContext: {
+                        registerTool: (tool) => {
+                            if (tool.name === 'labelprinter_action') {
+                                registeredTool = tool
+                            }
+                        }
+                    }
+                }
+            }
+        })
+
+        await bridge.init()
+        const response = await registeredTool.execute({
+            actions: [{ action: 'export_project_json' }, { action: 'get_ui_state' }]
+        })
+        const outputText = String(response?.content?.[0]?.text || '')
+        const payload = parseToolResponse(response)
+
+        assert.equal(payload.ok, true)
+        assert.equal(outputText.length <= 1500, true)
+        assert.equal(payload.warnings.some((warning) => warning.includes('shortened')), true)
+        assert.equal(payload.results.some((entry) => entry.action === 'export_project_json'), true)
+        assert.equal(payload.results.some((entry) => entry.action === 'get_ui_state'), true)
+    })
+
+    it('serves focused label context and project validation tools', async () => {
+        const registeredTools = new Map()
+        const projectState = {
+            backend: 'ble',
+            printer: 'P700',
+            media: 'W24',
+            resolution: 'HIGH',
+            orientation: 'horizontal',
+            mediaLengthMm: 80,
+            ble: {
+                serviceUuid: '0000aaaa-0000-1000-8000-00805f9b34fb'
+            },
+            parameters: [{ name: 'sku', defaultValue: '' }],
+            parameterDataRows: [{ sku: '' }],
+            parameterDataSourceName: 'rows.json',
+            items: [
+                { id: 'item-1', type: 'text', text: 'A' },
+                { id: 'item-2', type: 'qr', payload: 'B' }
+            ]
+        }
+        const parameterPanel = {
+            validation: {
+                errors: [],
+                warnings: [{ code: 'fallbackDefaultParameter', parameterName: 'sku' }]
+            },
+            parseError: null,
+            hasBlockingErrors: () => false
+        }
+        const bridge = new WebMcpBridge({
+            aiActionBridge: {
+                runActions: async () => ({ executed: [], errors: [], warnings: [] }),
+                getUiStateSnapshot: () => ({
+                    selectedItemIds: ['item-2'],
+                    warnings: ['Preview uses fallback parameter value.']
+                }),
+                getActionCapabilities: () => ({ actions: [] }),
+                parameterPanel
+            },
+            appController: {
+                setZoom: () => {},
+                setLocale: () => {},
+                applyProjectPayload: async () => {},
+                loadProjectFromUrl: async () => {},
+                loadParameterDataFromUrl: async () => {},
+                buildProjectPayload: () => ({
+                    ...projectState,
+                    parameters: projectState.parameters.map((entry) => ({ ...entry })),
+                    parameterDataRows: projectState.parameterDataRows.map((row) => ({ ...row })),
+                    items: projectState.items.map((item) => ({ ...item }))
+                }),
+                buildProjectShareUrl: () => ''
+            },
+            runtime: {
+                document: {
+                    modelContext: {
+                        registerTool: (tool) => {
+                            registeredTools.set(tool.name, tool)
+                        }
+                    }
+                }
+            }
+        })
+
+        await bridge.init()
+        const contextPayload = parseToolResponse(await registeredTools.get('get_label_context').execute({}))
+        const validationPayload = parseToolResponse(await registeredTools.get('validate_project').execute({}))
+
+        assert.equal(contextPayload.ok, true)
+        assert.equal(contextPayload.context.label.media, 'W24')
+        assert.equal(contextPayload.context.itemCount, 2)
+        assert.deepEqual(contextPayload.context.selectedItemIds, ['item-2'])
+        assert.equal(contextPayload.context.parameterState.rowCount, 1)
+        assert.equal(contextPayload.context.warnings.includes('Preview uses fallback parameter value.'), true)
+
+        assert.equal(validationPayload.ok, true)
+        assert.equal(validationPayload.validation.valid, false)
+        assert.equal(
+            validationPayload.validation.errors.some((message) => message.includes('writeCharacteristicUuid')),
+            true
+        )
+        assert.equal(validationPayload.validation.warnings.length >= 1, true)
+    })
+
+    it('serves prepare_print and import_label_data without silently printing', async () => {
+        const registeredTools = new Map()
+        const runCalls = []
+        const focusCalls = []
+        const applyRawCalls = []
+        const projectState = {
+            backend: 'usb',
+            printer: 'P700',
+            media: 'W24',
+            resolution: 'HIGH',
+            orientation: 'horizontal',
+            parameters: [{ name: 'name', defaultValue: '' }],
+            parameterDataRows: [],
+            parameterDataRaw: '[]',
+            parameterDataSourceName: '',
+            items: [{ id: 'item-1', type: 'text', text: '{{name}}' }]
+        }
+        const parameterPanel = {
+            validation: { errors: [], warnings: [] },
+            parseError: null,
+            hasBlockingErrors: () => false,
+            buildPrintParameterValueMaps: () => projectState.parameterDataRows,
+            applyParameterDataRawText: (rawText, sourceName) => {
+                applyRawCalls.push({ rawText, sourceName })
+                projectState.parameterDataRaw = rawText
+                projectState.parameterDataRows = JSON.parse(rawText)
+                projectState.parameterDataSourceName = sourceName
+            }
+        }
+        const bridge = new WebMcpBridge({
+            aiActionBridge: {
+                runActions: async (actions) => {
+                    runCalls.push(actions)
+                    return { executed: [], errors: [], warnings: [] }
+                },
+                getUiStateSnapshot: () => ({ selectedItemIds: ['item-1'] }),
+                getActionCapabilities: () => ({ actions: [] }),
+                parameterPanel
+            },
+            appController: {
+                setZoom: () => {},
+                setLocale: () => {},
+                applyProjectPayload: async () => {},
+                loadProjectFromUrl: async () => {},
+                loadParameterDataFromUrl: async () => {},
+                els: {
+                    print: {
+                        focus: () => focusCalls.push('print')
+                    }
+                },
+                buildProjectPayload: () => ({
+                    ...projectState,
+                    parameters: projectState.parameters.map((entry) => ({ ...entry })),
+                    parameterDataRows: projectState.parameterDataRows.map((row) => ({ ...row })),
+                    items: projectState.items.map((item) => ({ ...item }))
+                }),
+                buildProjectShareUrl: () => ''
+            },
+            runtime: {
+                document: {
+                    modelContext: {
+                        registerTool: (tool) => {
+                            registeredTools.set(tool.name, tool)
+                        }
+                    }
+                }
+            }
+        })
+
+        await bridge.init()
+        const importPayload = parseToolResponse(
+            await registeredTools.get('import_label_data').execute({
+                rows: [{ name: 'Andres' }, { name: 'Maria' }],
+                sourceName: 'rows.json'
+            })
+        )
+        const preparePayload = parseToolResponse(await registeredTools.get('prepare_print').execute({}))
+
+        assert.equal(importPayload.ok, true)
+        assert.equal(importPayload.imported.rowCount, 2)
+        assert.equal(importPayload.imported.sourceName, 'rows.json')
+        assert.equal(importPayload.parameterState.rowCount, 2)
+        assert.equal(applyRawCalls.length, 1)
+
+        assert.equal(preparePayload.ok, true)
+        assert.equal(preparePayload.ready, true)
+        assert.equal(preparePayload.userActionRequired, true)
+        assert.equal(preparePayload.focusedPrintButton, true)
+        assert.equal(preparePayload.validation.parameterBatchCount, 2)
+        assert.deepEqual(focusCalls, ['print'])
+        assert.deepEqual(runCalls, [])
     })
 
     it('applies project-patched WebMCP actions for BLE, parameters, and Google font links', async () => {
@@ -289,7 +595,9 @@ describe('webmcp-bridge', () => {
                 navigator: {
                     modelContext: {
                         registerTool: (tool) => {
-                            registeredTool = tool
+                            if (tool.name === 'labelprinter_action') {
+                                registeredTool = tool
+                            }
                         }
                     }
                 }
@@ -383,7 +691,9 @@ describe('webmcp-bridge', () => {
                 navigator: {
                     modelContext: {
                         registerTool: (tool) => {
-                            registeredTool = tool
+                            if (tool.name === 'labelprinter_action') {
+                                registeredTool = tool
+                            }
                         }
                     }
                 }
@@ -436,7 +746,9 @@ describe('webmcp-bridge', () => {
                 navigator: {
                     modelContext: {
                         registerTool: (tool) => {
-                            registeredTool = tool
+                            if (tool.name === 'labelprinter_action') {
+                                registeredTool = tool
+                            }
                         }
                     }
                 }

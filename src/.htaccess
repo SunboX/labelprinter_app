@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 André Fiedler
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+<IfModule mod_headers.c>
+    Header always set Origin-Agent-Cluster "?1"
+    Header always set Permissions-Policy "tools=(self)"
+    Header always set Origin-Trial "AjH3Mb+g5uL8e0Csze4isEVXg1owuWGXz9NdNiKxCAsCDcylQmsp0XsxSHtTMXVvPCUcMf1t4PSf556Z8JXKjwwAAABQeyJvcmlnaW4iOiJodHRwczovL2xhYmVscHJpbnRlci5hcHA6NDQzIiwiZmVhdHVyZSI6IldlYk1DUCIsImV4cGlyeSI6MTc5NDg3MzYwMH0="
+</IfModule>

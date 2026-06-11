@@ -61,6 +61,52 @@ export class WebMcpBridgeSchemaUtils {
     }
 
     /**
+     * Builds an empty-object schema for read-only context tools.
+     * @returns {Record<string, any>}
+     */
+    static buildEmptyInputSchema() {
+        return {
+            type: 'object',
+            properties: {}
+        }
+    }
+
+    /**
+     * Builds the prepare-print tool input schema.
+     * @returns {Record<string, any>}
+     */
+    static buildPreparePrintInputSchema() {
+        return {
+            type: 'object',
+            properties: {
+                skipBatchConfirm: { type: 'boolean' }
+            }
+        }
+    }
+
+    /**
+     * Builds the focused label-data import tool input schema.
+     * @returns {Record<string, any>}
+     */
+    static buildImportLabelDataInputSchema() {
+        return {
+            type: 'object',
+            properties: {
+                rows: {
+                    oneOf: [
+                        { type: 'array', items: { type: 'object' } },
+                        { type: 'object' }
+                    ]
+                },
+                json: { type: 'string' },
+                parameterData: { type: ['string', 'array', 'object'] },
+                sourceName: { type: 'string' },
+                sourceLabel: { type: 'string' }
+            }
+        }
+    }
+
+    /**
      * Builds the WebMCP action input schema.
      * @returns {Record<string, any>}
      */

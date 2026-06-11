@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { WebMcpBridgeSchemaUtils } from './WebMcpBridgeSchemaUtils.mjs'
+import { WebMcpProjectInspector } from './WebMcpProjectInspector.mjs'
+import { WebMcpResponseBudgetUtils } from './WebMcpResponseBudgetUtils.mjs'
+import { WEB_MCP_TOOL_NAMES, WebMcpToolDefinitions } from './WebMcpToolDefinitions.mjs'
 
-const WEB_MCP_TOOL_NAME = 'labelprinter_action'
 const WEB_MCP_SOURCE_LABEL = 'WebMCP'
 const EDITOR_ACTION_NAMES = new Set([
     'add_item',
@@ -52,26 +54,18 @@ export class WebMcpBridge {
     }
 
     /**
-     * Registers the WebMCP tool when navigator.modelContext is available.
+     * Registers the WebMCP tool when document.modelContext is available.
      * @returns {Promise<boolean>}
      */
     async init() {
         const modelContext = this.#resolveModelContext()
         if (!modelContext) return false
-        const toolDefinition = this.#buildToolDefinition()
+        const toolDefinitions = this.#buildToolDefinitions()
         try {
-            if (typeof modelContext.registerTool === 'function') {
+            for (const toolDefinition of toolDefinitions) {
                 await Promise.resolve(modelContext.registerTool(toolDefinition))
-                return true
             }
-            if (typeof modelContext.provideContext === 'function') {
-                await Promise.resolve(
-                    modelContext.provideContext({
-                        tools: [toolDefinition]
-                    })
-                )
-                return true
-            }
+            return true
         } catch (error) {
             console.info('WebMCP registration failed:', this.#normalizeErrorMessage(error))
         }
@@ -79,39 +73,34 @@ export class WebMcpBridge {
     }
 
     /**
-     * Resolves navigator.modelContext from the active runtime.
-     * @returns {Record<string, any> | null}
+     * Resolves the current WebMCP modelContext from the active runtime.
+     * @returns {{ registerTool: Function } | null}
      */
     #resolveModelContext() {
+        const documentRef = this.#runtime?.document
         const navigatorRef = this.#runtime?.navigator
-        const modelContext = navigatorRef?.modelContext
-        if (!modelContext || typeof modelContext !== 'object') return null
-        const canRegister = typeof modelContext.registerTool === 'function'
-        const canProvideContext = typeof modelContext.provideContext === 'function'
-        if (!canRegister && !canProvideContext) return null
-        return modelContext
-    }
-
-    /**
-     * Builds the single WebMCP tool definition.
-     * @returns {Record<string, any>}
-     */
-    #buildToolDefinition() {
-        return {
-            name: WEB_MCP_TOOL_NAME,
-            description:
-                'Execute Labelprinter editor actions and extended app controls in one ordered action pipeline.',
-            inputSchema: this.#buildInputSchema(),
-            execute: async (input) => this.#executeTool(input)
+        const candidates = [documentRef?.modelContext, navigatorRef?.modelContext]
+        for (const modelContext of candidates) {
+            if (!modelContext || typeof modelContext !== 'object') continue
+            if (typeof modelContext.registerTool === 'function') {
+                return modelContext
+            }
         }
+        return null
     }
 
     /**
-     * Builds the WebMCP input schema.
-     * @returns {Record<string, any>}
+     * Builds all WebMCP tool definitions.
+     * @returns {Array<Record<string, any>>}
      */
-    #buildInputSchema() {
-        return WebMcpBridgeSchemaUtils.buildInputSchema()
+    #buildToolDefinitions() {
+        return WebMcpToolDefinitions.build({
+            executeAction: async (input) => this.#executeTool(input),
+            executeLabelContext: async () => this.#executeLabelContextTool(),
+            executeValidateProject: async () => this.#executeValidateProjectTool(),
+            executePreparePrint: async (input) => this.#executePreparePrintTool(input),
+            executeImportLabelData: async (input) => this.#executeImportLabelDataTool(input)
+        })
     }
 
     /**
@@ -145,10 +134,176 @@ export class WebMcpBridge {
             content: [
                 {
                     type: 'text',
-                    text: JSON.stringify(envelope, null, 2)
+                    text: WebMcpResponseBudgetUtils.serializeEnvelope(envelope, {
+                        toolName: WEB_MCP_TOOL_NAMES.action
+                    })
                 }
             ]
         }
+    }
+
+    /**
+     * Executes the focused label-context tool.
+     * @returns {Promise<{ content: Array<{ type: 'text', text: string }> }>}
+     */
+    async #executeLabelContextTool() {
+        const context = this.#buildLabelContext()
+        return this.#buildToolResponse({ ok: true, context }, WEB_MCP_TOOL_NAMES.labelContext)
+    }
+
+    /**
+     * Executes the focused project-validation tool.
+     * @returns {Promise<{ content: Array<{ type: 'text', text: string }> }>}
+     */
+    async #executeValidateProjectTool() {
+        await this.#waitForParameterValidation()
+        const validation = this.#buildProjectValidation()
+        return this.#buildToolResponse({ ok: true, validation }, WEB_MCP_TOOL_NAMES.validateProject)
+    }
+
+    /**
+     * Executes print preparation without starting printer output.
+     * @param {Record<string, any>} _input
+     * @returns {Promise<{ content: Array<{ type: 'text', text: string }> }>}
+     */
+    async #executePreparePrintTool(_input) {
+        await this.#waitForParameterValidation()
+        const validation = this.#buildProjectValidation()
+        const focusedPrintButton = validation.printReady ? this.#focusPrintButton() : false
+        return this.#buildToolResponse(
+            {
+                ok: true,
+                ready: validation.printReady,
+                userActionRequired: true,
+                focusedPrintButton,
+                validation
+            },
+            WEB_MCP_TOOL_NAMES.preparePrint
+        )
+    }
+
+    /**
+     * Executes focused parameter data import.
+     * @param {Record<string, any>} input
+     * @returns {Promise<{ content: Array<{ type: 'text', text: string }> }>}
+     */
+    async #executeImportLabelDataTool(input) {
+        try {
+            const rows = this.#normalizeParameterDataRows(this.#extractImportLabelData(input))
+            const sourceName = String(input?.sourceName || WEB_MCP_SOURCE_LABEL).trim() || WEB_MCP_SOURCE_LABEL
+            const sourceLabel = this.#resolveSourceLabel(input?.sourceLabel)
+            await this.#applyParameterDataRows(rows, sourceName, sourceLabel)
+            return this.#buildToolResponse(
+                {
+                    ok: true,
+                    imported: {
+                        rowCount: rows.length,
+                        sourceName
+                    },
+                    parameterState: this.#buildParameterStateSnapshot()
+                },
+                WEB_MCP_TOOL_NAMES.importLabelData
+            )
+        } catch (error) {
+            return this.#buildToolResponse(
+                {
+                    ok: false,
+                    errors: [this.#normalizeErrorMessage(error)]
+                },
+                WEB_MCP_TOOL_NAMES.importLabelData
+            )
+        }
+    }
+
+    /**
+     * Builds a serialized WebMCP content response.
+     * @param {Record<string, any>} payload
+     * @param {string} toolName
+     * @returns {{ content: Array<{ type: 'text', text: string }> }}
+     */
+    #buildToolResponse(payload, toolName) {
+        return {
+            content: [
+                {
+                    type: 'text',
+                    text: WebMcpResponseBudgetUtils.serializeEnvelope(payload, { toolName })
+                }
+            ]
+        }
+    }
+
+    /**
+     * Builds compact current label context.
+     * @returns {Record<string, any>}
+     */
+    #buildLabelContext() {
+        const payload = this.#safeBuildProjectPayload()
+        const uiState = this.#safeGetUiStateSnapshot()
+        const parameterState = this.#buildParameterStateSnapshot()
+        return WebMcpProjectInspector.buildLabelContext({
+            payload,
+            uiState,
+            parameterState,
+            supportedValues: this.#buildSupportedValuesSnapshot(),
+            toolName: WEB_MCP_TOOL_NAMES.labelContext
+        })
+    }
+
+    /**
+     * Builds print-readiness validation for the current project.
+     * @returns {Record<string, any>}
+     */
+    #buildProjectValidation() {
+        const payload = this.#safeBuildProjectPayload()
+        const uiState = this.#safeGetUiStateSnapshot()
+        const parameterState = this.#buildParameterStateSnapshot()
+        return WebMcpProjectInspector.buildProjectValidation({
+            payload,
+            uiState,
+            parameterState,
+            parameterPanel: this.#safeGetParameterPanel(),
+            supportedValues: this.#buildSupportedValuesSnapshot()
+        })
+    }
+
+    /**
+     * Waits for parameter validation if the panel exposes that hook.
+     * @returns {Promise<void>}
+     */
+    async #waitForParameterValidation() {
+        const parameterPanel = this.#safeGetParameterPanel()
+        if (typeof parameterPanel?.waitForValidation === 'function') {
+            await parameterPanel.waitForValidation()
+        }
+    }
+
+    /**
+     * Focuses the visible print button when the app exposes it.
+     * @returns {boolean}
+     */
+    #focusPrintButton() {
+        try {
+            const printButton = this.#appController?.els?.print
+            if (typeof printButton?.focus === 'function') {
+                printButton.focus()
+                return true
+            }
+        } catch (_error) {}
+        return false
+    }
+
+    /**
+     * Extracts focused label-data import input.
+     * @param {Record<string, any>} input
+     * @returns {unknown}
+     */
+    #extractImportLabelData(input) {
+        if (input && typeof input === 'object') {
+            if (Object.hasOwn(input, 'rows')) return input.rows
+            if (Object.hasOwn(input, 'json')) return input.json
+            if (Object.hasOwn(input, 'parameterData')) return input.parameterData
+        }
+        throw new Error('Missing rows or json value')
     }
 
     /**
@@ -297,21 +452,8 @@ export class WebMcpBridge {
                 case 'set_parameter_data_json': {
                     const rows = this.#normalizeParameterDataRows(action.parameterData)
                     const sourceName = String(action.sourceName || WEB_MCP_SOURCE_LABEL).trim() || WEB_MCP_SOURCE_LABEL
-                    const rawJson = JSON.stringify(rows, null, 2)
-                    const parameterPanel = this.#safeGetParameterPanel()
-                    if (typeof parameterPanel?.applyParameterDataRawText === 'function') {
-                        parameterPanel.applyParameterDataRawText(rawJson, sourceName)
-                    } else {
-                        const sourceLabel = this.#resolveSourceLabel(action.sourceLabel)
-                        await this.#applyPatchedProjectPayload(
-                            (payload) => {
-                                payload.parameterDataRows = rows
-                                payload.parameterDataRaw = rawJson
-                                payload.parameterDataSourceName = sourceName
-                            },
-                            sourceLabel
-                        )
-                    }
+                    const sourceLabel = this.#resolveSourceLabel(action.sourceLabel)
+                    await this.#applyParameterDataRows(rows, sourceName, sourceLabel)
                     envelope.executed.push('set_parameter_data_json')
                     envelope.results.push({
                         action: 'set_parameter_data_json',
@@ -463,6 +605,30 @@ export class WebMcpBridge {
         }
         patcher(payload)
         await this.#appController.applyProjectPayload(payload, sourceLabel)
+    }
+
+    /**
+     * Applies normalized parameter rows through the best available app path.
+     * @param {Array<Record<string, unknown>>} rows
+     * @param {string} sourceName
+     * @param {string} sourceLabel
+     * @returns {Promise<void>}
+     */
+    async #applyParameterDataRows(rows, sourceName, sourceLabel) {
+        const rawJson = JSON.stringify(rows, null, 2)
+        const parameterPanel = this.#safeGetParameterPanel()
+        if (typeof parameterPanel?.applyParameterDataRawText === 'function') {
+            parameterPanel.applyParameterDataRawText(rawJson, sourceName)
+            return
+        }
+        await this.#applyPatchedProjectPayload(
+            (payload) => {
+                payload.parameterDataRows = rows
+                payload.parameterDataRaw = rawJson
+                payload.parameterDataSourceName = sourceName
+            },
+            sourceLabel
+        )
     }
 
     /**
@@ -685,7 +851,7 @@ export class WebMcpBridge {
         const media = this.#appendCurrentOption(this.#readSelectOptions(elements?.media), payload.media)
         const resolutions = this.#appendCurrentOption(this.#readSelectOptions(elements?.resolution), payload.resolution)
         return {
-            toolName: WEB_MCP_TOOL_NAME,
+            toolName: WEB_MCP_TOOL_NAMES.action,
             locales: WebMcpBridgeSchemaUtils.getLocales(),
             backends: WebMcpBridgeSchemaUtils.getBackends(),
             orientations: WebMcpBridgeSchemaUtils.getOrientations(),
@@ -719,7 +885,8 @@ export class WebMcpBridge {
             ...baseCapabilities,
             actions: mergedActions,
             webMcp: {
-                toolName: WEB_MCP_TOOL_NAME,
+                toolName: WEB_MCP_TOOL_NAMES.action,
+                tools: Object.values(WEB_MCP_TOOL_NAMES),
                 extendedActions,
                 supportedValues: this.#buildSupportedValuesSnapshot()
             }

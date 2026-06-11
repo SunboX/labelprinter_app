@@ -89,13 +89,14 @@ SPDX-License-Identifier: CC-BY-SA-4.0
 - Expected: assistant replies in panel, actions execute only through allowlisted commands, and endpoint errors are surfaced in chat/status.
 
 ## WebMCP
-- Unit: `tests/webmcp-bridge.test.mjs` validates WebMCP registration behavior (`registerTool` + `provideContext`), mixed action routing, response envelope shape, invalid-action error handling, and extended controls (`set_ble`, `set_parameters`, `set_parameter_data_json`, `set_google_font_links`, `get_parameter_state`, `get_supported_values`).
+- Unit: `tests/webmcp-bridge.test.mjs` validates WebMCP registration behavior (`document.modelContext.registerTool` with deprecated navigator compatibility), focused tools (`get_label_context`, `validate_project`, `prepare_print`, `import_label_data`), mixed action routing, response envelope shape, output-budget shortening, invalid-action error handling, and extended controls (`set_ble`, `set_parameters`, `set_parameter_data_json`, `set_google_font_links`, `get_parameter_state`, `get_supported_values`).
+- Unit: `tests/webmcp-origin-trial.test.mjs` validates the production WebMCP origin-trial token and Apache header rules.
 - Unit: `tests/webmcp-wiring.test.mjs` verifies `src/main.mjs` imports/initializes `WebMcpBridge` and exposes the required app-control wrappers.
-- Manual: use Chrome Canary/Dev with version `146.0.7672.0+`, enable `chrome://flags/#enable-webmcp-testing`, relaunch, then open `http://localhost:3000/`.
+- Manual: use Chrome 149+ on the registered production origin, or enable `chrome://flags/#enable-webmcp-testing` for local development, relaunch, then open `http://localhost:3000/`.
 - Manual: install/open the Model Context Tool Inspector extension and inspect the current tab tools.
-- Expected: exactly one app tool is registered: `labelprinter_action`.
-- Manual: execute a mixed action payload (for example `add_item`, `set_zoom`, `set_parameters`, `set_parameter_data_json`, `build_share_url`) through the inspector.
-- Expected: the editor mutates as requested, and tool output returns JSON with `ok`, `executed`, `errors`, `warnings`, `results`, and `uiState`.
+- Expected: five app tools are registered: `labelprinter_action`, `get_label_context`, `validate_project`, `prepare_print`, and `import_label_data`.
+- Manual: execute focused read-only calls (`get_label_context`, `validate_project`), then import rows with `import_label_data`, prepare with `prepare_print`, and execute a mixed `labelprinter_action` payload (for example `add_item`, `set_zoom`, `set_parameters`, `set_parameter_data_json`, `build_share_url`) through the inspector.
+- Expected: read-only tools return compact JSON, `prepare_print` does not start printing directly, editor mutations execute only through action/import tools, and tool output remains parseable JSON.
 
 ## Workspace zoom
 - Unit: `tests/zoom-utils.test.mjs` validates zoom clamping, stepping, label formatting, and display-aware zoom persistence payload matching.

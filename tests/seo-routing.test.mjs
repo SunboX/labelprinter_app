@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
+import { readFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { after, before, describe, it } from 'node:test'
 
@@ -51,6 +52,16 @@ describe('SEO route serving', () => {
             assert.equal(response.status, 200, `${path} should return 200`)
         }
     })
+
+    it('serves WebMCP origin-trial, origin-keying, and permissions headers', async () => {
+        const html = await readFile('src/index.html', 'utf8')
+        const originTrialToken = extractOriginTrialToken(html)
+        const response = await fetch(`${baseUrl}/`, { redirect: 'manual' })
+
+        assert.equal(response.headers.get('origin-agent-cluster'), '?1')
+        assert.equal(response.headers.get('permissions-policy'), 'tools=(self)')
+        assert.equal(response.headers.get('origin-trial'), originTrialToken)
+    })
 })
 
 /**
@@ -94,4 +105,15 @@ async function waitForServerReady(child, url) {
  */
 function delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Extracts the WebMCP origin-trial token from static HTML.
+ * @param {string} html
+ * @returns {string}
+ */
+function extractOriginTrialToken(html) {
+    const match = String(html).match(/<meta\s+http-equiv="origin-trial"\s+content="([^"]+)"\s*\/>/)
+    assert.ok(match, 'expected origin-trial meta tag')
+    return match[1]
 }
