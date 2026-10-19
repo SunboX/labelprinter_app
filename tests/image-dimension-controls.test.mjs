@@ -29,7 +29,7 @@ class Element {
 
 it('edits decimal millimetres on displayed axes and steps by 0.1 mm after rotation', () => {
     const original = globalThis.document
-    globalThis.document = { createElement: () => new Element() }
+    globalThis.document = { createElement: () => new Element(), createElementNS: () => new Element() }
     try {
         for (const rotation of [0, 90, -90, 180]) {
             const item = { width: 80, height: 80, rotation }
@@ -42,6 +42,9 @@ it('edits decimal millimetres on displayed axes and steps by 0.1 mm after rotati
                 onChange: () => changes++
             })
             const [minus, input, plus] = widthCtrl.children[1].children
+            assert.equal(minus.children[0].attributes['aria-hidden'], 'true')
+            assert.equal(minus.children[0].children[0].attributes.d, 'M5 12h14')
+            assert.equal(plus.children[0].children[0].attributes.d, 'M5 12h14M12 5v14')
             input.value = '42.5'
             input.listeners.input()
             const key = ImageDimensionUtils.swapsAxes(rotation) ? 'height' : 'width'
@@ -76,7 +79,7 @@ it('edits decimal millimetres on displayed axes and steps by 0.1 mm after rotati
 
 it('does not progressively shrink stored dimensions while rotating through intermediate angles', () => {
     const original = globalThis.document
-    globalThis.document = { createElement: () => new Element() }
+    globalThis.document = { createElement: () => new Element(), createElementNS: () => new Element() }
     try {
         const item = { width: 120, height: 400, rotation: -90 }
         const state = { media: 'W24', resolution: 'LOW', orientation: 'horizontal' }

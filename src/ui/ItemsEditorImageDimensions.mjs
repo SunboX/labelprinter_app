@@ -7,6 +7,25 @@ import { ImageDimensionUtils } from '../ImageDimensionUtils.mjs'
 /** Decimal millimetre controls for the displayed image axes. */
 export class ItemsEditorImageDimensions {
     /**
+     * Creates a decorative plus or minus SVG for a labeled step button.
+     * @param {boolean} increase
+     * @returns {SVGSVGElement}
+     */
+    static createStepIcon(increase) {
+        const namespace = 'http://www.w3.org/2000/svg'
+        const icon = document.createElementNS(namespace, 'svg')
+        icon.setAttribute('viewBox', '0 0 24 24')
+        icon.setAttribute('aria-hidden', 'true')
+        const path = document.createElementNS(namespace, 'path')
+        path.setAttribute('d', increase ? 'M5 12h14M12 5v14' : 'M5 12h14')
+        path.setAttribute('fill', 'none')
+        path.setAttribute('stroke', 'currentColor')
+        path.setAttribute('stroke-width', '2')
+        path.setAttribute('stroke-linecap', 'round')
+        icon.append(path)
+        return icon
+    }
+    /**
      * Builds synchronized size sliders, decimal inputs, and 0.1 mm step buttons.
      * @param {{item: object, state: object, translate: Function, onChange: Function}} options
      * @returns {{widthCtrl: HTMLElement, heightCtrl: HTMLElement, sync: Function}}
@@ -70,13 +89,13 @@ export class ItemsEditorImageDimensions {
             }
             const minus = document.createElement('button')
             const plus = document.createElement('button')
-            for (const [button, sign, key] of [
-                [minus, '−', 'itemsEditor.decreaseSize'],
-                [plus, '+', 'itemsEditor.increaseSize']
+            for (const [button, key] of [
+                [minus, 'itemsEditor.decreaseSize'],
+                [plus, 'itemsEditor.increaseSize']
             ]) {
                 button.type = 'button'
                 button.className = 'ghost'
-                button.textContent = sign
+                button.append(ItemsEditorImageDimensions.createStepIcon(button === plus))
                 button.setAttribute('aria-label', translate(key, { dimension: labelText }))
                 button.addEventListener('click', () => apply(Number(input.value) + (button === plus ? 0.1 : -0.1)))
             }

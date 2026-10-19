@@ -151,8 +151,10 @@ export class ItemsEditorImageSupport {
      * }} options
      */
     static appendImageSourceControls({ item, contentWrap, translate, onFileSelected }) {
-        const previewBox = document.createElement('div')
+        const previewBox = document.createElement('button')
+        previewBox.type = 'button'
         previewBox.className = 'image-item-preview'
+        previewBox.setAttribute('aria-label', translate('itemsEditor.uploadImage'))
         if (item.imageData) {
             const previewImage = document.createElement('img')
             previewImage.className = 'image-item-preview-image'
@@ -184,6 +186,7 @@ export class ItemsEditorImageSupport {
         uploadInput.accept = 'image/*'
         uploadInput.hidden = true
         uploadButton.addEventListener('click', () => uploadInput.click())
+        previewBox.addEventListener('click', () => uploadInput.click())
         uploadInput.addEventListener('change', async () => {
             const file = uploadInput.files?.[0] || null
             if (!file) return

@@ -143,7 +143,7 @@ Properties:
 
 Handling:
 
-- Upload using `Upload image` in the card or double-click the image in preview.
+- Upload using the clickable image preview box or `Upload image` in the card, or double-click the image on the label. The preview box also supports keyboard activation.
 - Paste a copied image with `Ctrl+V` (Windows/Linux) or `Cmd+V` (macOS) anywhere in the editor to add a new image object. Text-only paste keeps its normal behavior.
 - Enter decimal millimetres in **Length** and **Height**, or use the sliders and **− / +** buttons (0.1 mm steps).
 - At quarter turns, the dimension controls follow the displayed horizontal and vertical axes. The printable cross-axis limit follows rotation, so a rotated image can grow along the label.
