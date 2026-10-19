@@ -149,6 +149,31 @@ export class PreviewPositionModeUtils {
         let maxEnd = cursor
         blocks.forEach((block) => {
             const item = block.ref || {}
+            if (item.type === 'image') {
+                // Image spans already include rotation; use the same displayed start as drawing.
+                const bounds = RotationUtils.computeRotatedBounds(
+                    {
+                        x: 0,
+                        y: 0,
+                        width: block.imageWidth,
+                        height: block.imageHeight
+                    },
+                    item.rotation
+                )
+                const end = PreviewPositionModeUtils.resolveFeedAxisEnd({
+                    item,
+                    flowCursor: cursor,
+                    feedPadStart,
+                    isHorizontal,
+                    span: block.span,
+                    drawSpan: isHorizontal ? bounds.width : bounds.height,
+                    feedOffset: Number(isHorizontal ? item.xOffset || 0 : item.yOffset || 0),
+                    centerInFlowSpan: true
+                })
+                maxEnd = Math.max(maxEnd, end)
+                cursor = PreviewPositionModeUtils.resolveNextFlowCursor({ item, flowCursor: cursor, span: block.span })
+                return
+            }
             if (isHorizontal) {
                 let feedOffset = Number(item.xOffset || 0)
                 let size = Math.max(1, block.span || 1)
@@ -203,10 +228,7 @@ export class PreviewPositionModeUtils {
                         feedOffset
                     })
                 )
-                const rotatedBounds = RotationUtils.computeRotatedBounds(
-                    { x: start, y: 0, width: size, height: crossSize },
-                    item.rotation
-                )
+                const rotatedBounds = RotationUtils.computeRotatedBounds({ x: start, y: 0, width: size, height: crossSize }, item.rotation)
                 maxEnd = Math.max(maxEnd, rotatedBounds.x + rotatedBounds.width)
             } else {
                 let size = Math.max(1, block.span || 1)
@@ -267,10 +289,7 @@ export class PreviewPositionModeUtils {
                         centerInFlowSpan: true
                     })
                 )
-                const rotatedBounds = RotationUtils.computeRotatedBounds(
-                    { x: 0, y: start, width: crossSize, height: size },
-                    item.rotation
-                )
+                const rotatedBounds = RotationUtils.computeRotatedBounds({ x: 0, y: start, width: crossSize, height: size }, item.rotation)
                 maxEnd = Math.max(maxEnd, rotatedBounds.y + rotatedBounds.height)
             }
             cursor = PreviewPositionModeUtils.resolveNextFlowCursor({

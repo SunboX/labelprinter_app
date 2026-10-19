@@ -1,3 +1,4 @@
+import { EditorImageClipboard } from './EditorImageClipboard.mjs'
 import { FontFamilyUtils } from '../FontFamilyUtils.mjs'
 import { BarcodeUtils } from '../BarcodeUtils.mjs'
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
@@ -38,6 +39,7 @@ export class ItemsEditor {
         this.translate = translate
         this.setStatus = setStatus
         this.selectedItemIds = new Set()
+        EditorImageClipboard.bind(this)
     }
     /**
      * Sets the item change callback.
@@ -125,9 +127,7 @@ export class ItemsEditor {
         }
 
         if (loadedLinks.length) {
-            this.state.customFontLinks = FontFamilyUtils.normalizeGoogleFontLinks(
-                this.state.customFontLinks.concat(loadedLinks)
-            )
+            this.state.customFontLinks = FontFamilyUtils.normalizeGoogleFontLinks(this.state.customFontLinks.concat(loadedLinks))
         }
         if (loadedFamilies.length) {
             this.fontFamilies = FontFamilyUtils.normalizeFontFamilies(this.fontFamilies.concat(loadedFamilies), 'Barlow')
@@ -154,7 +154,6 @@ export class ItemsEditor {
             }
         }
     }
-
     /**
      * Selects an icon item and opens its icon chooser in the objects panel.
      * @param {string} itemId
@@ -217,12 +216,8 @@ export class ItemsEditor {
         this.#pruneCollapsedItemIds()
         this.els.items.innerHTML = ''
         const sizeLabel =
-            this.state.orientation === 'horizontal'
-                ? this.translate('itemsEditor.sizeLength')
-                : this.translate('itemsEditor.sizeHeight')
-        const panelItems = this.#panelItemOrder
-            .map((itemId) => this.state.items.find((item) => item.id === itemId))
-            .filter(Boolean)
+            this.state.orientation === 'horizontal' ? this.translate('itemsEditor.sizeLength') : this.translate('itemsEditor.sizeHeight')
+        const panelItems = this.#panelItemOrder.map((itemId) => this.state.items.find((item) => item.id === itemId)).filter(Boolean)
         panelItems.forEach((item, panelIndex) => {
             const card = this.#createItemCard(item, panelIndex, sizeLabel)
             this.els.items.appendChild(card)
@@ -274,11 +269,7 @@ export class ItemsEditor {
      * Updates scroll indicator attributes for the objects-panel list.
      */
     #updateItemsScrollIndicators() {
-        ItemsScrollIndicatorUtils.update(
-            this.els.items,
-            this.els.objectsScrollIndicator,
-            (key) => this.translate(key)
-        )
+        ItemsScrollIndicatorUtils.update(this.els.items, this.els.objectsScrollIndicator, (key) => this.translate(key))
     }
     /**
      * Adds a new text item.
@@ -366,11 +357,7 @@ export class ItemsEditor {
     addImageItem() {
         const crossAxisLimit = ItemsEditorImageSupport.resolveImageCrossAxisLimit(this.state)
         const defaultSide = Math.max(8, Math.min(96, crossAxisLimit))
-        const defaultDimensions = ItemsEditorImageSupport.constrainImageDimensionsForOrientation(
-            defaultSide,
-            defaultSide,
-            this.state
-        )
+        const defaultDimensions = ItemsEditorImageSupport.constrainImageDimensionsForOrientation(defaultSide, defaultSide, this.state)
         const id = this.nextId()
         this.state.items.push({
             id,
@@ -515,34 +502,12 @@ export class ItemsEditor {
         this.render()
     }
     /**
-     * Creates a slider control for item adjustments.
-     * @param {string} label
-     * @param {number} value
-     * @param {number} min
-     * @param {number} max
-     * @param {number} step
-     * @param {(value: number) => void} onInput
+     * Creates an item slider using the shared control builder.
+     * @param {...any} args
      * @returns {HTMLDivElement}
      */
-    #createSlider(label, value, min, max, step, onInput) {
-        const wrap = document.createElement('div')
-        wrap.className = 'slider'
-        const top = document.createElement('div')
-        top.className = 'small'
-        top.textContent = `${label}: ${value}`
-        const input = document.createElement('input')
-        input.type = 'range'
-        input.min = min
-        input.max = max
-        input.step = step
-        input.value = value
-        input.addEventListener('input', (e) => {
-            const v = Number(e.target.value)
-            top.textContent = `${label}: ${v}`
-            onInput(v)
-        })
-        wrap.append(top, input)
-        return wrap
+    #createSlider(...args) {
+        return ItemsEditorControlSupport.createSlider(...args)
     }
     /**
      * Creates a single item card with controls.
@@ -576,11 +541,11 @@ export class ItemsEditor {
                   ? this.translate('itemsEditor.typeQr')
                   : item.type === 'barcode'
                     ? this.translate('itemsEditor.typeBarcode')
-                  : item.type === 'image'
-                    ? this.translate('itemsEditor.typeImage')
-                    : item.type === 'icon'
-                      ? this.translate('itemsEditor.typeIcon')
-                      : this.translate('itemsEditor.typeShape')
+                    : item.type === 'image'
+                      ? this.translate('itemsEditor.typeImage')
+                      : item.type === 'icon'
+                        ? this.translate('itemsEditor.typeIcon')
+                        : this.translate('itemsEditor.typeShape')
         tag.textContent = typeLabel
         const handle = document.createElement('div')
         handle.className = 'handle'
@@ -591,9 +556,7 @@ export class ItemsEditor {
         toggleSettings.type = 'button'
         toggleSettings.className = 'ghost item-toggle'
         toggleSettings.textContent = isCollapsed ? '▸' : '▾'
-        toggleSettings.title = this.translate(
-            isCollapsed ? 'itemsEditor.expandSettings' : 'itemsEditor.collapseSettings'
-        )
+        toggleSettings.title = this.translate(isCollapsed ? 'itemsEditor.expandSettings' : 'itemsEditor.collapseSettings')
         toggleSettings.setAttribute('aria-label', toggleSettings.title)
         toggleSettings.setAttribute('aria-expanded', String(!isCollapsed))
         toggleSettings.addEventListener('click', () => this.#toggleItemCollapsed(item.id))
@@ -666,7 +629,6 @@ export class ItemsEditor {
                 onChange: this.#onChange
             })
         }
-
         const controls = document.createElement('div')
         controls.className = 'controls'
 
@@ -685,7 +647,10 @@ export class ItemsEditor {
         }
 
         const remove = document.createElement('button')
-        remove.textContent = this.translate('itemsEditor.remove')
+        remove.type = 'button'
+        remove.className = 'ghost item-delete'
+        remove.title = this.translate('itemsEditor.remove')
+        remove.setAttribute('aria-label', remove.title)
         remove.addEventListener('click', () => {
             const stateIndex = this.state.items.findIndex((entry) => entry.id === item.id)
             if (stateIndex >= 0) {
@@ -693,12 +658,14 @@ export class ItemsEditor {
             }
             this.#panelItemOrder = this.#panelItemOrder.filter((itemId) => itemId !== item.id)
             this.#collapsedItemIds.delete(item.id)
+            this.selectedItemIds.delete(item.id)
             this.#autoExpandedItemIds.delete(item.id)
             this.render()
             this.#onChange()
         })
 
-        body.append(contentWrap, controls, remove)
+        headerActions.insertBefore(remove, toggleSettings)
+        body.append(contentWrap, controls)
         card.append(meta, body)
         card.querySelectorAll('input, textarea, select').forEach((el) =>
             el.addEventListener('dragstart', (ev) => {
@@ -722,17 +689,10 @@ export class ItemsEditor {
             item.yOffset = v
             this.#onChange()
         })
-        const rotationCtrl = this.#createSlider(
-            this.translate('itemsEditor.sliderRotation'),
-            item.rotation ?? 0,
-            -180,
-            180,
-            1,
-            (v) => {
-                item.rotation = v
-                this.#onChange()
-            }
-        )
+        const rotationCtrl = this.#createSlider(this.translate('itemsEditor.sliderRotation'), item.rotation ?? 0, -180, 180, 1, (v) => {
+            item.rotation = v
+            this.#onChange()
+        })
 
         const fontCtrl = document.createElement('div')
         fontCtrl.className = 'field'
@@ -867,9 +827,7 @@ export class ItemsEditor {
         try {
             const result = await FontFamilyUtils.loadGoogleFontLink(rawValue, document, window.location)
             this.#ensureCustomFontLinksState()
-            this.state.customFontLinks = FontFamilyUtils.normalizeGoogleFontLinks(
-                this.state.customFontLinks.concat([result.url])
-            )
+            this.state.customFontLinks = FontFamilyUtils.normalizeGoogleFontLinks(this.state.customFontLinks.concat([result.url]))
             this.fontFamilies = FontFamilyUtils.normalizeFontFamilies(this.fontFamilies.concat(result.families), 'Barlow')
             if (result.families.length) {
                 item.fontFamily = result.families[0]

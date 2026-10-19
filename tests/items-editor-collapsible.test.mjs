@@ -13,6 +13,14 @@ describe('items editor collapsible cards', () => {
         assert.match(css, /\.item-card\.collapsed\s+\.item-body\s*{[^}]*display:\s*none/i)
     })
 
+    it('puts the accessible delete action between the drag handle and collapse toggle', async () => {
+        const source = await readFile('src/ui/ItemsEditor.mjs', 'utf8')
+        assert.match(source, /headerActions\.append\(handle, toggleSettings\)/)
+        assert.match(source, /headerActions\.insertBefore\(remove, toggleSettings\)/)
+        assert.match(source, /remove\.setAttribute\('aria-label', remove\.title\)/)
+        assert.doesNotMatch(source, /body\.append\(contentWrap, controls, remove\)/)
+    })
+
     it('includes a toggle control and collapse logic in ItemsEditor', async () => {
         const source = await readFile('src/ui/ItemsEditor.mjs', 'utf8')
         assert.match(source, /item-toggle/)

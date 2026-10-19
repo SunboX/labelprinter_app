@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { ImageDimensionUtils } from '../ImageDimensionUtils.mjs'
 import { InteractionUtils } from '../InteractionUtils.mjs'
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { Media } from 'labelprinterkit-web/src/index.mjs'
@@ -246,15 +247,19 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
      * @param {number} minSize
      */
     _resizeConstrainedImageLikeItem(item, event, minSize) {
-        const widthDots = Math.max(minSize, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
-        const heightDots = Math.max(minSize, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
+        let widthDots = Math.max(minSize, Math.round((event.rect?.width || 0) * this._dotsPerPxX))
+        let heightDots = Math.max(minSize, Math.round((event.rect?.height || 0) * this._dotsPerPxY))
+        if (item.type === 'image' && ImageDimensionUtils.swapsAxes(item.rotation)) {
+            ;[widthDots, heightDots] = [heightDots, widthDots]
+        }
         const media = Media[this.state.media] || Media.W24
         const printWidth = Math.max(8, media?.printArea || 128)
         const constrained = this._constrainImageDimensionsToPrintWidth(
             widthDots,
             heightDots,
-            printWidth,
-            this.state.orientation === 'horizontal'
+            item.type === 'image' ? printWidth - 4 : printWidth,
+            this.state.orientation === 'horizontal',
+            item.type === 'image' ? item.rotation : 0
         )
         item.width = Math.max(minSize, constrained.width)
         item.height = Math.max(minSize, constrained.height)
@@ -676,9 +681,7 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         this._activeItemId = entry.id
         this._hoverItemId = entry.id
         const dragItemIds = InteractionUtils.resolveDragItemIds(entry.id, this._selectedItemIds)
-        const dragEntries = dragItemIds
-            .map((id) => this._interactiveItemsById.get(id) || null)
-            .filter((candidate) => !!candidate)
+        const dragEntries = dragItemIds.map((id) => this._interactiveItemsById.get(id) || null).filter((candidate) => !!candidate)
         this._interaction = {
             type: 'drag',
             entries: dragEntries

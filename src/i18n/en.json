@@ -201,6 +201,8 @@
         "failed": "Preview failed. Check your inputs."
     },
     "itemsEditor": {
+        "decreaseSize": "Decrease {{dimension}}",
+        "increaseSize": "Increase {{dimension}}",
         "sizeLength": "Length",
         "sizeHeight": "Height",
         "newText": "New text",

@@ -1,3 +1,4 @@
+import { ImageDimensionUtils } from '../ImageDimensionUtils.mjs'
 import { PreviewLayoutUtils } from '../PreviewLayoutUtils.mjs'
 import { ParameterTemplateUtils } from '../ParameterTemplateUtils.mjs'
 import { ImageRasterUtils } from '../ImageRasterUtils.mjs'
@@ -94,9 +95,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 const scaledDescent = descent * textVerticalScale
                 const scaledTextHeight = Math.max(1, textTotalHeight * textVerticalScale)
                 // Keep base flow dimensions stable while dragging; offsets are visual translation only.
-                const span = isHorizontal
-                    ? Math.max(textAdvanceWidth, scaledTextHeight)
-                    : Math.max(scaledTextHeight + 4, scaledTextHeight)
+                const span = isHorizontal ? Math.max(textAdvanceWidth, scaledTextHeight) : Math.max(scaledTextHeight + 4, scaledTextHeight)
                 blocks.push({
                     ref: item,
                     resolvedText,
@@ -137,13 +136,13 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 const { width: imageWidth, height: imageHeight } = this._constrainImageDimensionsToPrintWidth(
                     rawImageWidth,
                     rawImageHeight,
-                    printWidth,
-                    isHorizontal
+                    printWidth - 4,
+                    isHorizontal,
+                    item.rotation
                 )
-                const imageCanvas = item.imageData
-                    ? await this._getCachedImageCanvas(item, imageWidth, imageHeight)
-                    : null
-                const span = isHorizontal ? imageWidth : Math.max(imageHeight + 4, imageHeight)
+                const imageCanvas = item.imageData ? await this._getCachedImageCanvas(item, imageWidth, imageHeight) : null
+                const rotated = RotationUtils.computeRotatedBounds({ x: 0, y: 0, width: imageWidth, height: imageHeight }, item.rotation)
+                const span = isHorizontal ? rotated.width : rotated.height + 4
                 blocks.push({ ref: item, span, imageWidth, imageHeight, imageCanvas })
                 continue
             }
@@ -366,8 +365,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      */
     _renderTextFlowBlock({ ctx, block, flowCursor, feedPadStart, canvas, isHorizontal, textDotScale, maxFontDots, layoutItems }) {
         const item = block.ref
-        const resolvedSize =
-            block.fontSizeDots || Math.min(Math.max(8, Math.round((item.fontSize || 16) * textDotScale)), maxFontDots)
+        const resolvedSize = block.fontSizeDots || Math.min(Math.max(8, Math.round((item.fontSize || 16) * textDotScale)), maxFontDots)
         ctx.font = PreviewRendererCanvasSupport.buildTextFontDeclaration({
             size: resolvedSize,
             family: block.family || item.fontFamily || 'sans-serif',
@@ -381,8 +379,7 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
         const underlineThicknessRaw = Number(block.textUnderlineThickness || underlineMetrics.thickness) * verticalScale
         const underlineThickness = Math.max(1, underlineThicknessRaw)
         const strikethroughMetrics = PreviewRendererCanvasSupport.computeStrikethroughMetrics(resolvedSize, 1)
-        const strikethroughOffset =
-            Math.max(1, Number(block.textStrikethroughOffset || strikethroughMetrics.offset)) * verticalScale
+        const strikethroughOffset = Math.max(1, Number(block.textStrikethroughOffset || strikethroughMetrics.offset)) * verticalScale
         const strikethroughThickness =
             Math.max(1, Number(block.textStrikethroughThickness || strikethroughMetrics.thickness)) * verticalScale
         const textLines = Array.isArray(block.textLines) && block.textLines.length ? block.textLines : [block.resolvedText || '']
@@ -422,12 +419,8 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             const baselineY = blockTop + fallbackAscent
             const textMetrics = ctx.measureText(block.resolvedText || '')
             const inkLeft = Number.isFinite(textMetrics.actualBoundingBoxLeft) ? textMetrics.actualBoundingBoxLeft : 0
-            const inkRight = Number.isFinite(textMetrics.actualBoundingBoxRight)
-                ? textMetrics.actualBoundingBoxRight
-                : textMetrics.width
-            const actualAscent = Number.isFinite(textMetrics.actualBoundingBoxAscent)
-                ? textMetrics.actualBoundingBoxAscent
-                : fallbackAscent
+            const inkRight = Number.isFinite(textMetrics.actualBoundingBoxRight) ? textMetrics.actualBoundingBoxRight : textMetrics.width
+            const actualAscent = Number.isFinite(textMetrics.actualBoundingBoxAscent) ? textMetrics.actualBoundingBoxAscent : fallbackAscent
             const actualDescent = Number.isFinite(textMetrics.actualBoundingBoxDescent)
                 ? textMetrics.actualBoundingBoxDescent
                 : fallbackDescent
@@ -554,22 +547,19 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             })
         })
 
-        const textBounds = renderedLineBounds.reduce(
-            (acc, entry) => {
-                if (!acc) return { ...entry }
-                const x = Math.min(acc.x, entry.x)
-                const y = Math.min(acc.y, entry.y)
-                const right = Math.max(acc.x + acc.width, entry.x + entry.width)
-                const bottom = Math.max(acc.y + acc.height, entry.y + entry.height)
-                return {
-                    x,
-                    y,
-                    width: Math.max(1, right - x),
-                    height: Math.max(1, bottom - y)
-                }
-            },
-            null
-        ) || {
+        const textBounds = renderedLineBounds.reduce((acc, entry) => {
+            if (!acc) return { ...entry }
+            const x = Math.min(acc.x, entry.x)
+            const y = Math.min(acc.y, entry.y)
+            const right = Math.max(acc.x + acc.width, entry.x + entry.width)
+            const bottom = Math.max(acc.y + acc.height, entry.y + entry.height)
+            return {
+                x,
+                y,
+                width: Math.max(1, right - x),
+                height: Math.max(1, bottom - y)
+            }
+        }, null) || {
             x: drawX,
             y: blockTop,
             width: Math.max(1, Number(block.textInkWidth || block.textAdvanceWidth || 1)),
@@ -649,21 +639,16 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
      *  drawHeight: number
      * }} options
      */
-    _renderRasterFlowBlock({
-        ctx,
-        block,
-        flowCursor,
-        feedPadStart,
-        canvas,
-        isHorizontal,
-        layoutItems,
-        drawCanvas,
-        drawWidth,
-        drawHeight
-    }) {
+    _renderRasterFlowBlock({ ctx, block, flowCursor, feedPadStart, canvas, isHorizontal, layoutItems, drawCanvas, drawWidth, drawHeight }) {
         const item = block.ref
         const safeWidth = Math.max(1, drawWidth)
         const safeHeight = Math.max(1, drawHeight)
+        const rotated = RotationUtils.computeRotatedBounds(
+            { x: 0, y: 0, width: safeWidth, height: safeHeight },
+            item.type === 'image' ? item.rotation : 0
+        )
+        const shiftX = (rotated.width - safeWidth) / 2
+        const shiftY = (rotated.height - safeHeight) / 2
         const drawX = isHorizontal
             ? PreviewPositionModeUtils.resolveFeedAxisStart({
                   item,
@@ -671,22 +656,25 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                   feedPadStart,
                   isHorizontal: true,
                   span: block.span,
-                  drawSpan: safeWidth,
+                  drawSpan: rotated.width,
                   feedOffset: Number(item.xOffset || 0)
-              })
-            : Number(item.xOffset || 0)
+              }) + shiftX
+            : Number(item.xOffset || 0) + shiftX
+        const centeredY = (canvas.height - safeHeight) / 2 + Number(item.yOffset || 0)
         const drawY = isHorizontal
-            ? Math.max(0, (canvas.height - safeHeight) / 2 + Number(item.yOffset || 0))
+            ? item.type === 'image'
+                ? centeredY
+                : Math.max(0, centeredY)
             : PreviewPositionModeUtils.resolveFeedAxisStart({
                   item,
                   flowCursor,
                   feedPadStart,
                   isHorizontal: false,
                   span: block.span,
-                  drawSpan: safeHeight,
+                  drawSpan: rotated.height,
                   feedOffset: Number(item.yOffset || 0),
                   centerInFlowSpan: true
-              })
+              }) + shiftY
         const bounds = { x: drawX, y: drawY, width: safeWidth, height: safeHeight }
         if (drawCanvas) {
             RotationUtils.drawWithRotation(ctx, bounds, item.rotation, () => {
@@ -755,32 +743,16 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
 
     /**
      * Constrains image dimensions to the printable cross-axis width.
-     * Horizontal layout constrains image height, vertical layout constrains image width.
+     * Uses the rotated cross axis for image items.
      * @param {number} width
      * @param {number} height
      * @param {number} printWidth
      * @param {boolean} isHorizontal
+     * @param {number} [rotation=0]
      * @returns {{ width: number, height: number }}
      */
-    _constrainImageDimensionsToPrintWidth(width, height, printWidth, isHorizontal) {
-        const safeWidth = Math.max(8, Math.round(Number(width) || 8))
-        const safeHeight = Math.max(8, Math.round(Number(height) || 8))
-        const crossAxisLimit = Math.max(8, Math.round(Number(printWidth) || 8))
-        if (isHorizontal && safeHeight > crossAxisLimit) {
-            const scale = crossAxisLimit / safeHeight
-            return {
-                width: Math.max(8, Math.round(safeWidth * scale)),
-                height: crossAxisLimit
-            }
-        }
-        if (!isHorizontal && safeWidth > crossAxisLimit) {
-            const scale = crossAxisLimit / safeWidth
-            return {
-                width: crossAxisLimit,
-                height: Math.max(8, Math.round(safeHeight * scale))
-            }
-        }
-        return { width: safeWidth, height: safeHeight }
+    _constrainImageDimensionsToPrintWidth(width, height, printWidth, isHorizontal, rotation = 0) {
+        return ImageDimensionUtils.constrain(width, height, printWidth, isHorizontal, rotation)
     }
 
     /**

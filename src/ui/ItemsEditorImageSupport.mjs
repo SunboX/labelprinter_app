@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { ImageDimensionUtils } from '../ImageDimensionUtils.mjs'
+import { ItemsEditorImageDimensions } from './ItemsEditorImageDimensions.mjs'
 import { ImageRasterUtils } from '../ImageRasterUtils.mjs'
 import { RotationUtils } from '../RotationUtils.mjs'
 import { Media } from 'labelprinterkit-web/src/index.mjs'
@@ -27,27 +29,17 @@ export class ItemsEditorImageSupport {
      * @param {number} width
      * @param {number} height
      * @param {object} state
+     * @param {number} [rotation=0]
      * @returns {{ width: number, height: number }}
      */
-    static constrainImageDimensionsForOrientation(width, height, state) {
-        const safeWidth = Math.max(8, Math.round(Number(width) || 8))
-        const safeHeight = Math.max(8, Math.round(Number(height) || 8))
-        const crossAxisLimit = ItemsEditorImageSupport.resolveImageCrossAxisLimit(state)
-        if (state.orientation === 'horizontal' && safeHeight > crossAxisLimit) {
-            const scale = crossAxisLimit / safeHeight
-            return {
-                width: Math.max(8, Math.round(safeWidth * scale)),
-                height: crossAxisLimit
-            }
-        }
-        if (state.orientation === 'vertical' && safeWidth > crossAxisLimit) {
-            const scale = crossAxisLimit / safeWidth
-            return {
-                width: crossAxisLimit,
-                height: Math.max(8, Math.round(safeHeight * scale))
-            }
-        }
-        return { width: safeWidth, height: safeHeight }
+    static constrainImageDimensionsForOrientation(width, height, state, rotation = 0) {
+        return ImageDimensionUtils.constrain(
+            width,
+            height,
+            ItemsEditorImageSupport.resolveImageCrossAxisLimit(state),
+            state.orientation === 'horizontal',
+            rotation
+        )
     }
 
     /**
@@ -70,11 +62,7 @@ export class ItemsEditorImageSupport {
             width: Math.max(8, Math.round(safeNaturalWidth * scale)),
             height: Math.max(8, Math.round(safeNaturalHeight * scale))
         }
-        return ItemsEditorImageSupport.constrainImageDimensionsForOrientation(
-            scaledDimensions.width,
-            scaledDimensions.height,
-            state
-        )
+        return ItemsEditorImageSupport.constrainImageDimensionsForOrientation(scaledDimensions.width, scaledDimensions.height, state)
     }
 
     /**
@@ -229,27 +217,16 @@ export class ItemsEditorImageSupport {
         item.imageSmoothing = normalizedOptions.imageSmoothing
         item.imageInvert = normalizedOptions.imageInvert
         item.rotation = RotationUtils.normalizeDegrees(item.rotation, 0)
-        const crossAxisLimit = ItemsEditorImageSupport.resolveImageCrossAxisLimit(state)
-        const { widthMax, heightMax } = ItemsEditorControlSupport.resolveDimensionMax(state, crossAxisLimit)
-        const { widthCtrl, heightCtrl } = ItemsEditorControlSupport.createConstrainedDimensionControls({
-            item,
-            state,
-            sizeLabel,
-            heightLabel: translate('itemsEditor.sizeHeight'),
-            minWidth: 8,
-            minHeight: 8,
-            widthMax,
-            heightMax,
-            defaultWidth: 96,
-            defaultHeight: 96,
-            onChange,
-            constrainDimensions: ItemsEditorImageSupport.constrainImageDimensionsForOrientation,
-            createSlider
-        })
+        const { widthCtrl, heightCtrl, sync } = ItemsEditorImageDimensions.create({ item, state, translate, onChange })
         const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
             item,
             translate,
-            onChange,
+            onChange: () => {
+                // Rotation fitting is visual until a dimension is edited; dragging the
+                // rotation slider must not repeatedly shrink the stored image size.
+                sync()
+                onChange()
+            },
             createSlider
         })
 
@@ -291,16 +268,6 @@ export class ItemsEditorImageSupport {
             }
         })
 
-        controls.append(
-            widthCtrl,
-            heightCtrl,
-            offsetCtrl,
-            yOffsetCtrl,
-            rotationCtrl,
-            thresholdCtrl,
-            ditherCtrl,
-            smoothingCtrl,
-            invertCtrl
-        )
+        controls.append(widthCtrl, heightCtrl, offsetCtrl, yOffsetCtrl, rotationCtrl, thresholdCtrl, ditherCtrl, smoothingCtrl, invertCtrl)
     }
 }

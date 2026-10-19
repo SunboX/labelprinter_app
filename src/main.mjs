@@ -1,3 +1,4 @@
+import { EditorMediaControls } from './ui/EditorMediaControls.mjs'
 import { ItemsEditor } from './ui/ItemsEditor.mjs'
 import { ParameterPanel } from './ui/ParameterPanel.mjs'
 import { PreviewRenderer } from './ui/PreviewRenderer.mjs'
@@ -886,23 +887,7 @@ class AppController {
             this.state.backend = this.els.mode.value
             this.#toggleBleFields()
         })
-        this.els.orientation.addEventListener('change', () => {
-            this.state.orientation = this.els.orientation.value
-            this.itemsEditor.render()
-            this.previewRenderer.render()
-        })
-        this.els.media.addEventListener('change', () => {
-            this.state.media = this.els.media.value
-            this.previewRenderer.render()
-        })
-        this.els.mediaLength.addEventListener('input', (e) => {
-            const val = e.target.value.trim()
-            this.state.mediaLengthMm = val ? Number(val) : null
-            this.previewRenderer.render()
-        })
-        this.els.resolution.addEventListener('change', () => {
-            this.state.resolution = this.els.resolution.value
-        })
+        EditorMediaControls.bind(this.els, this.state, this.itemsEditor, this.previewRenderer)
         this.els.printer.addEventListener('change', () => {
             this.state.printer = this.els.printer.value
         })

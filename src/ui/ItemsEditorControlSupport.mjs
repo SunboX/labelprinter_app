@@ -7,6 +7,36 @@
  */
 export class ItemsEditorControlSupport {
     /**
+     * Creates a slider control for item adjustments.
+     * @param {string} label
+     * @param {number} value
+     * @param {number} min
+     * @param {number} max
+     * @param {number} step
+     * @param {(value: number) => void} onInput
+     * @returns {HTMLDivElement}
+     */
+    static createSlider(label, value, min, max, step, onInput) {
+        const wrap = document.createElement('div')
+        wrap.className = 'slider'
+        const top = document.createElement('div')
+        top.className = 'small'
+        top.textContent = `${label}: ${value}`
+        const input = document.createElement('input')
+        input.type = 'range'
+        input.min = min
+        input.max = max
+        input.step = step
+        input.value = value
+        input.addEventListener('input', (e) => {
+            const v = Number(e.target.value)
+            top.textContent = `${label}: ${v}`
+            onInput(v)
+        })
+        wrap.append(top, input)
+        return wrap
+    }
+    /**
      * Resolves max width/height values for orientation-aware item sliders.
      * @param {object} state
      * @param {number} crossAxisLimit
@@ -114,17 +144,10 @@ export class ItemsEditorControlSupport {
             onChange()
         })
         const rotationCtrl = includeRotation
-            ? createSlider(
-                  translate('itemsEditor.sliderRotation'),
-                  item.rotation ?? 0,
-                  rotationMin,
-                  rotationMax,
-                  1,
-                  (value) => {
-                      item.rotation = value
-                      onChange()
-                  }
-              )
+            ? createSlider(translate('itemsEditor.sliderRotation'), item.rotation ?? 0, rotationMin, rotationMax, 1, (value) => {
+                  item.rotation = value
+                  onChange()
+              })
             : null
         return { offsetCtrl, yOffsetCtrl, rotationCtrl }
     }

@@ -201,6 +201,8 @@
         "failed": "Vorschau fehlgeschlagen. Eingaben prüfen."
     },
     "itemsEditor": {
+        "decreaseSize": "{{dimension}} verkleinern",
+        "increaseSize": "{{dimension}} vergrößern",
         "sizeLength": "Länge",
         "sizeHeight": "Höhe",
         "newText": "Neuer Text",
