@@ -32,6 +32,7 @@ describe('items editor collapsible cards', () => {
 
     it('uses one shared size for square dimension buttons and the input height', async () => {
         const css = await readCssBundle('src/style.css')
+        assert.match(css, /\.item-card \.controls\.image-controls\s*{[^}]*minmax\(180px, 1fr\)/)
         assert.match(css, /\.image-dimension-inputs\s*{[^}]*--image-dimension-control-size:\s*40px/)
         assert.match(css, /\.image-dimension-inputs input\s*{[^}]*height:\s*var\(--image-dimension-control-size\)/)
         assert.match(

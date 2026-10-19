@@ -26,6 +26,10 @@
     gap: 8px;
 }
 
+.item-card .controls.image-controls {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
 .item-card .controls .google-font-field {
     grid-column: 1 / -1;
 }

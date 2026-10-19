@@ -214,6 +214,7 @@ export class ItemsEditorImageSupport {
      * }} options
      */
     static appendImageControls({ item, controls, sizeLabel, state, translate, onChange, createSlider }) {
+        controls.classList.add('image-controls')
         const normalizedOptions = ImageRasterUtils.normalizeItemOptions(item)
         item.imageDither = normalizedOptions.imageDither
         item.imageThreshold = normalizedOptions.imageThreshold
