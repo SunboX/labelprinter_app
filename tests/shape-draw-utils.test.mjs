@@ -7,6 +7,22 @@ import { describe, it } from 'node:test'
 import { ShapeDrawUtils } from '../src/ShapeDrawUtils.mjs'
 
 describe('shape-draw-utils', () => {
+    it('renders a 0.1 mm stroke without clamping it to one printer dot', () => {
+        const strokeWidth = (0.1 * 180) / 25.4
+        const ctx = {
+            save() {},
+            restore() {},
+            beginPath() {},
+            moveTo() {},
+            lineTo() {},
+            stroke() {}
+        }
+        ShapeDrawUtils.drawShape(ctx, { shapeType: 'line', strokeWidth }, 0, 0, 120, 20)
+        assert.equal(ctx.lineWidth, strokeWidth)
+        const bounds = ShapeDrawUtils.computeInteractionBounds({ shapeType: 'polygon', sides: 4, strokeWidth }, 0, 0, 20, 20)
+        assert.ok(Math.abs(bounds.width - (20 + strokeWidth)) < 0.000001)
+    })
+
     it('keeps default interaction bounds for non-polygon shapes', () => {
         const bounds = ShapeDrawUtils.computeInteractionBounds({ shapeType: 'rect', strokeWidth: 2 }, 10, 20, 80, 24)
         assert.deepEqual(bounds, { x: 10, y: 20, width: 80, height: 24 })

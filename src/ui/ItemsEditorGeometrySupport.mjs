@@ -5,6 +5,7 @@
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { QrCodeUtils } from '../QrCodeUtils.mjs'
 import { ItemsEditorControlSupport } from './ItemsEditorControlSupport.mjs'
+import { ItemsEditorShapeDimensions } from './ItemsEditorShapeDimensions.mjs'
 
 /**
  * Shared QR and shape control helpers for the items editor.
@@ -125,26 +126,35 @@ export class ItemsEditorGeometrySupport {
      * @param {{
      *  item: object,
      *  controls: HTMLElement,
-     *  sizeLabel: string,
+     *  state: object,
      *  translate: (key: string, params?: Record<string, string | number>) => string,
      *  onChange: () => void,
      *  createSlider: (label: string, value: number, min: number, max: number, step: number, onInput: (value: number) => void) => HTMLDivElement
      * }} options
      */
-    static appendShapeControls({ item, controls, sizeLabel, translate, onChange, createSlider }) {
-        const widthCtrl = createSlider(sizeLabel, item.width || 120, 20, 420, 2, (value) => {
-            item.width = value
-            onChange()
+    static appendShapeControls({ item, controls, state, translate, onChange, createSlider }) {
+        controls.className = 'controls shape-controls'
+        const dimensions = { item, state, translate, onChange }
+        const widthCtrl = ItemsEditorShapeDimensions.createControl({
+            ...dimensions,
+            key: 'width',
+            label: translate('itemsEditor.sizeLength'),
+            axis: 0,
+            defaultDots: 120
         })
-        const heightLabel =
-            item.shapeType === 'line' ? translate('itemsEditor.sliderThickness') : translate('itemsEditor.sizeHeight')
-        const heightCtrl = createSlider(heightLabel, item.height || 20, 4, 240, 1, (value) => {
-            item.height = value
-            onChange()
+        const heightCtrl = ItemsEditorShapeDimensions.createControl({
+            ...dimensions,
+            key: 'height',
+            label: translate('itemsEditor.sizeHeight'),
+            axis: 1,
+            defaultDots: 20
         })
-        const strokeCtrl = createSlider(translate('itemsEditor.sliderStroke'), item.strokeWidth || 2, 1, 12, 1, (value) => {
-            item.strokeWidth = value
-            onChange()
+        const strokeCtrl = ItemsEditorShapeDimensions.createControl({
+            ...dimensions,
+            key: 'strokeWidth',
+            label: translate('itemsEditor.sliderStroke'),
+            axis: 1,
+            defaultDots: 2
         })
         const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
             item,
@@ -159,9 +169,13 @@ export class ItemsEditorGeometrySupport {
         controls.append(widthCtrl, heightCtrl, strokeCtrl, offsetCtrl, yOffsetCtrl, rotationCtrl)
 
         if (item.shapeType === 'roundRect') {
-            const radiusCtrl = createSlider(translate('itemsEditor.sliderRadius'), item.cornerRadius || 8, 0, 60, 1, (value) => {
-                item.cornerRadius = value
-                onChange()
+            const radiusCtrl = ItemsEditorShapeDimensions.createControl({
+                ...dimensions,
+                key: 'cornerRadius',
+                label: translate('itemsEditor.sliderRadius'),
+                axis: 0,
+                defaultDots: 8,
+                min: 0
             })
             controls.append(radiusCtrl)
         }

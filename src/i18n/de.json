@@ -279,7 +279,7 @@
         "imageSmoothingmedium": "Mittel",
         "imageSmoothinghigh": "Hoch",
         "imageInvert": "Schwarz/Weiß invertieren",
-        "sliderStroke": "Strich",
+        "sliderStroke": "Linienstärke",
         "sliderThickness": "Dicke",
         "sliderRadius": "Radius",
         "sliderSides": "Seiten"

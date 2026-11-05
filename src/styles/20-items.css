@@ -30,6 +30,11 @@
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
+.item-card .controls.shape-controls {
+    /* Keep the millimetre inputs and step buttons together on narrow screens. */
+    grid-template-columns: minmax(0, 1fr);
+}
+
 .item-card .controls .google-font-field {
     grid-column: 1 / -1;
 }
@@ -408,7 +413,7 @@ input[type='range'] {
         overflow: visible;
     }
     .main-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
     .workspace {
         order: -1;

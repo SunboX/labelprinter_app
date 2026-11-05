@@ -18,7 +18,7 @@ export class ShapeDrawUtils {
      */
     static computeInteractionBounds(item, x, y, width, height) {
         const type = item?.shapeType || 'rect'
-        const strokePadding = Math.max(0, (Math.max(1, item?.strokeWidth || 2) || 1) / 2)
+        const strokePadding = Math.max(0.1, item?.strokeWidth || 2) / 2
         if (type !== 'polygon') {
             return { x, y, width, height }
         }
@@ -56,7 +56,8 @@ export class ShapeDrawUtils {
      */
     static drawShape(ctx, item, x, y, width, height) {
         const type = item.shapeType || 'rect'
-        const lw = Math.max(1, item.strokeWidth || 2)
+        // Decimal millimetre strokes can be narrower than one printer dot.
+        const lw = Math.max(0.1, item.strokeWidth || 2)
         ctx.save()
         ctx.lineWidth = lw
         ctx.strokeStyle = '#000'
@@ -64,7 +65,7 @@ export class ShapeDrawUtils {
         if (type === 'rect') {
             ctx.strokeRect(x, y, width, height)
         } else if (type === 'roundRect') {
-            const r = Math.min(item.cornerRadius || 8, width / 2, height / 2)
+            const r = Math.min(item.cornerRadius ?? 8, width / 2, height / 2)
             ctx.beginPath()
             ctx.moveTo(x + r, y)
             ctx.lineTo(x + width - r, y)

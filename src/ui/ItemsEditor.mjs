@@ -643,7 +643,7 @@ export class ItemsEditor {
         } else if (item.type === 'icon') {
             this.#appendIconControls(item, controls, sizeLabel)
         } else if (item.type === 'shape') {
-            this.#appendShapeControls(item, controls, sizeLabel)
+            this.#appendShapeControls(item, controls)
         }
 
         const remove = document.createElement('button')
@@ -939,13 +939,12 @@ export class ItemsEditor {
      * Appends shape controls to the controls container.
      * @param {object} item
      * @param {HTMLElement} controls
-     * @param {string} sizeLabel
      */
-    #appendShapeControls(item, controls, sizeLabel) {
+    #appendShapeControls(item, controls) {
         ItemsEditorGeometrySupport.appendShapeControls({
             item,
             controls,
-            sizeLabel,
+            state: this.state,
             translate: this.translate,
             onChange: this.#onChange,
             createSlider: this.#createSlider.bind(this)
