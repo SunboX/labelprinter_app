@@ -77,6 +77,7 @@ export class ItemsEditorBarcodeSupport {
         })
         const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
             item,
+            state,
             translate,
             onChange,
             createSlider

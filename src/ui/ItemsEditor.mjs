@@ -681,17 +681,12 @@ export class ItemsEditor {
      * @param {HTMLElement} controls
      */
     #appendTextControls(item, controls) {
-        const offsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, 0, 50, 1, (v) => {
-            item.xOffset = v
-            this.#onChange()
-        })
-        const yOffsetCtrl = this.#createSlider(this.translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, -50, 50, 1, (v) => {
-            item.yOffset = v
-            this.#onChange()
-        })
-        const rotationCtrl = this.#createSlider(this.translate('itemsEditor.sliderRotation'), item.rotation ?? 0, -180, 180, 1, (v) => {
-            item.rotation = v
-            this.#onChange()
+        const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
+            item,
+            state: this.state,
+            translate: this.translate,
+            onChange: this.#onChange,
+            createSlider: this.#createSlider.bind(this)
         })
 
         const fontCtrl = document.createElement('div')

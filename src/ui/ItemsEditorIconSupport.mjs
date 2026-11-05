@@ -240,6 +240,7 @@ export class ItemsEditorIconSupport {
         })
         const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
             item,
+            state,
             translate,
             onChange,
             createSlider

@@ -19,7 +19,7 @@ describe('items editor rotation controls', () => {
         assert.match(itemsEditorSource, /type: 'qr'[\s\S]*rotation: 0/)
         assert.match(itemsEditorSource, /type: 'barcode'[\s\S]*rotation: 0/)
         assert.match(itemsEditorSource, /type: 'shape'[\s\S]*rotation: 0/)
-        assert.match(itemsEditorSource, /this\.translate\('itemsEditor\.sliderRotation'\)/)
+        assert.match(itemsEditorSource, /ItemsEditorControlSupport\.createOffsetAndRotationControls\(/)
     })
 
     it('adds rotation sliders for image, icon, and barcode items', () => {

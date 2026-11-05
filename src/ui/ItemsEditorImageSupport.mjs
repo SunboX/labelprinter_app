@@ -224,6 +224,7 @@ export class ItemsEditorImageSupport {
         const { widthCtrl, heightCtrl, sync } = ItemsEditorImageDimensions.create({ item, state, translate, onChange })
         const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
             item,
+            state,
             translate,
             onChange: () => {
                 // Rotation fitting is visual until a dimension is edited; dragging the

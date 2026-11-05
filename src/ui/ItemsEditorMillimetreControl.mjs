@@ -4,8 +4,8 @@
 import { Resolution } from 'labelprinterkit-web/src/index.mjs'
 import { ItemsEditorImageDimensions } from './ItemsEditorImageDimensions.mjs'
 
-/** Millimetre inputs for shape geometry, stored as printer dots for rendering. */
-export class ItemsEditorShapeDimensions {
+/** Millimetre inputs for item geometry, stored as printer dots for rendering. */
+export class ItemsEditorMillimetreControl {
     /**
      * Builds a numeric input, slider, and buttons with 0.1 mm increments.
      * Existing dot values remain unchanged until the user edits a control.
@@ -25,13 +25,12 @@ export class ItemsEditorShapeDimensions {
         row.className = 'image-dimension-inputs'
         const input = document.createElement('input')
         input.type = 'number'
-        input.min = String(min)
+        if (Number.isFinite(min)) input.min = String(min)
         input.step = '0.1'
         input.inputMode = 'decimal'
         input.setAttribute('aria-label', labelText)
         const range = document.createElement('input')
         range.type = 'range'
-        range.min = String(min)
         range.step = '0.1'
         range.setAttribute('aria-label', labelText)
         const minus = document.createElement('button')
@@ -40,6 +39,8 @@ export class ItemsEditorShapeDimensions {
         const sync = () => {
             const mm = (item[key] ?? defaultDots) / dotsPerMm
             input.value = String(Math.round(mm * 100) / 100)
+            // Signed offsets have no artificial typing limit; keep their slider useful around zero.
+            range.min = String(Number.isFinite(min) ? min : Math.min(-100, Math.floor(mm)))
             range.max = String(Math.max(key === 'strokeWidth' ? 10 : 100, Math.ceil(mm)))
             range.value = input.value
             minus.disabled = mm <= min + 0.000001
@@ -63,7 +64,7 @@ export class ItemsEditorShapeDimensions {
             button.setAttribute('aria-label', translate(translationKey, { dimension: labelText }))
             button.addEventListener('click', () => {
                 const current = (item[key] ?? defaultDots) / dotsPerMm
-                const next = Math.round((current + (button === plus ? 0.1 : -0.1)) * 10) / 10
+                const next = Math.round((current + (button === plus ? 0.1 : -0.1)) * 100) / 100
                 apply(Math.max(min, next))
             })
         }

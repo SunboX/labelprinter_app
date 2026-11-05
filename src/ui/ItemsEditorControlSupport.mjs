@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { ItemsEditorMillimetreControl } from './ItemsEditorMillimetreControl.mjs'
+
 /**
  * Shared UI-control helpers for item settings cards.
  */
@@ -106,16 +108,13 @@ export class ItemsEditorControlSupport {
     }
 
     /**
-     * Creates X/Y offset sliders and an optional rotation slider.
+     * Creates signed X/Y millimetre controls and an optional rotation slider.
      * @param {{
      *  item: object,
+     *  state: object,
      *  translate: (key: string, params?: Record<string, string | number>) => string,
      *  onChange: () => void,
      *  createSlider: (label: string, value: number, min: number, max: number, step: number, onInput: (value: number) => void) => HTMLDivElement,
-     *  xMin?: number,
-     *  xMax?: number,
-     *  yMin?: number,
-     *  yMax?: number,
      *  includeRotation?: boolean,
      *  rotationMin?: number,
      *  rotationMax?: number
@@ -124,25 +123,30 @@ export class ItemsEditorControlSupport {
      */
     static createOffsetAndRotationControls({
         item,
+        state,
         translate,
         onChange,
         createSlider,
-        xMin = -80,
-        xMax = 80,
-        yMin = -80,
-        yMax = 80,
         includeRotation = true,
         rotationMin = -180,
         rotationMax = 180
     }) {
-        const offsetCtrl = createSlider(translate('itemsEditor.sliderXOffset'), item.xOffset ?? 0, xMin, xMax, 1, (value) => {
-            item.xOffset = value
-            onChange()
+        const offsets = ['xOffset', 'yOffset'].map((key, axis) => {
+            const field = ItemsEditorMillimetreControl.createControl({
+                item,
+                state,
+                key,
+                axis,
+                label: translate(axis === 0 ? 'itemsEditor.sliderXOffset' : 'itemsEditor.sliderYOffset'),
+                defaultDots: 0,
+                min: -Infinity,
+                translate,
+                onChange
+            })
+            field.className += ' offset-field'
+            return field
         })
-        const yOffsetCtrl = createSlider(translate('itemsEditor.sliderYOffset'), item.yOffset ?? 0, yMin, yMax, 1, (value) => {
-            item.yOffset = value
-            onChange()
-        })
+        const [offsetCtrl, yOffsetCtrl] = offsets
         const rotationCtrl = includeRotation
             ? createSlider(translate('itemsEditor.sliderRotation'), item.rotation ?? 0, rotationMin, rotationMax, 1, (value) => {
                   item.rotation = value
