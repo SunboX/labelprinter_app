@@ -418,7 +418,7 @@ function clampQrSizeToLabel(state, value) {
     }
     const maxSize = Math.max(1, Math.floor(Math.min(maxByWidth, maxByLength)))
     const safeValue = Number.isFinite(value) ? Number(value) : 120
-    return Math.max(1, Math.min(maxSize, Math.round(safeValue)))
+    return Math.max(1, Math.min(maxSize, safeValue))
 }
 
 /**

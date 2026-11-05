@@ -22,6 +22,7 @@ export class EditorMediaControls {
         els.mediaLength.addEventListener('input', (event) => {
             const value = event.target.value.trim()
             state.mediaLengthMm = value ? Number(value) : null
+            itemsEditor.render()
             previewRenderer.render()
         })
     }

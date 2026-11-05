@@ -6,6 +6,7 @@ import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { QrCodeUtils } from '../QrCodeUtils.mjs'
 import { ItemsEditorControlSupport } from './ItemsEditorControlSupport.mjs'
 import { ItemsEditorMillimetreControl } from './ItemsEditorMillimetreControl.mjs'
+import { Resolution } from 'labelprinterkit-web/src/index.mjs'
 
 /**
  * Shared QR and shape control helpers for the items editor.
@@ -39,12 +40,25 @@ export class ItemsEditorGeometrySupport {
             onChange,
             createSlider
         })
-        const sizeCtrl = createSlider(translate('itemsEditor.sliderQrSize'), item.size, minQrSize, maxQrSize, 1, (value) => {
-            item.size = QrSizeUtils.clampQrSizeToLabel(state, value)
-            item.height = item.size
-            item._qrCache = null
-            onChange()
+        const dotsPerMm = (Resolution[state.resolution] || Resolution.LOW).dots[0] / 25.4
+        const sizeCtrl = ItemsEditorMillimetreControl.createControl({
+            item,
+            state,
+            key: 'size',
+            label: translate('itemsEditor.sliderQrSize'),
+            axis: 0,
+            defaultDots: minQrSize,
+            min: Math.min(maxQrSize / dotsPerMm, Math.ceil((minQrSize / dotsPerMm) * 10) / 10),
+            max: maxQrSize / dotsPerMm,
+            translate,
+            setDots: (value) => {
+                item.size = QrSizeUtils.clampQrSizeToLabel(state, value)
+                item.height = item.size
+                item._qrCache = null
+            },
+            onChange
         })
+        sizeCtrl.className += ' size-field'
 
         const errorCorrectionCtrl = document.createElement('div')
         errorCorrectionCtrl.className = 'field'

@@ -63,7 +63,7 @@ export class ItemsEditorBarcodeSupport {
         const { widthCtrl, heightCtrl } = ItemsEditorControlSupport.createConstrainedDimensionControls({
             item,
             state,
-            sizeLabel,
+            sizeLabel: translate('itemsEditor.sizeLength'),
             heightLabel: translate('itemsEditor.sizeHeight'),
             minWidth: 16,
             minHeight: 16,
@@ -72,8 +72,8 @@ export class ItemsEditorBarcodeSupport {
             defaultWidth: 220,
             defaultHeight: 64,
             onChange,
-            constrainDimensions: ItemsEditorImageSupport.constrainImageDimensionsForOrientation,
-            createSlider
+            translate,
+            constrainDimensions: ItemsEditorImageSupport.constrainImageDimensionsForOrientation
         })
         const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
             item,

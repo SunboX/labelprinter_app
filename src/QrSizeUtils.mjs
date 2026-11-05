@@ -87,6 +87,7 @@ export class QrSizeUtils {
     static clampQrSizeToLabel(state, value) {
         const maxSize = QrSizeUtils.computeMaxQrSizeDots(state)
         const safeValue = Number.isFinite(value) ? Number(value) : QrSizeUtils.computeInitialQrSizeDots(state)
-        return Math.max(1, Math.min(maxSize, Math.round(safeValue)))
+        // Keep decimal geometry for mm controls; raster generation rounds its own pixel size.
+        return Math.max(1, Math.min(maxSize, safeValue))
     }
 }

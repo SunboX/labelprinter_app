@@ -48,4 +48,5 @@ it('refreshes dimension limits and millimetre conversion when media, resolution,
     assert.equal(state.mediaLengthMm, 42.5)
     events['mediaLength:input']({ target: { value: '' } })
     assert.equal(state.mediaLengthMm, null)
+    assert.equal(editorRenders, 5, 'fixed length changes refresh QR size limits')
 })

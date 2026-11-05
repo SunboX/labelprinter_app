@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { ItemsEditorMillimetreControl } from './ItemsEditorMillimetreControl.mjs'
+import { Resolution } from 'labelprinterkit-web/src/index.mjs'
 
 /**
  * Shared UI-control helpers for item settings cards.
@@ -54,7 +55,7 @@ export class ItemsEditorControlSupport {
     }
 
     /**
-     * Creates width/height sliders for constrained item dimensions.
+     * Creates millimetre controls for constrained item dimensions.
      * @param {{
      *  item: object,
      *  state: object,
@@ -66,9 +67,9 @@ export class ItemsEditorControlSupport {
      *  heightMax: number,
      *  defaultWidth: number,
      *  defaultHeight: number,
+     *  translate: Function,
      *  onChange: () => void,
      *  constrainDimensions: (width: number, height: number, state: object) => { width: number, height: number },
-     *  createSlider: (label: string, value: number, min: number, max: number, step: number, onInput: (value: number) => void) => HTMLDivElement
      * }} options
      * @returns {{ widthCtrl: HTMLDivElement, heightCtrl: HTMLDivElement }}
      */
@@ -83,9 +84,9 @@ export class ItemsEditorControlSupport {
         heightMax,
         defaultWidth,
         defaultHeight,
+        translate,
         onChange,
-        constrainDimensions,
-        createSlider
+        constrainDimensions
     }) {
         const applyConstrainedDimensions = (nextWidth, nextHeight) => {
             const constrained = constrainDimensions(nextWidth, nextHeight, state)
@@ -95,14 +96,31 @@ export class ItemsEditorControlSupport {
 
         applyConstrainedDimensions(item.width || defaultWidth, item.height || defaultHeight)
 
-        const widthCtrl = createSlider(sizeLabel, item.width, minWidth, widthMax, 1, (value) => {
-            applyConstrainedDimensions(value, item.height || defaultHeight)
-            onChange()
+        const resolution = Resolution[state.resolution] || Resolution.LOW
+        const fields = ['width', 'height'].map((key, axis) => {
+            const dotsPerMm = resolution.dots[axis] / 25.4
+            const field = ItemsEditorMillimetreControl.createControl({
+                item,
+                state,
+                key,
+                axis,
+                label: axis === 0 ? sizeLabel : heightLabel,
+                defaultDots: axis === 0 ? defaultWidth : defaultHeight,
+                min: Math.ceil(((axis === 0 ? minWidth : minHeight) / dotsPerMm) * 10) / 10,
+                max: (axis === 0 ? widthMax : heightMax) / dotsPerMm,
+                setDots: (dots) => applyConstrainedDimensions(axis === 0 ? dots : item.width, axis === 1 ? dots : item.height),
+                translate,
+                onChange: () => {
+                    fields.forEach((control) => {
+                        if (control !== field) ItemsEditorMillimetreControl.sync(control)
+                    })
+                    onChange()
+                }
+            })
+            field.className += ' size-field'
+            return field
         })
-        const heightCtrl = createSlider(heightLabel, item.height, minHeight, heightMax, 1, (value) => {
-            applyConstrainedDimensions(item.width || defaultWidth, value)
-            onChange()
-        })
+        const [widthCtrl, heightCtrl] = fields
 
         return { widthCtrl, heightCtrl }
     }

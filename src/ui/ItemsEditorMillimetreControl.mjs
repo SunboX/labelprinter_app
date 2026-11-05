@@ -6,14 +6,22 @@ import { ItemsEditorImageDimensions } from './ItemsEditorImageDimensions.mjs'
 
 /** Millimetre inputs for item geometry, stored as printer dots for rendering. */
 export class ItemsEditorMillimetreControl {
+    static #syncCallbacks = new WeakMap()
+
+    /** Refreshes a control after related geometry changes. @param {HTMLElement} field */
+    static sync(field) {
+        ItemsEditorMillimetreControl.#syncCallbacks.get(field)?.()
+    }
+
     /**
      * Builds a numeric input, slider, and buttons with 0.1 mm increments.
      * Existing dot values remain unchanged until the user edits a control.
      * @param {{item: object, state: object, key: string, label: string, axis: number,
-     * defaultDots: number, min?: number, translate: Function, onChange: Function}} options
+     * defaultDots: number, min?: number, max?: number, setDots?: (dots: number) => void,
+     * translate: Function, onChange: Function}} options
      * @returns {HTMLElement}
      */
-    static createControl({ item, state, key, label, axis, defaultDots, min = 0.1, translate, onChange }) {
+    static createControl({ item, state, key, label, axis, defaultDots, min = 0.1, max = Infinity, setDots, translate, onChange }) {
         const resolution = Resolution[state.resolution] || Resolution.LOW
         const dotsPerMm = resolution.dots[axis] / 25.4
         const labelText = `${label} (mm)`
@@ -26,6 +34,7 @@ export class ItemsEditorMillimetreControl {
         const input = document.createElement('input')
         input.type = 'number'
         if (Number.isFinite(min)) input.min = String(min)
+        if (Number.isFinite(max)) input.max = String(max)
         input.step = '0.1'
         input.inputMode = 'decimal'
         input.setAttribute('aria-label', labelText)
@@ -36,22 +45,25 @@ export class ItemsEditorMillimetreControl {
         const minus = document.createElement('button')
         const plus = document.createElement('button')
         /** Refreshes both controls without rounding the stored printer dots. */
-        const sync = () => {
+        const sync = (preserveInput = false) => {
             const mm = (item[key] ?? defaultDots) / dotsPerMm
-            input.value = String(Math.round(mm * 100) / 100)
+            const displayed = String(Math.round(mm * 100) / 100)
+            // Reassigning a number input while typing discards its pending decimal separator.
+            if (!preserveInput) input.value = displayed
             // Signed offsets have no artificial typing limit; keep their slider useful around zero.
             range.min = String(Number.isFinite(min) ? min : Math.min(-100, Math.floor(mm)))
-            range.max = String(Math.max(key === 'strokeWidth' ? 10 : 100, Math.ceil(mm)))
-            range.value = input.value
+            range.max = String(Number.isFinite(max) ? max : Math.max(key === 'strokeWidth' ? 10 : 100, Math.ceil(mm)))
+            range.value = displayed
             minus.disabled = mm <= min + 0.000001
+            plus.disabled = mm >= max - 0.000001
         }
         /** Applies valid edits, preserving unfinished numeric input while typing. */
         const apply = (mm, normalize = true) => {
             if (!Number.isFinite(mm) || mm < min) return
-            item[key] = mm * dotsPerMm
-            const typed = input.value
-            sync()
-            if (!normalize) input.value = typed
+            const dots = Math.min(max, mm) * dotsPerMm
+            if (setDots) setDots(dots)
+            else item[key] = dots
+            sync(!normalize)
             onChange()
         }
         for (const [button, translationKey] of [
@@ -71,10 +83,11 @@ export class ItemsEditorMillimetreControl {
         input.addEventListener('input', () => {
             if (input.value.trim()) apply(Number(input.value), false)
         })
-        input.addEventListener('change', sync)
+        input.addEventListener('change', () => sync())
         range.addEventListener('input', () => apply(Number(range.value)))
         row.append(minus, input, plus)
         field.append(caption, row, range)
+        ItemsEditorMillimetreControl.#syncCallbacks.set(field, sync)
         sync()
         return field
     }

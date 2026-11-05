@@ -226,7 +226,7 @@ export class ItemsEditorIconSupport {
         const { widthCtrl, heightCtrl } = ItemsEditorControlSupport.createConstrainedDimensionControls({
             item,
             state,
-            sizeLabel,
+            sizeLabel: translate('itemsEditor.sizeLength'),
             heightLabel: translate('itemsEditor.sizeHeight'),
             minWidth: 8,
             minHeight: 8,
@@ -235,8 +235,8 @@ export class ItemsEditorIconSupport {
             defaultWidth: 72,
             defaultHeight: 72,
             onChange,
-            constrainDimensions: ItemsEditorImageSupport.constrainImageDimensionsForOrientation,
-            createSlider
+            translate,
+            constrainDimensions: ItemsEditorImageSupport.constrainImageDimensionsForOrientation
         })
         const { offsetCtrl, yOffsetCtrl, rotationCtrl } = ItemsEditorControlSupport.createOffsetAndRotationControls({
             item,
