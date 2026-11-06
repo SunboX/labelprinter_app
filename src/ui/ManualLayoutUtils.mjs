@@ -10,9 +10,21 @@ export class ManualLayoutUtils {
         return item?.positionMode === 'absolute' && item.positionAnchor === 'top-left'
     }
 
-    /** Pins the current visible bounds without moving the object. @param {object} item @param {object} [bounds] */
-    static pin(item, bounds = item?._layoutBounds) {
+    /**
+     * Pins visible bounds and preserves later objects when removing an item from flow.
+     * @param {object} item
+     * @param {object} [bounds]
+     * @param {object[]} [items] Ordered layout items with their last rendered bounds.
+     */
+    static pin(item, bounds = item?._layoutBounds, items = []) {
         if (ManualLayoutUtils.isAnchored(item) || !bounds) return
+        const index = items.indexOf(item)
+        if (item.positionMode !== 'absolute' && index >= 0) {
+            // Later flow items depend on this span. Freeze their visible positions before it disappears.
+            for (const following of items.slice(index + 1)) {
+                if (following.positionMode !== 'absolute') ManualLayoutUtils.pin(following)
+            }
+        }
         item.positionMode = 'absolute'
         item.positionAnchor = 'top-left'
         item.xOffset = Number(bounds.x) || 0

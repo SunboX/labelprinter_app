@@ -163,7 +163,7 @@ export class ItemsEditorControlSupport {
                     ? Number(item[key]) || 0
                     : item._layoutBounds?.[axis === 0 ? 'x' : 'y'] ?? item[key] ?? 0,
                 setDots: (dots) => {
-                    ManualLayoutUtils.pin(item)
+                    ManualLayoutUtils.pin(item, item._layoutBounds, state.items)
                     item[key] = dots
                 },
                 translate,

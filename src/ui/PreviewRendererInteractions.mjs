@@ -699,7 +699,7 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         this._hoverItemId = entry.id
         const dragItemIds = InteractionUtils.resolveDragItemIds(entry.id, this._selectedItemIds)
         const dragEntries = dragItemIds.map((id) => this._interactiveItemsById.get(id) || null).filter((candidate) => !!candidate)
-        dragEntries.forEach((candidate) => ManualLayoutUtils.pin(candidate.item, candidate.bounds))
+        dragEntries.forEach((candidate) => ManualLayoutUtils.pin(candidate.item, candidate.bounds, this.state.items))
         this._interaction = {
             type: 'drag',
             entries: dragEntries
@@ -775,7 +775,7 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
             this._selectOnlyItem(entry.id)
         }
         const item = entry.item
-        ManualLayoutUtils.pin(item, entry.bounds)
+        ManualLayoutUtils.pin(item, entry.bounds, this.state.items)
         this._activeItemId = entry.id
         this._hoverItemId = entry.id
         this._interaction = {

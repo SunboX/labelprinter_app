@@ -77,7 +77,7 @@ export class PreviewGroupResizeSupport {
         if (entries.length < 2) return
         renderer._interaction = {
             type: 'group-resize',
-            snapshot: SelectionTransformUtils.snapshot(entries),
+            snapshot: SelectionTransformUtils.snapshot(entries, renderer.state.items),
             startRect: { width: event.rect.width, height: event.rect.height },
             edges: { ...event.edges }
         }

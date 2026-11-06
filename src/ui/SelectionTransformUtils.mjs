@@ -8,11 +8,11 @@ import { ManualLayoutUtils } from './ManualLayoutUtils.mjs'
 
 /** Applies one proportional transform to a stable snapshot of a selection. */
 export class SelectionTransformUtils {
-    /** Captures actual visible bounds and pins each selected object. @param {object[]} entries @returns {object} */
-    static snapshot(entries) {
+    /** Captures visible bounds and pins selected objects. @param {object[]} entries @param {object[]} [items] @returns {object} */
+    static snapshot(entries, items = []) {
         const bounds = AlignmentUtils.computeBoundingRect(entries.map((entry) => entry.bounds))
         const members = entries.map((entry) => {
-            ManualLayoutUtils.pin(entry.item, entry.bounds)
+            ManualLayoutUtils.pin(entry.item, entry.bounds, items)
             const original = { ...entry.item }
             if (original.type === 'text' && original._renderedFontSize > 0) original.fontSize = original._renderedFontSize
             return { item: entry.item, original, bounds: { ...entry.bounds } }

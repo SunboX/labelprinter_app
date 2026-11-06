@@ -30,6 +30,7 @@ Notes:
 
 - Group resizing uses one scale factor for dimensions, fonts, strokes, and relative positions. The opposite group corner stays fixed; size limits apply to the whole selection.
 - Moving, resizing, aligning, or editing X/Y pins an object at its visible top-left position in the printable area. Other text growing or wrapping no longer shifts that manually placed object.
+- When an object leaves automatic flow, later flow objects keep their visible positions too. Moving text therefore cannot pull existing rectangles left or shorten the label past them.
 - Automatic flow remains available for objects that have not been manually positioned. Fixed positions survive saving and loading a project.
 - When multiple items are selected, dragging one selected item moves the full selection.
 - Remove an object using the trash icon between its drag handle and collapse arrow, including while the card is collapsed.

@@ -57,9 +57,10 @@ it('edits absolute X/Y from current visible bounds without jumping back to flow 
     globalThis.document = { createElement: () => new Element(), createElementNS: () => new Element() }
     try {
         const item = { xOffset: 4, yOffset: 0, _layoutBounds: { x: 100, y: 30, width: 80, height: 40 } }
+        const following = { type: 'shape', xOffset: -20, _layoutBounds: { x: 160, y: 10, width: 40, height: 40 } }
         const controls = ItemsEditorControlSupport.createOffsetAndRotationControls({
             item,
-            state: { resolution: 'LOW' },
+            state: { resolution: 'LOW', items: [item, following] },
             translate: (key) => key,
             onChange: () => {},
             includeRotation: false
@@ -71,6 +72,9 @@ it('edits absolute X/Y from current visible bounds without jumping back to flow 
         assert.ok(Math.abs(item.xOffset - (15.2 * 180) / 25.4) < 0.000001)
         assert.equal(item.yOffset, 30)
         assert.equal(item.positionAnchor, 'top-left')
+        assert.equal(following.positionAnchor, 'top-left', 'numeric placement preserves downstream flow objects')
+        assert.equal(following.xOffset, 160)
+        assert.equal(following.yOffset, 10)
         const yInput = controls.yOffsetCtrl.children[1].children[1]
         assert.equal(Number(yInput.value), Math.round((30 / (180 / 25.4)) * 100) / 100)
     } finally {

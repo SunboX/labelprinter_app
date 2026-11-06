@@ -289,7 +289,7 @@ export class PreviewRendererBase {
             const { deltaX, deltaY } = AlignmentUtils.computeAlignmentDelta(entry.bounds, referenceRect, alignMode)
             const nextDeltaX = Math.round(deltaX)
             const nextDeltaY = Math.round(deltaY)
-            if (nextDeltaX || nextDeltaY) ManualLayoutUtils.pin(entry.item, entry.bounds)
+            if (nextDeltaX || nextDeltaY) ManualLayoutUtils.pin(entry.item, entry.bounds, this.state.items)
             if (nextDeltaX) {
                 entry.item.xOffset = Math.round((entry.item.xOffset || 0) + nextDeltaX)
                 changed = true
