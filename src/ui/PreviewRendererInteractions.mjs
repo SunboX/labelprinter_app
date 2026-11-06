@@ -8,6 +8,7 @@ import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { Media } from 'labelprinterkit-web/src/index.mjs'
 import { ItemsEditorImageSupport } from './ItemsEditorImageSupport.mjs'
 import { PreviewRendererRender } from './PreviewRendererRender.mjs'
+import { ManualLayoutUtils } from './ManualLayoutUtils.mjs'
 
 /**
  * Interaction layer for selection, dragging, resizing, and inline editing.
@@ -246,10 +247,10 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
      */
     _applyOffsetDelta(item, deltaLeft, deltaTop) {
         if (deltaLeft) {
-            item.xOffset = Math.round((item.xOffset || 0) + deltaLeft)
+            item.xOffset = (Number(item.xOffset) || 0) + deltaLeft
         }
         if (deltaTop) {
-            item.yOffset = Math.round((item.yOffset || 0) + deltaTop)
+            item.yOffset = (Number(item.yOffset) || 0) + deltaTop
         }
     }
 
@@ -634,6 +635,9 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
             return null
         }
         const entry = this._getEntryFromTargetElement(targetElement)
+        if (this._selectedItemIds.size > 1 && this._selectedItemIds.has(entry?.id)) {
+            return { name: 'drag', edges: null }
+        }
         const handle = this._getPointerHandle(pointer, event, targetElement, entry)
         if (this._enablePreviewResize && handle && handle !== 'move') {
             const edges = InteractionUtils.getEdgesFromHandle(handle)
@@ -695,6 +699,7 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         this._hoverItemId = entry.id
         const dragItemIds = InteractionUtils.resolveDragItemIds(entry.id, this._selectedItemIds)
         const dragEntries = dragItemIds.map((id) => this._interactiveItemsById.get(id) || null).filter((candidate) => !!candidate)
+        dragEntries.forEach((candidate) => ManualLayoutUtils.pin(candidate.item, candidate.bounds))
         this._interaction = {
             type: 'drag',
             entries: dragEntries
@@ -721,8 +726,8 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         const dragEntries = this._interaction.entries || []
         dragEntries.forEach((dragEntry) => {
             const item = dragEntry.item
-            item.xOffset = Math.round((item.xOffset || 0) + dxDots)
-            item.yOffset = Math.round((item.yOffset || 0) + dyDots)
+            item.xOffset = (Number(item.xOffset) || 0) + dxDots
+            item.yOffset = (Number(item.yOffset) || 0) + dyDots
         })
         this._debugLog('drag:move', {
             id: entry.id,
@@ -770,6 +775,7 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
             this._selectOnlyItem(entry.id)
         }
         const item = entry.item
+        ManualLayoutUtils.pin(item, entry.bounds)
         this._activeItemId = entry.id
         this._hoverItemId = entry.id
         this._interaction = {

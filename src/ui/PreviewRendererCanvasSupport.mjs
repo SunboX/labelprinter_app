@@ -15,7 +15,7 @@ export class PreviewRendererCanvasSupport {
      * @returns {string}
      */
     static buildTextFontDeclaration({ size, family, bold = false, italic = false }) {
-        const safeSize = Math.max(1, Math.round(Number(size) || 1))
+        const safeSize = Math.max(1, Number(size) || 1)
         const safeFamily = String(family || 'sans-serif')
         const style = italic ? 'italic ' : ''
         const weight = bold ? '700 ' : ''

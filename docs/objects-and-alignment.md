@@ -17,7 +17,7 @@ All object types share these interaction rules:
 - Focus a card and press `Enter` or `Space` to select it with the keyboard.
 - Add/remove selection with `Ctrl` (Windows/Linux) or `Cmd` (macOS) + click.
 - Drag selected object(s) to move them.
-- Resize with visible handle dots (single selection only).
+- Resize one object with its visible handle dots. A multi-selection has four shared corner handles that resize the objects and their spacing proportionally.
 - Rotate using the `Rotation` slider (`-180` to `180` degrees).
 
 Special double-click actions:
@@ -28,7 +28,9 @@ Special double-click actions:
 
 Notes:
 
-- Multi-selection hides resize handles (move + align only).
+- Group resizing uses one scale factor for dimensions, fonts, strokes, and relative positions. The opposite group corner stays fixed; size limits apply to the whole selection.
+- Moving, resizing, aligning, or editing X/Y pins an object at its visible top-left position in the printable area. Other text growing or wrapping no longer shifts that manually placed object.
+- Automatic flow remains available for objects that have not been manually positioned. Fixed positions survive saving and loading a project.
 - When multiple items are selected, dragging one selected item moves the full selection.
 - Remove an object using the trash icon between its drag handle and collapse arrow, including while the card is collapsed.
 - Object cards can be reordered in the **Objects** panel using drag handles; this reorders settings cards only.
@@ -41,6 +43,7 @@ Notes:
 - `Drag` selected object: move object.
 - `Drag` one object within a multi-selection: move whole selection.
 - `Drag` handle dots (single selection): resize.
+- `Drag` a shared corner handle (multi-selection): resize the selection proportionally.
 - `Double-click` text: inline text edit.
 - `Double-click` image: open image picker for that item.
 - `Double-click` icon: open icon picker for that item.

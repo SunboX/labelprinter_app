@@ -12,6 +12,8 @@ import { PreviewRendererCanvasSupport } from './PreviewRendererCanvasSupport.mjs
 import { PreviewRendererBase } from './PreviewRendererBase.mjs'
 import { RulerCanvasUtils } from './RulerCanvasUtils.mjs'
 import { PreviewPositionModeUtils } from './PreviewPositionModeUtils.mjs'
+import { ManualLayoutUtils } from './ManualLayoutUtils.mjs'
+import { PreviewAnchoredLayoutSupport } from './PreviewAnchoredLayoutSupport.mjs'
 
 /**
  * Canvas construction and low-level rendering helpers for preview output.
@@ -64,7 +66,8 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
             if (item.type === 'text') {
                 const resolvedText = ParameterTemplateUtils.resolveTemplateString(item.text || '', parameterValues)
                 const family = item.fontFamily || 'sans-serif'
-                const requestedSizeDots = Math.round((item.fontSize || 16) * textDotScale)
+                const nominalSizeDots = (item.fontSize || 16) * textDotScale
+                const requestedSizeDots = ManualLayoutUtils.isAnchored(item) ? nominalSizeDots : Math.round(nominalSizeDots)
                 const {
                     size: fontSizeDots,
                     advanceWidth: textAdvanceWidth,
@@ -94,6 +97,8 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
                 const scaledAscent = ascent * textVerticalScale
                 const scaledDescent = descent * textVerticalScale
                 const scaledTextHeight = Math.max(1, textTotalHeight * textVerticalScale)
+                item._renderedFontSize = fontSizeDots / textDotScale
+                item._textScaleLimit = maxFontDots / Math.max(1, textTotalHeight)
                 // Keep base flow dimensions stable while dragging; offsets are visual translation only.
                 const span = isHorizontal ? Math.max(textAdvanceWidth, scaledTextHeight) : Math.max(scaledTextHeight + 4, scaledTextHeight)
                 blocks.push({
@@ -280,6 +285,10 @@ export class PreviewRendererCanvasBuild extends PreviewRendererBase {
     _renderFlowBlock({ ctx, block, flowCursor, feedPadStart, canvas, isHorizontal, textDotScale, maxFontDots, layoutItems }) {
         const item = block?.ref
         if (!item) return
+        if (ManualLayoutUtils.isAnchored(item)) {
+            PreviewAnchoredLayoutSupport.render(this, { ctx, block, flowCursor, feedPadStart, canvas, isHorizontal, textDotScale, maxFontDots, layoutItems })
+            return
+        }
 
         if (item.type === 'text') {
             this._renderTextFlowBlock({

@@ -4,6 +4,7 @@
 
 import { ItemsEditorMillimetreControl } from './ItemsEditorMillimetreControl.mjs'
 import { Resolution } from 'labelprinterkit-web/src/index.mjs'
+import { ManualLayoutUtils } from './ManualLayoutUtils.mjs'
 
 /**
  * Shared UI-control helpers for item settings cards.
@@ -158,8 +159,20 @@ export class ItemsEditorControlSupport {
                 label: translate(axis === 0 ? 'itemsEditor.sliderXOffset' : 'itemsEditor.sliderYOffset'),
                 defaultDots: 0,
                 min: -Infinity,
+                getDots: () => ManualLayoutUtils.isAnchored(item)
+                    ? Number(item[key]) || 0
+                    : item._layoutBounds?.[axis === 0 ? 'x' : 'y'] ?? item[key] ?? 0,
+                setDots: (dots) => {
+                    ManualLayoutUtils.pin(item)
+                    item[key] = dots
+                },
                 translate,
-                onChange
+                onChange: () => {
+                    offsets.forEach((control) => {
+                        if (control !== field) ItemsEditorMillimetreControl.sync(control)
+                    })
+                    onChange()
+                }
             })
             field.className += ' offset-field'
             return field

@@ -80,6 +80,8 @@ All items share:
 | `type` | `string` | yes | One of `text`, `qr`, `shape`, `image`, `icon`, `barcode` |
 | `xOffset` | `number` | no | Coerced to number with defaults |
 | `yOffset` | `number` | no | Coerced to number with defaults |
+| `positionMode` | `string` | no | `flow` (default) or `absolute` |
+| `positionAnchor` | `string` | no | `top-left` for manually placed objects; offsets are visible top-left coordinates in the printable area, in dots |
 | `rotation` | `number` | no | Normalized to degrees range |
 
 ### `text` Item

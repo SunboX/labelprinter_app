@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { AlignmentUtils } from '../AlignmentUtils.mjs'
+import { ManualLayoutUtils } from './ManualLayoutUtils.mjs'
 
 /**
  * Base preview renderer state and shared callbacks.
@@ -288,6 +289,7 @@ export class PreviewRendererBase {
             const { deltaX, deltaY } = AlignmentUtils.computeAlignmentDelta(entry.bounds, referenceRect, alignMode)
             const nextDeltaX = Math.round(deltaX)
             const nextDeltaY = Math.round(deltaY)
+            if (nextDeltaX || nextDeltaY) ManualLayoutUtils.pin(entry.item, entry.bounds)
             if (nextDeltaX) {
                 entry.item.xOffset = Math.round((entry.item.xOffset || 0) + nextDeltaX)
                 changed = true

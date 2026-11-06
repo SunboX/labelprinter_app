@@ -17,11 +17,11 @@ export class ItemsEditorMillimetreControl {
      * Builds a numeric input, slider, and buttons with 0.1 mm increments.
      * Existing dot values remain unchanged until the user edits a control.
      * @param {{item: object, state: object, key: string, label: string, axis: number,
-     * defaultDots: number, min?: number, max?: number, unitsPerMm?: number, setDots?: (dots: number) => void,
+     * defaultDots: number, min?: number, max?: number, unitsPerMm?: number, getDots?: () => number, setDots?: (dots: number) => void,
      * translate: Function, onChange: Function}} options
      * @returns {HTMLElement}
      */
-    static createControl({ item, state, key, label, axis, defaultDots, min = 0.1, max = Infinity, unitsPerMm, setDots, translate, onChange }) {
+    static createControl({ item, state, key, label, axis, defaultDots, min = 0.1, max = Infinity, unitsPerMm, getDots, setDots, translate, onChange }) {
         const resolution = Resolution[state.resolution] || Resolution.LOW
         const dotsPerMm = unitsPerMm || resolution.dots[axis] / 25.4
         const labelText = `${label} (mm)`
@@ -46,7 +46,7 @@ export class ItemsEditorMillimetreControl {
         const plus = document.createElement('button')
         /** Refreshes both controls without rounding the stored printer dots. */
         const sync = (preserveInput = false) => {
-            const mm = (item[key] ?? defaultDots) / dotsPerMm
+            const mm = (getDots ? getDots() : item[key] ?? defaultDots) / dotsPerMm
             const displayed = String(Math.round(mm * 100) / 100)
             // Reassigning a number input while typing discards its pending decimal separator.
             if (!preserveInput) input.value = displayed
@@ -75,7 +75,7 @@ export class ItemsEditorMillimetreControl {
             button.append(ItemsEditorImageDimensions.createStepIcon(button === plus))
             button.setAttribute('aria-label', translate(translationKey, { dimension: labelText }))
             button.addEventListener('click', () => {
-                const current = (item[key] ?? defaultDots) / dotsPerMm
+                const current = (getDots ? getDots() : item[key] ?? defaultDots) / dotsPerMm
                 const next = Math.round((current + (button === plus ? 0.1 : -0.1)) * 100) / 100
                 apply(Math.max(min, next))
             })
@@ -84,6 +84,7 @@ export class ItemsEditorMillimetreControl {
             if (input.value.trim()) apply(Number(input.value), false)
         })
         input.addEventListener('change', () => sync())
+        input.addEventListener('focus', () => sync())
         range.addEventListener('input', () => apply(Number(range.value)))
         row.append(minus, input, plus)
         field.append(caption, row, range)

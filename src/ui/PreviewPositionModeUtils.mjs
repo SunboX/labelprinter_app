@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { RotationUtils } from '../RotationUtils.mjs'
+import { ManualLayoutUtils } from './ManualLayoutUtils.mjs'
 
 /**
  * Shared helpers for mixed flow/absolute feed-axis positioning.
@@ -149,6 +150,11 @@ export class PreviewPositionModeUtils {
         let maxEnd = cursor
         blocks.forEach((block) => {
             const item = block.ref || {}
+            if (ManualLayoutUtils.isAnchored(item)) {
+                const bounds = ManualLayoutUtils.estimateBounds(block)
+                maxEnd = Math.max(maxEnd, isHorizontal ? bounds.x + bounds.width + 2 : bounds.y + bounds.height + 2)
+                return
+            }
             if (item.type === 'image') {
                 // Image spans already include rotation; use the same displayed start as drawing.
                 const bounds = RotationUtils.computeRotatedBounds(

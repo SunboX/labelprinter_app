@@ -7,6 +7,8 @@ import { ZoomUtils } from '../ZoomUtils.mjs'
 import { InteractionUtils } from '../InteractionUtils.mjs'
 import { Media } from 'labelprinterkit-web/src/index.mjs'
 import { PreviewRendererCanvasBuild } from './PreviewRendererCanvasBuild.mjs'
+import { PreviewGroupResizeSupport } from './PreviewGroupResizeSupport.mjs'
+import { AlignmentUtils } from '../AlignmentUtils.mjs'
 
 /**
  * Preview rendering and overlay drawing layer.
@@ -332,6 +334,7 @@ export class PreviewRendererRender extends PreviewRendererCanvasBuild {
         this._interactiveItems = layoutItems
             .filter((entry) => InteractionUtils.isInteractiveItemType(entry.type))
             .map((entry) => {
+                entry.item._layoutBounds = { ...entry.bounds }
                 const enriched = {
                     ...entry,
                     boundsCss: {
@@ -416,6 +419,7 @@ export class PreviewRendererRender extends PreviewRendererCanvasBuild {
      */
     _drawOverlay() {
         this._syncHitboxStacking()
+        PreviewGroupResizeSupport.sync(this)
         const overlay = this._overlayCanvas
         if (!overlay) return
         const ctx = overlay.getContext('2d')
@@ -434,6 +438,11 @@ export class PreviewRendererRender extends PreviewRendererCanvasBuild {
         }
         const overlayPadding = this._overlayPadding || 0
         selectedItems.forEach((entry) => this._drawSelectionOutline(ctx, entry.boundsCss, overlayPadding, '#2d7dff', [3, 2]))
+        if (selectedItems.length > 1) {
+            const boundsCss = AlignmentUtils.computeBoundingRect(selectedItems.map((entry) => entry.boundsCss))
+            this._drawSelectionOutline(ctx, boundsCss, overlayPadding, '#2d7dff', [])
+            this._drawSelectionHandles(ctx, { boundsCss, allowedHandles: ['nw', 'ne', 'se', 'sw'] }, overlayPadding)
+        }
         if (!selectedItems.length && hoverItem) {
             this._drawSelectionOutline(ctx, hoverItem.boundsCss, overlayPadding, '#2d7dff', [3, 2])
         }
@@ -487,7 +496,7 @@ export class PreviewRendererRender extends PreviewRendererCanvasBuild {
         const handleStroke = '#e7efff'
         const drawX = x + overlayPadding
         const drawY = y + overlayPadding
-        const allowedHandles = InteractionUtils.getAllowedResizeHandleNames(entry.item)
+        const allowedHandles = entry.allowedHandles || InteractionUtils.getAllowedResizeHandleNames(entry.item)
         const handles = InteractionUtils.computeHandlePositions({ x: drawX, y: drawY, width, height }, allowedHandles)
         handles.forEach((handle) => {
             ctx.beginPath()
