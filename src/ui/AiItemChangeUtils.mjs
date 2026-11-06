@@ -113,7 +113,7 @@ export class AiItemChangeUtils {
                 case 'fontSize': {
                     const numberValue = Number(value)
                     if (!Number.isFinite(numberValue)) return
-                    item.fontSize = Math.max(6, Math.round(numberValue))
+                    item.fontSize = Math.max(6, numberValue)
                     changedKeys.push(key)
                     return
                 }

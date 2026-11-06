@@ -88,7 +88,7 @@ All items share:
 | --- | --- | --- |
 | `text` | `string` | Supports `{{parameter_name}}` placeholders |
 | `fontFamily` | `string` | |
-| `fontSize` | `number` | |
+| `fontSize` | `number` | Nominal font size in CSS pixels (96 px/in); decimal values preserved; editor displays mm |
 | `textBold` | `boolean` | Bold style |
 | `textItalic` | `boolean` | Italic style |
 | `textUnderline` | `boolean` | Underline style |

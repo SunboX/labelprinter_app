@@ -79,6 +79,10 @@ class AppController {
         this.i18n = i18n
         this.urlPrintOptions = { autoPrint: false, skipBatchConfirm: false }
         this.itemsEditor.onChange = this.#handleStateChange.bind(this)
+        this.itemsEditor.onSelectionChange = (ids) => {
+            this.previewRenderer.setSelectedItemIds(ids, { emitChange: false })
+            this.#syncAlignControls()
+        }
         this.parameterPanel.onChange = this.#handleParameterChange.bind(this)
         this.previewRenderer.onSelectionChange = this.#handleSelectionChange.bind(this)
         this.previewRenderer.onItemChange = this.#handlePreviewItemChange.bind(this)

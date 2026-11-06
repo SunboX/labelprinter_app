@@ -84,6 +84,19 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
                 this._interactionElements.delete(id)
             }
         }
+        this._syncHitboxStacking()
+    }
+
+    /** Gives selected objects priority for dragging, resizing, and double-click editing. */
+    _syncHitboxStacking() {
+        const count = this._interactiveItems.length
+        this._interactiveItems.forEach((entry, index) => {
+            const element = this._interactionElements.get(entry.id)
+            if (!element) return
+            const selected = this._selectedItemIds.has(entry.id)
+            const priority = selected ? (entry.id === this._activeItemId ? count * 2 : count) : 0
+            element.style.zIndex = String(priority + index + 1)
+        })
     }
 
     /**
@@ -741,6 +754,7 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         this._interaction = null
         this._activeItemId = null
         this._drawOverlay()
+        this._emitItemChange()
     }
 
     /**
@@ -850,5 +864,6 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         this._interaction = null
         this._activeItemId = null
         this._drawOverlay()
+        this._emitItemChange()
     }
 }

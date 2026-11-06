@@ -9,11 +9,14 @@ import { ItemsEditorBarcodeSupport } from './ItemsEditorBarcodeSupport.mjs'
 import { ItemsEditorGeometrySupport } from './ItemsEditorGeometrySupport.mjs'
 import { ItemsEditorControlSupport } from './ItemsEditorControlSupport.mjs'
 import { ItemsScrollIndicatorUtils } from './ItemsScrollIndicatorUtils.mjs'
+import { ItemsEditorSelectionSupport } from './ItemsEditorSelectionSupport.mjs'
+import { ItemsEditorTextSupport } from './ItemsEditorTextSupport.mjs'
 /**
  * Manages the item list UI, including drag reordering and item controls.
  */
 export class ItemsEditor {
     #onChange = () => {}
+    #onSelectionChange = () => {}
     #translate = (key) => key
     #setStatus = () => {}
     #fontFamilies = FontFamilyUtils.getFallbackFontFamilies()
@@ -40,6 +43,15 @@ export class ItemsEditor {
         this.setStatus = setStatus
         this.selectedItemIds = new Set()
         EditorImageClipboard.bind(this)
+        ItemsEditorSelectionSupport.bind(this)
+    }
+    /** Sets the callback for selection originating in the objects panel. @param {Function} callback */
+    set onSelectionChange(callback) {
+        this.#onSelectionChange = typeof callback === 'function' ? callback : () => {}
+    }
+    /** Returns the panel selection callback. @returns {Function} */
+    get onSelectionChange() {
+        return this.#onSelectionChange
     }
     /**
      * Sets the item change callback.
@@ -520,6 +532,7 @@ export class ItemsEditor {
         const card = document.createElement('div')
         card.className = 'item-card'
         card.draggable = false
+        card.tabIndex = 0
         card.dataset.panelIndex = panelIndex.toString()
         card.dataset.itemId = item.id
         const isCollapsed = this.#collapsedItemIds.has(item.id)
@@ -737,9 +750,11 @@ export class ItemsEditor {
         googleFontHint.textContent = this.translate('itemsEditor.googleFontHint')
         googleFontCtrl.append(googleFontLabel, googleFontRow, googleFontHint)
 
-        const sizeCtrl = this.#createSlider(this.translate('itemsEditor.sliderFontSize'), item.fontSize, 10, 64, 1, (v) => {
-            item.fontSize = v
-            this.#onChange()
+        const sizeCtrl = ItemsEditorTextSupport.createFontSizeControl({
+            item,
+            state: this.state,
+            translate: this.translate,
+            onChange: this.#onChange
         })
 
         const textStyleCtrl = ItemsEditorControlSupport.createToggleButtonGroupField({

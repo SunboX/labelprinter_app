@@ -17,13 +17,13 @@ export class ItemsEditorMillimetreControl {
      * Builds a numeric input, slider, and buttons with 0.1 mm increments.
      * Existing dot values remain unchanged until the user edits a control.
      * @param {{item: object, state: object, key: string, label: string, axis: number,
-     * defaultDots: number, min?: number, max?: number, setDots?: (dots: number) => void,
+     * defaultDots: number, min?: number, max?: number, unitsPerMm?: number, setDots?: (dots: number) => void,
      * translate: Function, onChange: Function}} options
      * @returns {HTMLElement}
      */
-    static createControl({ item, state, key, label, axis, defaultDots, min = 0.1, max = Infinity, setDots, translate, onChange }) {
+    static createControl({ item, state, key, label, axis, defaultDots, min = 0.1, max = Infinity, unitsPerMm, setDots, translate, onChange }) {
         const resolution = Resolution[state.resolution] || Resolution.LOW
-        const dotsPerMm = resolution.dots[axis] / 25.4
+        const dotsPerMm = unitsPerMm || resolution.dots[axis] / 25.4
         const labelText = `${label} (mm)`
         const field = document.createElement('div')
         field.className = 'field image-dimension-field'

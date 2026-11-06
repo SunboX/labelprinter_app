@@ -235,8 +235,9 @@ export class PreviewRendererBase {
     /**
      * Replaces the current interactive selection.
      * @param {string[]} itemIds
+     * @param {{emitChange?: boolean}} [options={}]
      */
-    setSelectedItemIds(itemIds) {
+    setSelectedItemIds(itemIds, { emitChange = true } = {}) {
         const nextIds = new Set(Array.isArray(itemIds) ? itemIds.filter((id) => typeof id === 'string' && id) : [])
         let changed = false
         if (nextIds.size !== this._selectedItemIds.size) {
@@ -251,10 +252,10 @@ export class PreviewRendererBase {
         }
         if (!changed) return
         this._selectedItemIds = nextIds
-        if (this._activeItemId && !this._selectedItemIds.has(this._activeItemId)) {
-            this._activeItemId = null
+        if (!this._selectedItemIds.has(this._activeItemId)) {
+            this._activeItemId = nextIds.values().next().value || null
         }
-        this._emitSelectionChange()
+        if (emitChange) this._emitSelectionChange()
         this._drawOverlay()
     }
 

@@ -415,6 +415,7 @@ export class PreviewRendererRender extends PreviewRendererCanvasBuild {
      * Draws selection handles for the active or hovered item.
      */
     _drawOverlay() {
+        this._syncHitboxStacking()
         const overlay = this._overlayCanvas
         if (!overlay) return
         const ctx = overlay.getContext('2d')

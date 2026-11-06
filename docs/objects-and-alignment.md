@@ -12,7 +12,9 @@ This document describes every object type that can be placed on a label, its edi
 
 All object types share these interaction rules:
 
-- Select by clicking an object in the preview.
+- Select by clicking an object in the preview or its card in the **Objects** panel.
+- A selected object takes priority for pointer interaction when objects overlap, including drag, resize, and double-click actions. This does not change the drawing or print order.
+- Focus a card and press `Enter` or `Space` to select it with the keyboard.
 - Add/remove selection with `Ctrl` (Windows/Linux) or `Cmd` (macOS) + click.
 - Drag selected object(s) to move them.
 - Resize with visible handle dots (single selection only).
@@ -53,7 +55,7 @@ Properties:
 
 - `text`: displayed text content (supports `{{parameter_name}}` placeholders).
 - `fontFamily`: selected font family (local + added Google fonts).
-- `fontSize`: text size.
+- `fontSize`: nominal font-em size, edited in mm with decimal inputs, sliders, and 0.1 mm step buttons. Projects retain fractional CSS pixels (96 px per inch) for compatibility; glyph height depends on the font and existing tape fitting.
 - `textBold`: bold style toggle.
 - `textItalic`: italic style toggle.
 - `textUnderline`: underline style toggle.
