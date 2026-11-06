@@ -4,6 +4,7 @@
 
 import { QrSizeUtils } from '../QrSizeUtils.mjs'
 import { RotationUtils } from '../RotationUtils.mjs'
+import { BarcodeUtils } from '../BarcodeUtils.mjs'
 
 /**
  * Normalization and mutation helpers for assistant-driven item updates.
@@ -119,14 +120,14 @@ export class AiItemChangeUtils {
                 case 'barcodeModuleWidth': {
                     const numberValue = Number(value)
                     if (!Number.isFinite(numberValue)) return
-                    item.barcodeModuleWidth = Math.max(1, Math.round(numberValue))
+                    item.barcodeModuleWidth = BarcodeUtils.normalizeModuleWidth(numberValue)
                     changedKeys.push(key)
                     return
                 }
                 case 'barcodeMargin': {
                     const numberValue = Number(value)
                     if (!Number.isFinite(numberValue)) return
-                    item.barcodeMargin = Math.max(0, Math.round(numberValue))
+                    item.barcodeMargin = BarcodeUtils.normalizeMargin(numberValue)
                     changedKeys.push(key)
                     return
                 }

@@ -6,6 +6,8 @@ import { BarcodeUtils } from '../BarcodeUtils.mjs'
 import { RotationUtils } from '../RotationUtils.mjs'
 import { ItemsEditorImageSupport } from './ItemsEditorImageSupport.mjs'
 import { ItemsEditorControlSupport } from './ItemsEditorControlSupport.mjs'
+import { ItemsEditorMillimetreControl } from './ItemsEditorMillimetreControl.mjs'
+import { Resolution } from 'labelprinterkit-web/src/index.mjs'
 
 /**
  * Shared barcode-item helpers for the items editor.
@@ -82,28 +84,33 @@ export class ItemsEditorBarcodeSupport {
             onChange,
             createSlider
         })
-        const moduleWidthCtrl = createSlider(
-            translate('itemsEditor.barcodeModuleWidth'),
-            item.barcodeModuleWidth ?? 2,
-            1,
-            6,
-            1,
-            (value) => {
-                item.barcodeModuleWidth = value
-                onChange()
-            }
-        )
-        const marginCtrl = createSlider(
-            translate('itemsEditor.barcodeMargin'),
-            item.barcodeMargin ?? 0,
-            0,
-            30,
-            1,
-            (value) => {
-                item.barcodeMargin = value
-                onChange()
-            }
-        )
+        const dotsPerMm = (Resolution[state.resolution] || Resolution.LOW).dots[0] / 25.4
+        const moduleWidthCtrl = ItemsEditorMillimetreControl.createControl({
+            item,
+            state,
+            key: 'barcodeModuleWidth',
+            label: translate('itemsEditor.barcodeModuleWidth'),
+            axis: 0,
+            defaultDots: 2,
+            min: 0.1,
+            max: 6 / dotsPerMm,
+            translate,
+            onChange
+        })
+        const marginCtrl = ItemsEditorMillimetreControl.createControl({
+            item,
+            state,
+            key: 'barcodeMargin',
+            label: translate('itemsEditor.barcodeMargin'),
+            axis: 0,
+            defaultDots: 0,
+            min: 0,
+            max: 30 / dotsPerMm,
+            translate,
+            onChange
+        })
+        moduleWidthCtrl.className += ' size-field'
+        marginCtrl.className += ' size-field'
 
         const { field: formatCtrl } = ItemsEditorControlSupport.createSelectField({
             labelText: translate('itemsEditor.barcodeFormat'),

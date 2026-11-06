@@ -657,7 +657,7 @@ function buildBarcodeCanvas(value, width, height, item) {
         barcodeRuntime(source, normalizedValue, {
             format: normalizedOptions.barcodeFormat,
             displayValue: showText,
-            width: Math.max(1, Number(normalizedOptions.barcodeModuleWidth) || 2),
+            width: Math.max(0.1, Number(normalizedOptions.barcodeModuleWidth) || 2),
             height: drawHeight,
             margin: Math.max(0, Number(normalizedOptions.barcodeMargin) || 0),
             lineColor: '#000000',
@@ -718,8 +718,8 @@ function normalizeBarcodeOptions(item) {
     return {
         barcodeFormat: normalizeBarcodeFormat(source.barcodeFormat ?? source.format),
         barcodeShowText: normalizeBoolean(source.barcodeShowText ?? source.displayValue, false),
-        barcodeModuleWidth: clampInteger(source.barcodeModuleWidth ?? source.moduleWidth, 1, 6, 2),
-        barcodeMargin: clampInteger(source.barcodeMargin ?? source.margin, 0, 30, 0)
+        barcodeModuleWidth: clampNumber(source.barcodeModuleWidth ?? source.moduleWidth, 0.1, 6, 2),
+        barcodeMargin: clampNumber(source.barcodeMargin ?? source.margin, 0, 30, 0)
     }
 }
 
@@ -761,15 +761,15 @@ function normalizeBarcodeFormat(value) {
 }
 
 /**
- * Clamps one numeric value as integer.
+ * Clamps one numeric value without discarding fractional dots.
  * @param {unknown} value
  * @param {number} min
  * @param {number} max
  * @param {number} fallback
  * @returns {number}
  */
-function clampInteger(value, min, max, fallback) {
-    const numeric = Math.round(Number(value))
+function clampNumber(value, min, max, fallback) {
+    const numeric = Number(value)
     if (!Number.isFinite(numeric)) return fallback
     return Math.max(min, Math.min(max, numeric))
 }

@@ -32,7 +32,7 @@ export class BarcodeUtils {
     static #defaultShowText = false
     static #defaultModuleWidth = 2
     static #defaultMargin = 0
-    static #minModuleWidth = 1
+    static #minModuleWidth = 0.1
     static #maxModuleWidth = 6
     static #minMargin = 0
     static #maxMargin = 30
@@ -65,23 +65,23 @@ export class BarcodeUtils {
     }
 
     /**
-     * Normalizes the barcode module width in pixels.
+     * Normalizes the barcode module width in dots, preserving decimal mm edits.
      * @param {unknown} value
      * @returns {number}
      */
     static normalizeModuleWidth(value) {
-        const numeric = Math.round(Number(value))
+        const numeric = Number(value)
         if (!Number.isFinite(numeric)) return BarcodeUtils.#defaultModuleWidth
         return Math.max(BarcodeUtils.#minModuleWidth, Math.min(BarcodeUtils.#maxModuleWidth, numeric))
     }
 
     /**
-     * Normalizes the barcode quiet zone margin in pixels.
+     * Normalizes the barcode quiet zone margin in dots, preserving decimal mm edits.
      * @param {unknown} value
      * @returns {number}
      */
     static normalizeMargin(value) {
-        const numeric = Math.round(Number(value))
+        const numeric = Number(value)
         if (!Number.isFinite(numeric)) return BarcodeUtils.#defaultMargin
         return Math.max(BarcodeUtils.#minMargin, Math.min(BarcodeUtils.#maxMargin, numeric))
     }

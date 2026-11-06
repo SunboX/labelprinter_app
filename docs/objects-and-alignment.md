@@ -103,12 +103,13 @@ Properties:
 - `rotation`: rotation in degrees.
 - `barcodeFormat`: barcode symbology (for example `CODE128`, `CODE39`, `EAN13`, `ITF14`).
 - `barcodeShowText`: show/hide human-readable text below bars.
-- `barcodeModuleWidth`: bar module width.
-- `barcodeMargin`: quiet-zone margin around bars.
+- `barcodeModuleWidth`: bar module width in dots, shown and edited in mm with 0.1 mm steps.
+- `barcodeMargin`: quiet-zone margin in dots, shown and edited in mm with 0.1 mm steps (including zero).
 
 Handling:
 
 - The preview and print output use the same barcode generation pipeline.
+- Module width and margin retain decimal dot values when saving/loading projects; their mm controls use the horizontal print resolution.
 - Invalid barcode payload/format combinations show a visible placeholder block instead of breaking rendering.
 - Width/height are constrained to the printable cross-axis based on orientation/media, similar to images/icons.
 

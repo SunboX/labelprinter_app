@@ -152,8 +152,8 @@ Legacy QR aliases are also normalized:
 | `height` | `number` | Minimum constrained |
 | `barcodeFormat` | `string` | JsBarcode format |
 | `barcodeShowText` | `boolean` | Human-readable text |
-| `barcodeModuleWidth` | `number` | Module width |
-| `barcodeMargin` | `number` | Quiet zone |
+| `barcodeModuleWidth` | `number` | Module width in dots; decimal values preserved; editor displays mm |
+| `barcodeMargin` | `number` | Quiet zone in dots; decimal values preserved; editor displays mm |
 
 Legacy barcode aliases are also normalized:
 

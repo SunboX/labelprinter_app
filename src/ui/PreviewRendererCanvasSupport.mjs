@@ -185,7 +185,7 @@ export class PreviewRendererCanvasSupport {
             jsBarcode(canvas, value, {
                 format: options?.barcodeFormat || BarcodeUtils.getDefaultFormat(),
                 displayValue: showText,
-                width: Math.max(1, Number(options?.barcodeModuleWidth) || 2),
+                width: Math.max(0.1, Number(options?.barcodeModuleWidth) || 2),
                 height: drawHeight,
                 margin: Math.max(0, Number(options?.barcodeMargin) || 0),
                 lineColor: '#000000',
