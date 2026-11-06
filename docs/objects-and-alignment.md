@@ -16,6 +16,7 @@ All object types share these interaction rules:
 - A selected object takes priority for pointer interaction when objects overlap, including drag, resize, and double-click actions. This does not change the drawing or print order.
 - Focus a card and press `Enter` or `Space` to select it with the keyboard.
 - Add/remove selection with `Ctrl` (Windows/Linux) or `Cmd` (macOS) + click.
+- Click the empty label area, the gray preview background, or a ruler to clear the selection.
 - Drag selected object(s) to move them.
 - Resize one object with its visible handle dots. A multi-selection has four shared corner handles that resize the objects and their spacing proportionally.
 - Rotate using the `Rotation` slider (`-180` to `180` degrees).

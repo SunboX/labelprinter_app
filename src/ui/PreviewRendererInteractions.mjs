@@ -27,11 +27,13 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
         layer.style.top = '0'
         layer.style.pointerEvents = 'auto'
         layer.style.zIndex = '3'
-        layer.addEventListener('pointerdown', this._handleLayerPointerDown)
         layer.addEventListener('contextmenu', this._handleInteractionContextMenu)
         if (this.els.canvasWrap) {
             this.els.canvasWrap.appendChild(layer)
         }
+        // Listen on the whole preview stage, including the gray background and rulers.
+        const selectionSurface = this.els.canvasWrap?.closest?.('.stage') || this.els.canvasWrap || layer
+        selectionSurface.addEventListener('pointerdown', this._handleLayerPointerDown)
         this._interactionLayer = layer
         return layer
     }
@@ -442,15 +444,16 @@ export class PreviewRendererInteractions extends PreviewRendererRender {
     }
 
     /**
-     * Handles layer pointer down to clear selection when clicking empty space.
+     * Clears selection on empty label space or the surrounding preview stage.
      * @param {PointerEvent} event
      */
     _handleLayerPointerDown(event) {
+        if (this._interaction || (event.button != null && event.button !== 0)) return
+        if (event.target.closest?.('.preview-hitbox, .preview-group-hitbox, .preview-inline-text-editor')) return
         if (this._inlineTextEditor) {
             this._commitInlineTextEdit({ applyChanges: true })
         }
-        if (event.target !== this._interactionLayer) return
-        if (InteractionUtils.isAdditiveSelectionModifier(event)) {
+        if (event.target === this._interactionLayer && InteractionUtils.isAdditiveSelectionModifier(event)) {
             event.preventDefault()
             return
         }
